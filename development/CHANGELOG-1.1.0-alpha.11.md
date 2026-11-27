@@ -8,3 +8,5 @@
 - Original drone caps and other combat families unchanged.
 - Tests added: skill prerequisites, refresh pricing, reserve eligibility and separate cameras. Full Android CI and device tests pending.
 - Debug APK assembly explicitly requested; CI APK is intermediate only. Stable private test signing key and fingerprint verification required before distribution; no private credentials in repository.
+- Old campaign migration derives missed skill points from cleared stages, and an exhausted old shop can immediately stock the new reserve cards once. Current checkpoint preserves consumed refresh count and ranks.
+- Additional regression fixtures exercise an entirely capped stage-17 shop, skill catch-up and checkpoint round-trip. No results claimed until CI finishes.

@@ -49,3 +49,8 @@
 
 ## Alpha.10 physical drones
 - DroneSpec and DroneWing own all friendly drone limits; maximum eight live units per player, fixed slots, host-authoritative contact, serial respawn from reload, no drone bullet emission. Preserve bounded snapshots and checkpoint FORMAT=7. Both multiplayer peers need wire 24. Camera follows local player; default 1.60, close 1.85, full arena 1.0. No automatic difficulty changes based on player skill. Alpha.9 Arsenal other frame values remain. Source-only work unless APK explicitly requested.
+
+## Alpha.11 progression and camera
+- Skill IDs 10–18 are appended perk bits; original boss perks remain 0–9. Skill points are earned at stages 7/13/19/26/32/38/44 and recovered from cleared-stage count on older saves; maximum seven points in a normal run. Three independent ranks per branch. No account grind, no new serialized field. Core theft excludes skill bits.
+- Reserve upgrade IDs 20–22 are appended; available only from stage 15. Checkpoint FORMAT=7 uses its existing upgrade-count header; wire version 25 rejects old peers. Preserve three paid slots, locks, free/paid reroll accounting, and local camera only in multiplayer.
+- Assemble only debug APK as an intermediate after unit tests pass; never deliver until pinned permanent test signer, package, monotonic versionCode and APK hash are independently verified.

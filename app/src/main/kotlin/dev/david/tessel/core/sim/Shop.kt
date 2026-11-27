@@ -45,10 +45,7 @@ class Shop {
     private fun offerPerks(w: World, p: Int) {
         offers[p].fill(-1)
         if (offerEvolution(w,p)) return
-        if (w.devBoss < 0 && SkillTree.milestone(w.stage)) {
-            for (branch in 0 until Perks.OFFERED) offers[p][branch] = SkillTree.next(w.players.perks[p], branch)
-            return
-        }
+        if (w.stage % Bestiary.BOSS_EVERY != 0 && offerSkills(w,p)) return
         if (w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
         var n = 0
         val free = IntArray(Perks.count)
@@ -60,6 +57,13 @@ class Shop {
             free[pick] = held
             offers[p][slot] = free[slot]
         }
+    }
+
+    /** Derive earned points from cleared stages, including migrated older runs. */
+    private fun offerSkills(w: World,p: Int): Boolean {
+        if(w.devBoss >= 0 || SkillTree.unspent(w.stage,w.players.perks[p]) == 0) return false
+        for(branch in 0 until Perks.OFFERED) offers[p][branch] = SkillTree.next(w.players.perks[p],branch)
+        return offers[p].any { it >= 0 }
     }
 
     /** Perk id offered in [slot], or -1. */
@@ -113,6 +117,7 @@ class Shop {
             pl.hp[p] = min(pl.hp[p] + 2, pl.maxHp[p])
         }
         offers[p].fill(-1)
+        if(SkillTree.isNode(k)) offerSkills(w,p)
         return true
     }
 
@@ -235,6 +240,11 @@ class Shop {
             if (!cp.stockSaved[p]) restock(w, p)
             cp.perkOffer[p].copyInto(offers[p])
             if(offerEvolution(w,p)) offers[p].fill(-1)
+            else if(w.stage % Bestiary.BOSS_EVERY != 0 && offers[p].none { it >= 0 }) offerSkills(w,p)
+            // One-time migration: an alpha.10 shop with no remaining cards can
+            // immediately offer new reserves instead of requiring a paid refresh.
+            if(cp.loadedUpgradeCount <= Upgrades.RESERVE_POWER && w.stage >= 15 &&
+                (0 until SHOP_SLOTS).all { maxed(w,p,it) }) restock(w,p)
             // Old saved offers may contain retired cards.
             for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && (!Upgrades.availableAt(item(p,slot),w.stage) || !Upgrades.offered(item(p,slot),w.players.evolution[p]))) {
                 val available=(0 until Upgrades.count).filter { u -> Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }

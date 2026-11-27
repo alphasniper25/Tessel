@@ -62,6 +62,7 @@ object SkillTree {
     private val milestones = intArrayOf(7, 13, 19, 26, 32, 38, 44)
     private val roots = intArrayOf(Perks.REFRESH_I, Perks.FORTUNE_I, Perks.TRADE_I)
     fun milestone(stage: Int) = stage in milestones
+    fun unspent(stage: Int, mask: Int) = (milestones.count { it <= stage } - Integer.bitCount(mask and MASK)).coerceAtLeast(0)
     fun isNode(id: Int) = id in Perks.REFRESH_I..Perks.TRADE_III
     fun rank(mask: Int, branch: Int): Int {
         val root = roots[branch]

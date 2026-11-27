@@ -44,6 +44,7 @@ class Checkpoint(
     val locked = Array(MAX_PLAYERS) { BooleanArray(SHOP_SLOTS) }
     val quotes = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) }
     val stockSaved = BooleanArray(MAX_PLAYERS)
+    internal var loadedUpgradeCount = Upgrades.count
     val lastEvolutionStage = IntArray(MAX_PLAYERS)
     val upgradeSpent = Array(MAX_PLAYERS) { IntArray(Upgrades.count) }
     val evolution = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankEvolution.BASIC }
@@ -146,6 +147,7 @@ class Checkpoint(
                 val upgrades = buf.get().toInt() and 0xFF
                 val slots = buf.get().toInt() and 0xFF
                 val cp = Checkpoint(difficulty, stage, tick, players, inShop, bosses)
+                cp.loadedUpgradeCount = upgrades
                 for (p in 0 until players) {
                     cp.present[p] = buf.get().toInt() != 0
                     cp.ids[p] = buf.long

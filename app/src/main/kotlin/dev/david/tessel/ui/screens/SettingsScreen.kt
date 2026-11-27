@@ -122,6 +122,7 @@ fun SettingsScreen(
                 Group("Display") {
                     Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
                         Text("Camera zoom", Type.body, c.ink)
+                        Text("Full arena is solo-only; multiplayer follows your own tank.", Type.footnote, c.ink2)
                         Segmented(listOf("Full arena", "Closer", "Close"), listOf(1f, 1.60f, 1.85f).indexOf(settings.cameraZoom).coerceAtLeast(0), { i -> onChange { it.copy(cameraZoom = listOf(1f, 1.60f, 1.85f)[i]) } })
                     }
                     Divider()

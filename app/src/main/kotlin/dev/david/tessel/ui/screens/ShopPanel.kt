@@ -119,7 +119,7 @@ fun ShopPanel(
 
         if (shop.perkOffers.isEmpty()) {
             if (shop.offers.all { it.empty || it.maxed } && !shop.canReroll)
-                Text("All available upgrades mastered. Heal or continue to the next stage.", Type.footnote, c.ink3)
+                Text("No cards available right now. Heal, refresh when affordable, or continue.", Type.footnote, c.ink3)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (offer in shop.offers) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -166,7 +166,10 @@ private fun OfferTile(offer: ShopOffer, modifier: Modifier, enabled: Boolean, on
         onClick = onBuy,
         modifier = modifier,
     ) {
-        if (!offer.empty) LevelPips(offer.level, offer.maxLevel)
+        if (!offer.empty) {
+            if(offer.maxLevel > 20) Text("Rank ${offer.level} / ${offer.maxLevel}", Type.footnote, c.ink2)
+            else LevelPips(offer.level, offer.maxLevel)
+        }
         Spacer(Modifier.weight(1f))
         if (offer.empty) {
             Text("Sold / empty", Type.footnote, c.ink3)
