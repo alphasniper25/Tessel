@@ -10,6 +10,8 @@ import dev.david.tessel.core.sim.SHOP_SLOTS
 
 /** One decoded host snapshot, as the client keeps it. Reused, never reallocated. */
 class Snapshot {
+    val droneHp=IntArray(dev.david.tessel.core.sim.DroneWing.CAPACITY)
+    val droneX=FloatArray(droneHp.size);val droneY=FloatArray(droneHp.size);val droneAngle=FloatArray(droneHp.size)
     var tick = 0
     var stage = 1
     var phase = Phase.FIGHT

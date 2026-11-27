@@ -788,15 +788,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                     val pl = shown.players
                     viewport.follow(canvas.width, canvas.height, if (practice != null) 1f else renderer.zoom,
                         pl.prevX[me] + (pl.x[me]-pl.prevX[me])*blend, pl.prevY[me] + (pl.y[me]-pl.prevY[me])*blend)
-                    if (shown.playerCount > 1) {
-                        var loX = pl.x[me]; var hiX = loX; var loY = pl.y[me]; var hiY = loY
-                        for (p in 0 until shown.playerCount) if (pl.present[p]) {
-                            val x = pl.prevX[p] + (pl.x[p] - pl.prevX[p]) * blend
-                            val y = pl.prevY[p] + (pl.y[p] - pl.prevY[p]) * blend
-                            loX = minOf(loX, x); hiX = maxOf(hiX, x); loY = minOf(loY, y); hiY = maxOf(hiY, y)
-                        }
-                        viewport.followTeam(canvas.width, canvas.height, renderer.zoom, loX, hiX, loY, hiY)
-                    }
+                    // A player's chosen zoom is stable even when the team separates.
+                    // Off-screen teammates get colored edge markers in Renderer.
                     renderer.names = names
                     renderer.draw(canvas, shown, blend, viewport, shards, moveView, aimView, me)
                     val inset = cutout

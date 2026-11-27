@@ -387,6 +387,8 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             }
         }
 
+        val wing=v.droneWing
+        for(i in wing.hp.indices){wing.hp[i]=to.droneHp[i];if(wing.hp[i]<=0)continue;val x=if(from.droneHp[i]>0)from.droneX[i]+(to.droneX[i]-from.droneX[i])*t else to.droneX[i];val y=if(from.droneHp[i]>0)from.droneY[i]+(to.droneY[i]-from.droneY[i])*t else to.droneY[i];wing.x[i]=x;wing.y[i]=y;wing.prevX[i]=x;wing.prevY[i]=y;wing.angle[i]=to.droneAngle[i]}
         val bullets = v.bullets
         bullets.clear()
         for (i in 0 until ghosts.count) {
@@ -602,7 +604,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
     }
 
     private fun ghostVolley(s: Snapshot, who: Int, x: Float, y: Float, aimX: Float, aimY: Float) {
-        if (who == me || who !in 0 until s.playerCount) return
+        if (who == me || who !in 0 until s.playerCount || s.evolution[who].drones) return
         val speed = s.bulletSpeed[who]
         if (speed <= 0f) return
         val life = (s.range[who] / speed * TICK_HZ).toInt()
@@ -613,7 +615,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         for (k in 0 until n) {
             val origin=frame.originAngle(aim,k,n); val offset=if(frame.drones)0f else frame.offset(k,n)
             val ox=x+cos(origin)*muzzle-aimY*offset; val oy=y+sin(origin)*muzzle+aimX*offset
-            val a=if(frame.drones)frame.droneAim(aim,ox,oy,s.range[who],s.enemyCount,{s.enemyX[it]},{s.enemyY[it]},{s.enemyHp[it]>0f})else origin
+            val a=origin
             ghosts.add(ghostId--, ox, oy, cos(a)*speed, sin(a)*speed, life, 0f, s.bulletRadius[who], s.pierce[who], who)
         }
     }

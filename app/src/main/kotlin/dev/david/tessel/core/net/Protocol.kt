@@ -144,6 +144,10 @@ object Protocol {
             buf.put(pl.poisonTicks[p].coerceIn(0,255).toByte())
         }
 
+        val wing=w.droneWing
+        var droneCount=0;for(i in wing.hp.indices)if(wing.hp[i]>0)droneCount++
+        buf.put(droneCount.toByte())
+        for(i in wing.hp.indices)if(wing.hp[i]>0){buf.put(i.toByte());buf.put(wing.hp[i].toByte());Wire.putPos(buf,wing.x[i]);Wire.putPos(buf,wing.y[i]);buf.put((wing.angle[i]*ANGLE_SCALE).toInt().coerceIn(-127,127).toByte())}
         val e = w.enemies
         buf.putShort(e.count.toShort())
         for (i in 0 until e.count) {
@@ -297,6 +301,9 @@ object Protocol {
             s.poisonTicks[p]=buf.get().toInt() and 255
         }
 
+        s.droneHp.fill(0)
+        val dc=buf.get().toInt() and 255;require(dc<=s.droneHp.size)
+        repeat(dc){val i=buf.get().toInt() and 255;require(i in s.droneHp.indices && s.droneHp[i]==0);s.droneHp[i]=buf.get().toInt() and 255;require(s.droneHp[i] in 1..7);s.droneX[i]=Wire.getPos(buf);s.droneY[i]=Wire.getPos(buf);s.droneAngle[i]=buf.get()/ANGLE_SCALE}
         s.enemyCount = buf.short.toInt().coerceIn(0, MAX_ENEMIES)
         s.enemyIndex.clear()
         for (i in 0 until s.enemyCount) {

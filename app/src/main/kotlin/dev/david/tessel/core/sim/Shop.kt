@@ -226,7 +226,11 @@ class Shop {
             cp.perkOffer[p].copyInto(offers[p])
             if(offerEvolution(w,p)) offers[p].fill(-1)
             // Old saved offers may contain retired cards.
-            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && !Upgrades.offered(item(p,slot),w.players.evolution[p])) {stock[p][slot]=-1;locks[p][slot]=false;quotes[p][slot]=0}
+            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && !Upgrades.offered(item(p,slot),w.players.evolution[p])) {
+                val available=(0 until Upgrades.count).filter { u -> Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }
+                stock[p][slot]=if(available.isEmpty()) -1 else CardCode.pack(available[w.rng.int(0,available.lastIndex)],CardRarity.COMMON)
+                locks[p][slot]=false;quotes[p][slot]=0
+            }
         }
     }
 

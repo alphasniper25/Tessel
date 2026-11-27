@@ -47,11 +47,11 @@ object Upgrades {
 
     private val defs = arrayOf(
         UpgradeDef("Damage", "+15% damage per bullet", basePrice = 10, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
-        UpgradeDef("Fire Rate", "+10% shots per second", basePrice = 13, maxLevel = 20, step = 0.10f, stat = UpgradeStat.FIRE_RATE),
+        UpgradeDef("Fire Rate", "+10% shot or drone replacement rate", basePrice = 13, maxLevel = 20, step = 0.10f, stat = UpgradeStat.FIRE_RATE),
         UpgradeDef("Multishot", "One more bullet per shot", basePrice = 31, maxLevel = 8, step = 1f, stat = UpgradeStat.VOLLEY),
         UpgradeDef("Velocity", "+10% bullet speed", basePrice = 7, maxLevel = 10, step = 0.10f, stat = UpgradeStat.VELOCITY),
         UpgradeDef("Pierce", "Bullets go through one more enemy", basePrice = 28, maxLevel = 5, step = 1f, stat = UpgradeStat.PIERCE),
-        UpgradeDef("Range", "+12% bullet range", basePrice = 7, maxLevel = 10, step = 0.12f, stat = UpgradeStat.RANGE),
+        UpgradeDef("Range", "+12% bullet range; drones gain half as much command range", basePrice = 7, maxLevel = 10, step = 0.12f, stat = UpgradeStat.RANGE),
         UpgradeDef("Speed", "+6% move speed", basePrice = 10, maxLevel = 10, step = 0.06f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED),
         UpgradeDef("Max Health", "One more health pip, filled", basePrice = 21, maxLevel = 10, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.MAX_HP),
         UpgradeDef("Wealth", "+15% coin value", basePrice = 18, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY, stat = UpgradeStat.WEALTH),
@@ -65,7 +65,7 @@ object Upgrades {
         UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 168, maxLevel = 1, step = 0.8f, family = CardFamily.GUN, stat = UpgradeStat.DAMAGE_BONUS),
         UpgradeDef("Regeneration", "Recover health during combat; each level shortens the interval", basePrice=20, maxLevel=3, step=1f, family=CardFamily.HEALTH, stat=UpgradeStat.REGEN),
         UpgradeDef("Shield Recharge", "12% faster impact shield recovery", basePrice=23, maxLevel=4, step=.12f, family=CardFamily.RAM, stat=UpgradeStat.SHIELD_RECHARGE),
-        UpgradeDef("Drone Power", "+10% drone projectile damage", basePrice=18, maxLevel=5, step=.10f, stat=UpgradeStat.DRONE_POWER),
+        UpgradeDef("Drone Power", "+10% drone impact damage", basePrice=18, maxLevel=5, step=.10f, stat=UpgradeStat.DRONE_POWER),
     )
 
     val count get() = defs.size
@@ -73,6 +73,7 @@ object Upgrades {
         if(id==MULTISHOT || id==VELOCITY) return false
         if(id==SHIELD_RECHARGE) return frame.melee
         if(id==DRONE_POWER) return frame.drones
+        if(frame.drones && (id==PIERCE || id==CALIBER)) return false
         if(frame.melee && (id==FIRE_RATE || id==PIERCE || id==RANGE || id==CALIBER || id==CORE_BREAKER)) return false
         if(!frame.melee && frame!=TankEvolution.BASIC && id==RAM_DAMAGE) return false
         return true
@@ -112,11 +113,11 @@ object Upgrades {
         }
         return when (id) {
             DAMAGE -> "${pct(defs[id].step)} damage per bullet"
-            FIRE_RATE -> "${pct(defs[id].step)} shots per second"
+            FIRE_RATE -> "${pct(defs[id].step)} firing / drone replacement rate"
             MULTISHOT -> "$more more bullets per shot"
             VELOCITY -> "${pct(defs[id].step)} bullet speed"
             PIERCE -> "Bullets go through ${more.lowercase()} more enemies"
-            RANGE -> "${pct(defs[id].step)} bullet range"
+            RANGE -> "${pct(defs[id].step)} bullet range (half for drones)"
             SPEED -> "${pct(defs[id].step)} move speed"
             MAX_HEALTH -> "$more more health pips, filled"
             WEALTH -> "${pct(defs[id].step)} coin value"

@@ -31,15 +31,15 @@ class TankArt {
         val facet = if (paint == 0 || hurt) defaultFacet else cosmeticFacets[look.paint]
         line.color = body; line.alpha = alpha; line.strokeCap = Paint.Cap.ROUND; line.strokeWidth = r * .5f
         val turret = GarageCatalog.items[look.turret]
-        val n=evolution.barrels
+        val n=if(evolution.drones) minOf(4,evolution.barrels) else evolution.barrels
         val aim=atan2(ay,ax)
         val length=if(evolution==TankEvolution.BASIC) turret.barrelLength else evolution.length
         for(k in 0 until n){
             val a=evolution.originAngle(aim,k,n); val dx=cos(a); val dy=sin(a)
             val off=if(evolution.drones)0f else (k-(n-1)/2f)*evolution.lateral*r; val ox=-ay*off; val oy=ax*off
             if(evolution.drones){
-                val cx=x+dx*r*evolution.lateral+ox; val cy=y+dy*r*evolution.lateral+oy
-                line.strokeWidth=r*.11f; c.drawLine(x+dx*r*.7f,y+dy*r*.7f,cx,cy,line)
+                val cx=x+dx*r*1.35f+ox; val cy=y+dy*r*1.35f+oy
+                line.strokeWidth=r*.30f; c.drawLine(x+dx*r*.65f,y+dy*r*.65f,x+dx*r*1.35f,y+dy*r*1.35f,line)
                 fill.color=body;fill.alpha=alpha;hull.reset();hull.moveTo(cx+dx*r*.36f,cy+dy*r*.36f)
                 hull.lineTo(cx-dx*r*.30f-dy*r*.27f,cy-dy*r*.30f+dx*r*.27f);hull.lineTo(cx-dx*r*.30f+dy*r*.27f,cy-dy*r*.30f-dx*r*.27f);hull.close();c.drawPath(hull,fill)
             } else {

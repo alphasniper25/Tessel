@@ -64,12 +64,7 @@ class Pilot {
         x = (x + mx * travel).coerceIn(r, ARENA_W - r)
         y = (y + my * travel).coerceIn(r, ARENA_H - r)
 
-        var ax=input.aimX; var ay=input.aimY; var firing=input.fire
-        if(s.evolution[me].drones && !firing){
-            var best=s.range[me]*s.range[me]; var target=-1
-            for(j in 0 until s.enemyCount){val dx=s.enemyX[j]-x;val dy=s.enemyY[j]-y;val ds=dx*dx+dy*dy;if(ds<best){best=ds;target=j}}
-            if(target>=0){ax=s.enemyX[target]-x;ay=s.enemyY[target]-y;firing=true}
-        }
+        val ax=input.aimX; val ay=input.aimY; val firing=input.fire
         val aimLen = sqrt(ax*ax+ay*ay)
         val aiming = aimLen > 0.0001f
         if (aiming) {
@@ -77,6 +72,7 @@ class Pilot {
             aimY = ay / aimLen
         }
 
+        if(s.evolution[me].drones) shots.clear()
         shots.remember()
         for (i in 0 until shots.count) {
             shots.x[i] += shots.vx[i] * TICK_SECONDS
@@ -88,7 +84,7 @@ class Pilot {
 
         reload -= TICK_SECONDS
         var fired = false
-        if (standing && firing && aiming && !held && !s.evolution[me].melee) {
+        if (standing && firing && aiming && !held && !s.evolution[me].melee && !s.evolution[me].drones) {
             if (reload <= 0f) {
                 volley(s, me)
                 reload += 1f / s.fireRate[me]
@@ -113,7 +109,7 @@ class Pilot {
         for (k in 0 until n) {
             val origin=frame.originAngle(aim,k,n); val offset=if(frame.drones)0f else frame.offset(k,n)
             val ox=x+cos(origin)*muzzle-aimY*offset; val oy=y+sin(origin)*muzzle+aimX*offset
-            val a=if(frame.drones)frame.droneAim(aim,ox,oy,s.range[me],s.enemyCount,{s.enemyX[it]},{s.enemyY[it]},{s.enemyHp[it]>0f})else origin
+            val a=origin
             shots.add(nextId--, ox, oy, cos(a)*speed, sin(a)*speed, life, 0f, s.bulletRadius[me], s.pierce[me], me)
         }
     }

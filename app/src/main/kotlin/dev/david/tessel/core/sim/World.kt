@@ -89,6 +89,7 @@ class World(seed: Long = 1L) {
     val events = Events()
     val players = PlayerState()
     val bullets = BulletPool(MAX_BULLETS)
+    val droneWing = DroneWing()
 
     /** Enemy shots. Same storage as the players' bullets, owner -1. */
     val hostile = BulletPool(MAX_HOSTILE)
@@ -223,6 +224,7 @@ class World(seed: Long = 1L) {
         stageEarned.fill(0); stageKills.fill(0)
         shop.reset()
         bullets.clear()
+        droneWing.clear()
         hostile.clear()
         enemies.clear()
         coins.clear()
@@ -271,10 +273,12 @@ class World(seed: Long = 1L) {
         grid.clear()
         for (i in 0 until enemies.count) if (!Bestiary.of(enemies.type[i]).boss) grid.insert(i, enemies.x[i], enemies.y[i])
         separateEnemies()
+        droneWing.step(this, inputs)
         moveBullets()
         if (duel.on) duelStep()
         moveHostile()
         touchPlayers()
+        for(p in 0 until playerCount) if(!players.alive(p)) droneWing.clearOwner(p)
         revivePlayers()
         moveCoins()
 
@@ -376,6 +380,11 @@ class World(seed: Long = 1L) {
             pl.evolution[p] = cp.evolution[p]
             pl.lastEvolutionStage[p] = cp.lastEvolutionStage[p]
             cp.upgradeSpent[p].copyInto(pl.upgradeSpent[p])
+            // Old gun-emitter drone saves may have purchased incompatible bullet upgrades.
+            if(pl.evolution[p].drones) for(u in 0 until Upgrades.count) if(!Upgrades.offered(u,pl.evolution[p]) && pl.levels[p][u]>0){
+                pl.coins[p]+=(pl.upgradeSpent[p][u]*.7).toInt()
+                pl.upgradeSpent[p][u]=0;pl.levels[p][u]=0
+            }
             pl.appearance[p] = cp.appearance[p]
             pl.missionMask[p] = cp.missionMask[p]
             pl.present[p] = seated(p)
@@ -396,6 +405,7 @@ class World(seed: Long = 1L) {
         enemies.clear()
         hostile.clear()
         bullets.clear()
+        droneWing.clear()
         coins.clear()
         boss = -1
         this.stage = stage - 1
@@ -407,6 +417,7 @@ class World(seed: Long = 1L) {
     fun removePlayer(p: Int) {
         if (p !in 0 until playerCount || !players.present[p]) return
         players.present[p] = false
+        droneWing.clearOwner(p)
         players.hp[p] = 0
         for (i in 0 until coins.count) if (coins.target[i] == p) coins.target[i] = -1
         if (phase != Phase.SHOP && phase != Phase.OVER && nobodyStanding()) {
@@ -482,6 +493,7 @@ class World(seed: Long = 1L) {
      * The phone already saw it land; this applies it.
      */
     fun remoteHit(p: Int, id16: Int, ux: Float, uy: Float) {
+        if(players.evolution[p].drones) return
         if (phase != Phase.FIGHT && phase != Phase.CLEAR) return
         val e = enemies
         for (j in 0 until e.count) {
@@ -509,6 +521,7 @@ class World(seed: Long = 1L) {
         if (phase != Phase.FIGHT && phase != Phase.CLEAR) return
         var cause = Cause.NONE
         if (shot16 >= 0) {
+            if(droneWing.interceptedRecently(shot16,tick)) return
             val h = hostile
             for (i in 0 until h.count) {
                 if (h.id[i] and 0xFFFF != shot16 || h.life[i] <= 0) continue
@@ -695,13 +708,7 @@ class World(seed: Long = 1L) {
         pl.x[p] = pl.x[p].coerceIn(r, ARENA_W - r)
         pl.y[p] = pl.y[p].coerceIn(r, ARENA_H - r)
 
-        var ax=input.aimX; var ay=input.aimY
-        var firing=input.fire
-        if(pl.evolution[p].drones && !firing) {
-            var best = pl.range(p)*pl.range(p); var target=-1
-            for(j in 0 until enemies.count) { if(enemies.hp[j]<=0f) continue; val dx=enemies.x[j]-pl.x[p]; val dy=enemies.y[j]-pl.y[p]; val ds=dx*dx+dy*dy; if(ds<best){best=ds;target=j} }
-            if(target>=0){ax=enemies.x[target]-pl.x[p];ay=enemies.y[target]-pl.y[p];firing=true}
-        }
+        val ax=input.aimX; val ay=input.aimY; val firing=input.fire
         val aimLen = sqrt(ax*ax+ay*ay)
         val aiming = aimLen > 0.0001f
         if (aiming) { pl.aimX[p] = ax / aimLen; pl.aimY[p] = ay / aimLen }
@@ -711,7 +718,7 @@ class World(seed: Long = 1L) {
             return
         }
         pl.reload[p] -= TICK_SECONDS
-        if (firing && aiming && !stunned && !pl.evolution[p].melee) {
+        if (firing && aiming && !stunned && !pl.evolution[p].melee && !pl.evolution[p].drones) {
             if (pl.reload[p] <= 0f) {
                 shoot(p)
                 pl.reload[p] += 1f / pl.fireRate(p)
@@ -838,6 +845,7 @@ class World(seed: Long = 1L) {
         duel.round++
         duel.roundWinner = -1
         bullets.clear()
+        droneWing.clear()
         for (p in 0 until playerCount) {
             if (!pl.present[p]) continue
             pl.hp[p] = pl.maxHp[p]
@@ -882,7 +890,7 @@ class World(seed: Long = 1L) {
             val offset=if(frame.drones) 0f else frame.offset(k,n)
             val ox=pl.x[p]+cos(origin)*muzzle-pl.aimY[p]*offset
             val oy=pl.y[p]+sin(origin)*muzzle+pl.aimX[p]*offset
-            val a=if(frame.drones) frame.droneAim(aim,ox,oy,pl.range(p),enemies.count,{enemies.x[it]},{enemies.y[it]},{enemies.hp[it]>0f && !core.docked(it)}) else origin
+            val a=origin
             bullets.add(nextId++, ox, oy, cos(a)*speed, sin(a)*speed, life, damage, radius, pierce, p)
         }
         pl.fired[p] += n
@@ -1059,6 +1067,7 @@ class World(seed: Long = 1L) {
                 h.life[i] = 0
                 continue
             }
+            if(droneWing.intercept(h.x[i],h.y[i],h.radius[i])) { droneWing.markIntercepted(h.id[i],tick);h.life[i]=0;events.add(Events.HOSTILE_GONE,h.id[i]);continue }
             for (p in 0 until playerCount) {
                 if (!pl.alive(p) || pl.invuln[p] > 0 || remote[p]) continue
                 val reach = h.radius[i] + Balance.PLAYER_RADIUS * GRAZE
@@ -1355,6 +1364,7 @@ class World(seed: Long = 1L) {
         shownBossType = -1
         coins.clear()
         bullets.clear()
+        droneWing.clear()
         hostile.clear()
         phase = Phase.SHOP
         if (!practice && !duel.on) for (p in 0 until playerCount) if (players.present[p]) {

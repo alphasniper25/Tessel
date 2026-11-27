@@ -80,7 +80,7 @@ data class Settings(
     val tankClass: CharacterDef = CharacterDef.BALANCED,
     val cosmeticOwned: Int = GarageCatalog.defaultMask,
     val tankLook: TankLook = TankLook(),
-    val cameraZoom: Float = 1.12f,
+    val cameraZoom: Float = 1.60f,
 )
 
 /** Settings in one small preferences file. Writes happen off the main thread. */
@@ -140,7 +140,7 @@ class SettingsStore(context: Context) {
         tankClass = enumOr(prefs.getString("tank_class", null), CharacterDef.BALANCED),
         cosmeticOwned = prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask),
         tankLook = TankLook.decode(prefs.getString("tank_look", null), prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask)),
-        cameraZoom = prefs.getFloat("camera_zoom", 1.12f).takeIf { it in listOf(1f, 1.12f, 1.25f) } ?: 1.12f,
+        cameraZoom = when(prefs.getFloat("camera_zoom", 1.60f)){1f->1f;1.25f,1.85f->1.85f;else->1.60f},
         dev = Dev(
             off = prefs.getString(KEY_DEV_OFF, null).orEmpty().split(',').mapNotNull { it.toIntOrNull() }.toSet(),
             boss = prefs.getInt(KEY_DEV_BOSS, -1),

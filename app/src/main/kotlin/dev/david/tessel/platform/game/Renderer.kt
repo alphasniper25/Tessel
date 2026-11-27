@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import dev.david.tessel.core.content.Balance
+import dev.david.tessel.core.content.droneSpec
 import dev.david.tessel.core.content.CoreRules
 import dev.david.tessel.core.sim.CoreFight
 import dev.david.tessel.core.sim.ARENA_H
@@ -32,7 +33,7 @@ import kotlin.math.sqrt
 
 class Renderer(private val density: Float, palette: Palette) {
     var showStats = false
-    var zoom = 1.12f
+    var zoom = 1.60f
     private val tankArt = TankArt()
     var names: List<String> = emptyList()
     private val teamColors = intArrayOf(0xFF49D5E7.toInt(),0xFFE9B650.toInt(),0xFFB7A0F5.toInt(),0xFF80D28A.toInt(),0xFFF19BC9.toInt(),0xFF91ADFF.toInt(),0xFFE8E8E8.toInt(),0xFFF49570.toInt())
@@ -105,6 +106,7 @@ class Renderer(private val density: Float, palette: Palette) {
         shards.draw(canvas, view, fill)
         drawBullets(canvas, w, blend, view)
         drawHostile(canvas, w, blend, view)
+        drawDroneWing(canvas,w,blend,view)
         for (p in 0 until w.playerCount) {
             if (!w.players.present[p]) continue
             when {
@@ -114,6 +116,7 @@ class Renderer(private val density: Float, palette: Palette) {
             }
         }
         for (p in 0 until w.playerCount) if (w.players.present[p]) drawHealth(canvas, w, p, blend, view, p == me)
+        drawTeammateMarkers(canvas,w,view,me)
         drawStick(canvas, move)
         drawStick(canvas, aim)
 
@@ -369,6 +372,24 @@ class Renderer(private val density: Float, palette: Palette) {
         }
     }
 
+    private val dronePath=Path()
+    private fun drawDroneWing(canvas:Canvas,w:World,blend:Float,view:Viewport){
+        val d=w.droneWing;val pl=w.players;val r=dev.david.tessel.core.sim.DroneWing.RADIUS*view.scale
+        for(i in d.hp.indices){if(d.hp[i]<=0)continue;val p=i/dev.david.tessel.core.sim.DroneWing.LIMIT
+            val x=view.screenX(lerp(d.prevX[i],d.x[i],blend));val y=view.screenY(lerp(d.prevY[i],d.y[i],blend));val a=d.angle[i];val dx=cos(a);val dy=sin(a)
+            val paint=dev.david.tessel.core.content.GarageCatalog.items[pl.appearance[p].paint].color
+            fill.color=if(paint==0)playerBody else paint;fill.alpha=255
+            dronePath.reset();dronePath.moveTo(x+dx*r,y+dy*r);dronePath.lineTo(x-dx*r*.72f-dy*r*.72f,y-dy*r*.72f+dx*r*.72f);dronePath.lineTo(x-dx*r*.72f+dy*r*.72f,y-dy*r*.72f-dx*r*.72f);dronePath.close();canvas.drawPath(dronePath,fill)
+            if(w.playerCount>1){line.color=teamColors[p%teamColors.size];line.strokeWidth=1.2f*density;line.alpha=255;canvas.drawPath(dronePath,line)}
+        }
+    }
+    private fun drawTeammateMarkers(canvas:Canvas,w:World,view:Viewport,me:Int){
+        if(w.playerCount<=1)return
+        for(p in 0 until w.playerCount){if(p==me||!w.players.present[p])continue
+            val sx=view.screenX(w.players.x[p]);val sy=view.screenY(w.players.y[p]);if(sx in 0f..canvas.width.toFloat()&&sy in 0f..canvas.height.toFloat())continue
+            val margin=30f*density;val x=sx.coerceIn(margin,max(margin,canvas.width-margin));val y=sy.coerceIn(55f*density,max(55f*density,canvas.height-margin));fill.color=teamColors[p%teamColors.size];canvas.drawCircle(x,y,5f*density,fill);hpText.color=fill.color;canvas.drawText(names.getOrNull(p)?:"P${p+1}",x,y-8f*density,hpText)
+        }
+    }
     private fun drawPlayer(canvas: Canvas, w: World, p: Int, blend: Float, view: Viewport) {
         val pl = w.players
         val x = view.screenX(lerp(pl.prevX[p], pl.x[p], blend))
@@ -399,6 +420,7 @@ class Renderer(private val density: Float, palette: Palette) {
         fill.color=if(fraction <= .25f) palette.danger else if(w.playerCount > 1) teamColors[p % teamColors.size] else palette.ink
         if(fraction>0f) canvas.drawRoundRect(x-half,y,x-half+2*half*fraction,y+h,h/2,h/2,fill)
         hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(w.playerCount > 1) (names.getOrNull(p) ?: "P${p+1}") else "").put(if(w.playerCount > 1) "  " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
+        pl.evolution[p].droneSpec?.let { spec -> hpBuf.clear().put(w.droneWing.count(p)).put("/").put(spec.cap);canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y+h+11*density,hpText) }
     }
 
     /**
