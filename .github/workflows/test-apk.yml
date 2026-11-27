@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "SDK: $ANDROID_HOME"
           sdkmanager --list --channel=3 --include_obsolete | grep -E 'platforms;android-(36|37|Cinnamon)|build-tools;37' || true
-          sdkmanager --install --channel=3 --include_obsolete "platforms;android-37"
+          sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
       - name: Build signed debug test APK
         run: |
           chmod +x gradlew
