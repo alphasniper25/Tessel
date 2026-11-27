@@ -1,0 +1,81 @@
+name: TESSEL alpha.9 beta verification
+on:
+  push:
+    branches: [build/alpha9]
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+      - name: Run regression suite and build
+        run: |
+          chmod +x gradlew
+          for i in 1 2 3; do
+            if ./gradlew --no-daemon testDebugUnitTest assembleDebug > gradle-test.log 2>&1; then cat gradle-test.log; break; fi
+            cat gradle-test.log
+            if ! grep -q 'status code 429' gradle-test.log || [ "$i" = 3 ]; then exit 1; fi
+            sleep 15
+          done
+      - name: Verify intermediate APK and manifest
+        run: |
+          set -euo pipefail
+          SDK="$ANDROID_HOME/build-tools/37.0.0"
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p output
+          "$SDK/apksigner" verify --verbose --print-certs "$APK"
+          "$SDK/aapt2" dump badging "$APK" > output/badging.txt
+          grep "package: name='com.kreatonik.tessel.debug' versionCode='30' versionName='1.1.0-alpha.9'" output/badging.txt
+          cp "$APK" output/intermediate.apk
+          cp "$SDK/aapt2" output/aapt2
+          (cd output && sha256sum intermediate.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpha9-verified-intermediate
+          path: output/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alpha9-unit-tests
+          path: app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Pin Kotlin compiler
+        run: |
+          curl --fail --location --retry 3 https://github.com/JetBrains/kotlin/releases/download/v1.9.0/kotlin-compiler-1.9.0.zip -o "$RUNNER_TEMP/kotlin.zip"
+          unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP/kotlin"
+          echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Focused rare mechanics and fresh stratified cohort
+        run: |
+          set -euo pipefail
+          mkdir -p validation
+          kotlinc $(find app/src/main/kotlin/dev/david/tessel/core -name '*.kt') development/HeadlessCohort.kt development/BranchRefineSmoke.kt development/EvolutionHazardsSmoke.kt -include-runtime -d "$RUNNER_TEMP/validate.jar"
+          java -cp "$RUNNER_TEMP/validate.jar" dev.david.tessel.core.sim.EvolutionHazardsSmokeKt | tee validation/evolution.txt
+          java -cp "$RUNNER_TEMP/validate.jar" dev.david.tessel.core.sim.BranchRefineSmokeKt | tee validation/branch.txt
+          java -Xmx1g -cp "$RUNNER_TEMP/validate.jar" dev.david.tessel.core.sim.HeadlessCohortKt 150 2 4 validation/cohort 2100 1 2000 2 | tee validation/campaign.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alpha9-validation
+          path: validation/
+          retention-days: 14
