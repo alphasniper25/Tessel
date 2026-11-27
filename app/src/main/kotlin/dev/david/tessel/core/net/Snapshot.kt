@@ -72,6 +72,8 @@ class Snapshot {
     val aimY = FloatArray(MAX_PLAYERS)
     val hp = IntArray(MAX_PLAYERS)
     val maxHp = IntArray(MAX_PLAYERS)
+    val character = Array(MAX_PLAYERS) { dev.david.tessel.core.content.CharacterDef.BALANCED }
+    val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
     val hurt = BooleanArray(MAX_PLAYERS)
     val invuln = BooleanArray(MAX_PLAYERS)
 

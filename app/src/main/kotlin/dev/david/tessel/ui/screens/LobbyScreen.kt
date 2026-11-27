@@ -251,7 +251,7 @@ private fun Stage(lobby: CoopLobby, state: LobbyState, saved: Checkpoint?, setti
                     Modifier.padding(start = Space.x1),
                 )
                 Spacer(Modifier.height(Space.x5))
-                LobbyReadyControls(lobby, state.readiness, canChoose = false)
+                LobbyReadyControls(lobby, state.readiness, settings, canChoose = false)
                 PrimaryButton("Continue", { lobby.start(settings.difficulty) }, Modifier.fillMaxWidth(), enabled = allReady && resume.filled.any { it })
             } else if (state.players.isEmpty()) {
                 WaitingLine("Waiting for players. Up to seven can join.")
@@ -294,7 +294,7 @@ private fun Stage(lobby: CoopLobby, state: LobbyState, saved: Checkpoint?, setti
                 }
                 Spacer(Modifier.height(Space.x5))
                 val setup = if (duel) DuelSetup(DuelSetup.TARGETS[rounds], DuelSetup.HEALTH[health], power) else null
-                LobbyReadyControls(lobby, state.readiness, canChoose = !duel)
+                LobbyReadyControls(lobby, state.readiness, settings, canChoose = !duel)
                 PrimaryButton("Start", { lobby.start(settings.difficulty, setup) }, Modifier.fillMaxWidth(), enabled = allReady)
             }
         }
@@ -335,7 +335,7 @@ private fun Stage(lobby: CoopLobby, state: LobbyState, saved: Checkpoint?, setti
                 }
             }
             Spacer(Modifier.height(Space.x3))
-            LobbyReadyControls(lobby, state.readiness, canChoose = true)
+            LobbyReadyControls(lobby, state.readiness, settings, canChoose = true)
             WaitingLine("Everyone must be ready before ${state.host} can start.")
         }
 
@@ -353,13 +353,13 @@ private fun readyLabel(status: LobbyStatus?, index: Int, role: String?): String 
 }
 
 @Composable
-private fun LobbyReadyControls(lobby: CoopLobby, status: LobbyStatus?, canChoose: Boolean) {
+private fun LobbyReadyControls(lobby: CoopLobby, status: LobbyStatus?, settings: Settings, canChoose: Boolean) {
     val c = Theme.colors
     val choice = status?.choices?.getOrNull(status.self)
     if (choice == null) { WaitingLine("Synchronizing lobby…"); return }
     if (canChoose) {
         Segmented(CharacterDef.entries.map { it.label }, choice.character.ordinal, { lobby.chooseCharacter(CharacterDef.fromId(it)) })
-        Text(choice.character.description, Type.footnote, c.ink2)
+        CharacterPreview(choice.character, settings.tankLook, settings.difficulty)
         Text("Character applies to new co-op runs; saved games and duels keep their original stats.", Type.footnote, c.ink3)
     }
     Spacer(Modifier.height(Space.x3))

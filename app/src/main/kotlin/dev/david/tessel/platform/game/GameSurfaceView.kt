@@ -20,6 +20,7 @@ import androidx.core.view.WindowInsetsCompat
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.CharacterDef
+import dev.david.tessel.core.content.TankLook
 import dev.david.tessel.core.net.LobbyChoice
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Perks
@@ -134,6 +135,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     /** Where runs are written down and enemies logged. Set before the first run. */
     @Volatile var ledger: LedgerStore? = null
+
+    @Volatile var preferredCharacter: CharacterDef = CharacterDef.BALANCED
+    @Volatile var preferredLook = TankLook()
 
     fun cardUnlockMask(): Int = ledger?.state?.value?.totals?.let(CardMission::mask) ?: 0
 
@@ -253,6 +257,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         applyDev()
         world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
         world.players.chooseCharacter(0, character, difficulty.bonusHp)
+        world.players.appearance[0] = preferredLook
         world.players.missionMask[0] = cardUnlockMask()
         if (cheat) {
             if (dev.startStage > 1) world.skipTo(dev.startStage)
@@ -356,6 +361,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         val saved = saves?.get(slot) ?: return@onGameThread
         dropCoop()
         world.restore(saved.checkpoint, SystemClock.elapsedRealtimeNanos()) { it == HOST_PLAYER }
+        world.players.appearance[0] = preferredLook
         soloSlot = slot
         applyDev()
         freshRun()
@@ -385,6 +391,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 world.players.missionMask[p] = choice.missionMask and CardMission.allMask
             }
         }
+        for (p in 0 until players) world.players.appearance[p] = choices.getOrNull(p)?.appearance ?: TankLook()
         for (p in 1 until players) world.remote[p] = true
         host = HostSession(world, link::send).also {
             for (p in 1 until players) it.connect(p)
@@ -606,6 +613,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private fun qualityOf(player: Int) = if (direct[player]) 4 else linkQuality[player]
 
     fun applySettings(s: Settings) {
+        preferredCharacter = s.tankClass
+        preferredLook = s.tankLook
         controller.leftHanded = s.leftHanded
         controller.stickRadiusDp = s.stickSize.radiusDp
         haptics.enabled = s.vibration
@@ -614,6 +623,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         handler.post {
             renderer.stickRadius = controller.stickRadius
             renderer.showStats = s.showStats
+            renderer.zoom = s.cameraZoom
             hud.showLink = s.showLink
             breakEvery = s.breakEvery
             dev = s.dev
@@ -774,6 +784,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                     homeDrawn = true
                 } else {
                     homeDrawn = false
+                    val pl = shown.players
+                    viewport.follow(canvas.width, canvas.height, if (practice != null) 1f else renderer.zoom,
+                        pl.prevX[me] + (pl.x[me]-pl.prevX[me])*blend, pl.prevY[me] + (pl.y[me]-pl.prevY[me])*blend)
                     renderer.draw(canvas, shown, blend, viewport, shards, moveView, aimView, me)
                     val inset = cutout
                     hud.names = names
@@ -1145,6 +1158,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         val h = host ?: return
         if (!h.allRematchReady() || unreachable != 0) return
         val characters = world.players.character.copyOf()
+        val appearances = world.players.appearance.copyOf()
         val masks = h.rematchMasks.copyOf()
         // Players who left stay out of the new run too.
         val gone = BooleanArray(world.playerCount) { !world.players.present[it] }
@@ -1159,6 +1173,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             }
         }
         for (p in 1 until world.playerCount) world.remote[p] = true
+        for (p in appearances.indices) world.players.appearance[p] = appearances[p]
         for (p in gone.indices) if (gone[p]) world.removePlayer(p)
         host?.announceStart()
         if (setup == null) keep()

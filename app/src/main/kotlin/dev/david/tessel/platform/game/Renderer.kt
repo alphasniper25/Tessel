@@ -32,6 +32,10 @@ import kotlin.math.sqrt
 
 class Renderer(private val density: Float, palette: Palette) {
     var showStats = false
+    var zoom = 1.12f
+    private val tankArt = TankArt()
+    private val hpText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = 10f * density; typeface = Typeface.DEFAULT_BOLD }
+    private val hpBuf = TextBuf()
     var stickRadius = 56f * density
 
     var palette: Palette = palette
@@ -106,6 +110,7 @@ class Renderer(private val density: Float, palette: Palette) {
                 else -> drawPartner(canvas, w, p, blend, view)
             }
         }
+        for (p in 0 until w.playerCount) if (w.players.present[p]) drawHealth(canvas, w, p, blend, view, p == me)
         drawStick(canvas, move)
         drawStick(canvas, aim)
 
@@ -346,37 +351,27 @@ class Renderer(private val density: Float, palette: Palette) {
         val pl = w.players
         val x = view.screenX(lerp(pl.prevX[p], pl.x[p], blend))
         val y = view.screenY(lerp(pl.prevY[p], pl.y[p], blend))
-        val r = Balance.PLAYER_RADIUS * view.scale
         val hurt = pl.hurt[p] > 0
-        val alpha = if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255
-        val body = if (hurt) palette.danger else playerBody
-        val facet = if (hurt) palette.danger else playerFacet
-        val ax = pl.aimX[p]
-        val ay = pl.aimY[p]
+        tankArt.draw(canvas, x, y, Balance.PLAYER_RADIUS * view.scale, pl.aimX[p], pl.aimY[p], pl.character[p], pl.appearance[p],
+            if (hurt) palette.danger else playerBody, if (hurt) palette.danger else playerFacet, palette.ground, hurt,
+            if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255)
+    }
 
-        // A short stub, drawn first so the body covers its root.
-        line.strokeCap = Paint.Cap.ROUND
-        line.color = body
-        line.alpha = alpha
-        line.strokeWidth = r * 0.5f
-        canvas.drawLine(x + ax * r * 0.5f, y + ay * r * 0.5f, x + ax * r * 1.15f, y + ay * r * 1.15f, line)
-
-        fill.color = body
-        fill.alpha = alpha
-        canvas.drawCircle(x, y, r, fill)
-        fill.color = facet
-        fill.alpha = alpha
-        oval.set(x - r, y - r, x + r, y + r)
-        canvas.drawArc(oval, ROUND_SPLITS[0], ROUND_SPLITS[1] - ROUND_SPLITS[0], true, fill)
-        fill.alpha = 255
-
-        // Hairline gaps between the three facets, the same cut as the app icon.
-        line.strokeCap = Paint.Cap.BUTT
-        line.color = palette.ground
-        line.alpha = alpha
-        line.strokeWidth = max(density, r * 0.08f)
-        for (k in 0..2) canvas.drawLine(x, y, x + SPLIT_COS[k] * r * 1.02f, y + SPLIT_SIN[k] * r * 1.02f, line)
-        line.alpha = 255
+    private fun drawHealth(canvas: Canvas, w: World, p: Int, blend: Float, view: Viewport, self: Boolean) {
+        val pl = w.players
+        val rawX = view.screenX(lerp(pl.prevX[p], pl.x[p], blend))
+        val centerY = view.screenY(lerp(pl.prevY[p], pl.y[p], blend))
+        if (rawX !in 0f..canvas.width.toFloat() || centerY !in 0f..canvas.height.toFloat()) return
+        val x = rawX.coerceIn(25f*density, max(25f*density,canvas.width-25f*density))
+        val r = Balance.PLAYER_RADIUS * view.scale
+        val y = (if (centerY-r-22*density < 44*density) centerY+r+14*density else centerY-r-10*density).coerceIn(14f*density, max(14f*density, canvas.height-6f*density))
+        val half = max(r*1.25f, 19f*density)
+        val h = if(self) 4f*density else 3f*density
+        val fraction = (pl.hp[p].toFloat()/pl.maxHp[p].coerceAtLeast(1)).coerceIn(0f,1f)
+        fill.color=palette.raised; canvas.drawRoundRect(x-half,y,x+half,y+h,h/2,h/2,fill)
+        fill.color=if(fraction <= .25f) palette.danger else palette.ink
+        if(fraction>0f) canvas.drawRoundRect(x-half,y,x-half+2*half*fraction,y+h,h/2,h/2,fill)
+        hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(self && w.playerCount > 1) "YOU " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
     }
 
     /**
@@ -390,6 +385,11 @@ class Renderer(private val density: Float, palette: Palette) {
         val r = Balance.PLAYER_RADIUS * view.scale
         val hurt = pl.hurt[p] > 0
         val alpha = if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255
+        if (pl.character[p] != dev.david.tessel.core.content.CharacterDef.BALANCED || pl.appearance[p].code() != 0) {
+            tankArt.draw(canvas,x,y,r,pl.aimX[p],pl.aimY[p],pl.character[p],pl.appearance[p],
+                if(hurt) palette.danger else playerBody, if(hurt) palette.danger else playerFacet, palette.ground,hurt,alpha)
+            return
+        }
         val body = if (hurt) palette.danger else playerBody
         val facet = if (hurt) palette.danger else playerFacet
 

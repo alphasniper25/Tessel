@@ -46,6 +46,7 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onLogo: (() -> Unit)? = null,
     onCards: () -> Unit = {},
+    onGarage: () -> Unit = {},
 ) {
     val c = Theme.colors
     Row(
@@ -76,6 +77,7 @@ fun HomeScreen(
             Text(line, Type.subhead.merge(Type.numbers), c.ink2)
             val xp = dev.david.tessel.core.content.AccountProgress.xp(ledger.totals)
             Text("Level ${dev.david.tessel.core.content.AccountProgress.level(xp)} · $xp XP", Type.subhead.merge(Type.numbers), c.ink2)
+            CharacterPreview(settings.tankClass, settings.tankLook, settings.difficulty, Modifier.padding(top=8.dp))
         }
 
         Column(Modifier.width(360.dp).verticalScroll(rememberScrollState())) {
@@ -83,6 +85,8 @@ fun HomeScreen(
             Spacer(Modifier.height(Space.x4))
             Group(title = null) {
                 NavRow("Play Together", onClick = onTogether, detail = "Up to eight phones, one team.")
+                Divider()
+                NavRow("Tank Garage", onClick = onGarage, detail = "Choose and customize your tank.")
                 Divider()
                 NavRow("Cards & Missions", onClick = onCards, detail = "Collection and unlock progress.")
                 Divider()

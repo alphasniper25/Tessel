@@ -45,6 +45,7 @@ class Checkpoint(
     val quotes = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) }
     val stockSaved = BooleanArray(MAX_PLAYERS)
     val character = Array(MAX_PLAYERS) { CharacterDef.BALANCED }
+    val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
     val missionMask = IntArray(MAX_PLAYERS)
     val rerolls = IntArray(MAX_PLAYERS)
     val heals = IntArray(MAX_PLAYERS)
@@ -67,7 +68,7 @@ class Checkpoint(
     val names = Array(MAX_PLAYERS) { "" }
 
     fun write(): ByteArray {
-        val buf = ByteBuffer.allocate(64 + players * (160 + Upgrades.count + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = ByteBuffer.allocate(64 + players * (162 + Upgrades.count + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
         buf.put('T'.code.toByte())
         buf.put('C'.code.toByte())
         buf.put(FORMAT.toByte())
@@ -104,6 +105,7 @@ class Checkpoint(
             for (k in 0 until Perks.OFFERED) buf.put(perkOffer[p][k].toByte())
             buf.put(character[p].ordinal.toByte())
             buf.putInt(missionMask[p])
+            buf.putShort(appearance[p].code().toShort())
             buf.put(if (stockSaved[p]) 1.toByte() else 0.toByte())
             for (slot in 0 until SHOP_SLOTS) {
                 buf.put(if (locked[p][slot]) 1.toByte() else 0.toByte())
@@ -118,7 +120,7 @@ class Checkpoint(
 
     companion object {
         /** Bump when the layout changes. Saves from a version before [OLDEST] are dropped rather than misread. */
-        const val FORMAT = 5
+        const val FORMAT = 6
         private const val OLDEST = 1
 
         /** Null when [bytes] are not a save this version can read. */
@@ -177,6 +179,7 @@ class Checkpoint(
                     if (format >= 4) {
                         cp.character[p] = CharacterDef.fromId(buf.get().toInt())
                         if (format >= 5) cp.missionMask[p] = buf.int and CardMission.allMask
+                        if (format >= 6) cp.appearance[p] = dev.david.tessel.core.content.TankLook.fromCode(buf.short.toInt() and 0xFFFF)
                         cp.stockSaved[p] = buf.get().toInt() != 0
                         for (slot in 0 until slots) {
                             val locked = buf.get().toInt() != 0

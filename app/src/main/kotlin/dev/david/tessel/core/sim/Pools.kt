@@ -25,6 +25,7 @@ class PlayerState {
     val hp = IntArray(MAX_PLAYERS)
     val maxHp = IntArray(MAX_PLAYERS)
     val character = Array(MAX_PLAYERS) { CharacterDef.BALANCED }
+    val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
 
     /** Ticks left during which contact does no damage. */
     val invuln = IntArray(MAX_PLAYERS)
@@ -124,6 +125,7 @@ class PlayerState {
             aimX[i] = 1f
             aimY[i] = 0f
             character[i] = CharacterDef.BALANCED
+            appearance[i] = dev.david.tessel.core.content.TankLook()
             maxHp[i] = (Balance.PLAYER_HP + bonusHp).coerceAtLeast(1)
             hp[i] = if (i < count) maxHp[i] else 0
             invuln[i] = 0

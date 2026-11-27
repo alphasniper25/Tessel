@@ -9,7 +9,7 @@ import java.nio.ByteOrder
  * layout below changes; mismatched phones then refuse each other politely.
  */
 object Wire {
-    const val VERSION = 16
+    const val VERSION = 17
 
     const val HELLO = 1
     const val START = 2
@@ -161,24 +161,25 @@ object Wire {
         buf.put(choice.character.ordinal.toByte())
         buf.putInt(choice.missionMask)
         buf.put(if (choice.ready) 1.toByte() else 0.toByte())
+        buf.putShort(choice.appearance.code().toShort())
     }
     private fun getChoice(buf: ByteBuffer): LobbyChoice {
         val c = dev.david.tessel.core.content.CharacterDef.entries.getOrNull(buf.get().toInt()) ?: error("Invalid character")
         val mask = buf.int
         require(mask and dev.david.tessel.core.content.CardMission.allMask.inv() == 0)
         val ready = buf.get().toInt(); require(ready in 0..1)
-        return LobbyChoice(c, mask, ready == 1)
+        return LobbyChoice(c, mask, ready == 1, dev.david.tessel.core.content.TankLook.fromCode(buf.short.toInt() and 0xFFFF))
     }
     fun lobbySync(): ByteArray { val b = buffer(4); begin(b, LOBBY_SYNC); return finish(b) }
     fun lobbyChoice(epoch: Int, choice: LobbyChoice): ByteArray {
-        val buf = buffer(14); begin(buf, LOBBY_CHOICE); buf.putInt(epoch); putChoice(buf, choice); return finish(buf)
+        val buf = buffer(16); begin(buf, LOBBY_CHOICE); buf.putInt(epoch); putChoice(buf, choice); return finish(buf)
     }
     fun readLobbyChoice(bytes: ByteArray): Pair<Int, LobbyChoice>? = runCatching {
-        require(typeOf(bytes) == LOBBY_CHOICE && bytes.size == 14)
+        require(typeOf(bytes) == LOBBY_CHOICE && bytes.size == 16)
         val b = open(bytes); b.int to getChoice(b)
     }.getOrNull()
     fun lobbyStatus(status: LobbyStatus): ByteArray {
-        val buf = buffer(10 + status.choices.size * 6); begin(buf, LOBBY_STATUS)
+        val buf = buffer(10 + status.choices.size * 8); begin(buf, LOBBY_STATUS)
         buf.putInt(status.revision); buf.put(status.self.toByte()); buf.put(status.choices.size.toByte())
         for (c in status.choices) putChoice(buf, c)
         return finish(buf)
@@ -186,7 +187,7 @@ object Wire {
     fun readLobbyStatus(bytes: ByteArray): LobbyStatus? = runCatching {
         require(typeOf(bytes) == LOBBY_STATUS && bytes.size >= 10)
         val b = open(bytes); val epoch = b.int; val self = b.get().toInt(); val n = b.get().toInt()
-        require(n in 1..dev.david.tessel.core.sim.MAX_PLAYERS && self in 0 until n && b.remaining() == n * 6)
+        require(n in 1..dev.david.tessel.core.sim.MAX_PLAYERS && self in 0 until n && b.remaining() == n * 8)
         LobbyStatus(epoch, self, List(n) { getChoice(b) })
     }.getOrNull()
 

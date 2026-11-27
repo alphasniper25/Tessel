@@ -324,6 +324,7 @@ class World(seed: Long = 1L) {
             pl.levels[p].copyInto(cp.levels[p])
             cp.perks[p] = pl.perks[p]
             cp.character[p] = pl.character[p]
+            cp.appearance[p] = pl.appearance[p]
             cp.missionMask[p] = pl.missionMask[p]
         }
         if (cp.inShop) shop.keep(cp)
@@ -353,6 +354,7 @@ class World(seed: Long = 1L) {
             cp.levels[p].copyInto(pl.levels[p])
             pl.perks[p] = cp.perks[p]
             pl.character[p] = cp.character[p]
+            pl.appearance[p] = cp.appearance[p]
             pl.missionMask[p] = cp.missionMask[p]
             pl.present[p] = seated(p)
             if (!pl.present[p]) pl.hp[p] = 0 else if (pl.hp[p] <= 0) pl.hp[p] = max(1, pl.maxHp[p] / 2)

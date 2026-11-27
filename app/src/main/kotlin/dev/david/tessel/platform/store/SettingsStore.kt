@@ -3,6 +3,9 @@ package dev.david.tessel.platform.store
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.CharacterDef
+import dev.david.tessel.core.content.GarageCatalog
+import dev.david.tessel.core.content.TankLook
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -74,6 +77,10 @@ data class Settings(
     val tutorialSeen: Boolean = false,
     val devUnlocked: Boolean = false,
     val dev: Dev = Dev(),
+    val tankClass: CharacterDef = CharacterDef.BALANCED,
+    val cosmeticOwned: Int = GarageCatalog.defaultMask,
+    val tankLook: TankLook = TankLook(),
+    val cameraZoom: Float = 1.12f,
 )
 
 /** Settings in one small preferences file. Writes happen off the main thread. */
@@ -111,6 +118,10 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_DEV_INVINCIBLE, next.dev.invincible)
             .putBoolean(KEY_DEV_NO_SPAWNS, next.dev.noSpawns)
             .putFloat(KEY_DEV_SPEED, next.dev.speed)
+            .putString("tank_class", next.tankClass.name)
+            .putInt("cosmetic_owned", next.cosmeticOwned)
+            .putString("tank_look", next.tankLook.encode())
+            .putFloat("camera_zoom", next.cameraZoom)
             .apply()
     }
 
@@ -126,6 +137,10 @@ class SettingsStore(context: Context) {
         breakEvery = prefs.getInt(KEY_BREAK, 0).coerceIn(0, MAX_BREAK_MINUTES),
         tutorialSeen = prefs.getBoolean(KEY_TUTORIAL, false),
         devUnlocked = prefs.getBoolean(KEY_DEV_UNLOCKED, false),
+        tankClass = enumOr(prefs.getString("tank_class", null), CharacterDef.BALANCED),
+        cosmeticOwned = prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask),
+        tankLook = TankLook.decode(prefs.getString("tank_look", null), prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask)),
+        cameraZoom = prefs.getFloat("camera_zoom", 1.12f).takeIf { it in listOf(1f, 1.12f, 1.25f) } ?: 1.12f,
         dev = Dev(
             off = prefs.getString(KEY_DEV_OFF, null).orEmpty().split(',').mapNotNull { it.toIntOrNull() }.toSet(),
             boss = prefs.getInt(KEY_DEV_BOSS, -1),

@@ -49,10 +49,12 @@ fun PlayPanel(
     onContinue: (Int) -> Unit,
     onDelete: (Int) -> Unit,
     onNewCharacter: ((CharacterDef) -> Unit)? = null,
+    initialCharacter: CharacterDef = CharacterDef.BALANCED,
+    look: dev.david.tessel.core.content.TankLook = dev.david.tessel.core.content.TankLook(),
 ) {
     val c = Theme.colors
     val full = saves.size >= SoloSaves.SLOTS
-    var selected by remember { mutableIntStateOf(0) }
+    var selected by remember(initialCharacter) { mutableIntStateOf(initialCharacter.ordinal) }
     Row(
         Modifier.padding(start = Space.x6, end = Space.x6, top = Space.x3, bottom = Space.x5),
         horizontalArrangement = Arrangement.spacedBy(Space.x8),
@@ -69,9 +71,9 @@ fun PlayPanel(
             Text("${difficulty.blurb} Play Together uses this too.", Type.footnote, c.ink3, Modifier.padding(start = Space.x1))
             Spacer(Modifier.height(Space.x4))
             if (onNewCharacter != null) {
-                Text("Character", Type.headline, c.ink)
+                Text("Tank type", Type.headline, c.ink)
                 Segmented(options = CharacterDef.entries.map { it.label }, selected = selected, onSelect = { selected = it })
-                Text(CharacterDef.fromId(selected).description, Type.footnote, c.ink2)
+                CharacterPreview(CharacterDef.fromId(selected), look, difficulty)
                 Spacer(Modifier.height(Space.x3))
             }
             PrimaryButton("New Run", { if (onNewCharacter == null) onNew() else onNewCharacter(CharacterDef.fromId(selected)) }, Modifier.fillMaxWidth(), enabled = !full)

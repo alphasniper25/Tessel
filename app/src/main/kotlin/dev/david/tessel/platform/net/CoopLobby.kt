@@ -261,6 +261,7 @@ class CoopLobby(private val activity: ComponentActivity, private val game: GameS
         reset()
         resuming = saved
         hosting = true
+        readyLobby.set(0, readyLobby.revision, LobbyChoice(game.preferredCharacter, game.cardUnlockMask(), false, game.preferredLook))
         code = newCode()
         publishHosting()
         advertise()
@@ -310,12 +311,12 @@ class CoopLobby(private val activity: ComponentActivity, private val game: GameS
 
     fun chooseCharacter(character: CharacterDef) {
         val old = if (hosting) readyLobby.get(0) else guestStatus?.let { it.choices[it.self] } ?: return
-        updateChoice(old.copy(character = character, ready = false, missionMask = game.cardUnlockMask()))
+        updateChoice(old.copy(character = character, ready = false, missionMask = game.cardUnlockMask(), appearance = game.preferredLook))
     }
 
     fun setReady(value: Boolean) {
         val old = if (hosting) readyLobby.get(0) else guestStatus?.let { it.choices[it.self] } ?: return
-        updateChoice(old.copy(ready = value, missionMask = game.cardUnlockMask()))
+        updateChoice(old.copy(ready = value, missionMask = game.cardUnlockMask(), appearance = game.preferredLook))
     }
 
     private fun updateChoice(choice: LobbyChoice) {
@@ -671,7 +672,12 @@ class CoopLobby(private val activity: ComponentActivity, private val game: GameS
                     if (hosting || playing || endpointId != hostEndpoint) return
                     val status = Wire.readLobbyStatus(bytes) ?: return
                     if (guestStatus != null && status.revision < guestStatus!!.revision) return
+                    val first = guestStatus == null
                     guestStatus = status
+                    if (first) {
+                        val choice = status.choices[status.self]
+                        if (choice.character != game.preferredCharacter || choice.appearance != game.preferredLook) updateChoice(choice.copy(character = game.preferredCharacter, ready = false, missionMask = game.cardUnlockMask(), appearance = game.preferredLook))
+                    }
                     val now = stateFlow.value
                     if (now is LobbyState.Joined) stateFlow.value = now.copy(readiness = status)
                 }

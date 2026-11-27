@@ -348,6 +348,8 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             // Scores and health come from the newest snapshot: menus and pips should not lag.
             pl.hp[p] = top.hp[p]
             pl.maxHp[p] = top.maxHp[p]
+            pl.character[p] = top.character[p]
+            pl.appearance[p] = top.appearance[p]
             pl.hurt[p] = if (top.hurt[p]) 1 else 0
             pl.invuln[p] = if (top.invuln[p]) 1 else 0
             pl.revive[p] = (top.revive[p] * REVIVE_TICKS).toInt()

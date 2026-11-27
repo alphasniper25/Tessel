@@ -101,6 +101,8 @@ object Protocol {
             Wire.putUnit(buf, pl.aimY[p])
             buf.put(pl.hp[p].toByte())
             buf.put(pl.maxHp[p].toByte())
+            buf.put(pl.character[p].ordinal.toByte())
+            buf.putShort(pl.appearance[p].code().toShort())
             var flags = 0
             if (pl.hurt[p] > 0) flags = flags or 1
             if (pl.invuln[p] > 0) flags = flags or 2
@@ -248,6 +250,9 @@ object Protocol {
             s.aimY[p] = Wire.getUnit(buf)
             s.hp[p] = buf.get().toInt()
             s.maxHp[p] = buf.get().toInt()
+            s.character[p] = dev.david.tessel.core.content.CharacterDef.fromId(buf.get().toInt())
+            val lookCode = buf.short.toInt() and 0xFFFF
+            if (s.appearance[p].code() != lookCode) s.appearance[p] = dev.david.tessel.core.content.TankLook.fromCode(lookCode)
             val f = buf.get().toInt()
             s.hurt[p] = f and 1 != 0
             s.invuln[p] = f and 2 != 0

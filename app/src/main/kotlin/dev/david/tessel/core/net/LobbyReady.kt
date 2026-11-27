@@ -4,7 +4,7 @@ import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.sim.MAX_PLAYERS
 
-data class LobbyChoice(val character: CharacterDef = CharacterDef.BALANCED, val missionMask: Int = 0, val ready: Boolean = false)
+data class LobbyChoice(val character: CharacterDef = CharacterDef.BALANCED, val missionMask: Int = 0, val ready: Boolean = false, val appearance: dev.david.tessel.core.content.TankLook = dev.david.tessel.core.content.TankLook())
 data class LobbyStatus(val revision: Int, val self: Int, val choices: List<LobbyChoice>)
 
 /** Host owns the roster epoch; old ready packets cannot authorize a changed roster. */

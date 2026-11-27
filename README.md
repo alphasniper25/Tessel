@@ -1,4 +1,4 @@
-> **Fork development:** V1.1.0-alpha.3. See [changelog](development/CHANGELOG-1.1.0-alpha.3.md) and [checks](development/ALPHA3_CHECKS.md). Debug APK builds are explicitly authorized for testing only; no production release. The fork uses its own package and NFC/Nearby identity, and in-app updates remain disabled. Upstream documentation below is retained for attribution and may describe older gameplay.
+> **Fork development:** V1.1.0-alpha.4. See [changelog](development/CHANGELOG-1.1.0-alpha.4.md) and [checks](development/ALPHA4_CHECKS.md). Debug APK builds are explicitly authorized for testing only; no production release. The fork uses its own package and NFC/Nearby identity, and in-app updates remain disabled. Upstream documentation below is retained for attribution and may describe older gameplay.
 
 # Tessel
 

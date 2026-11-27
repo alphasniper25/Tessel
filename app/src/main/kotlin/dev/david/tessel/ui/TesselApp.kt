@@ -109,6 +109,7 @@ fun TesselApp(
     var lobbyOpen by rememberSaveable { mutableStateOf(false) }
     var statsOpen by rememberSaveable { mutableStateOf(false) }
     var cardsOpen by rememberSaveable { mutableStateOf(false) }
+    var garageOpen by rememberSaveable { mutableStateOf(false) }
     var playOpen by remember { mutableStateOf(false) }
     var devOpen by rememberSaveable { mutableStateOf(false) }
     var codeOpen by remember { mutableStateOf(false) }
@@ -144,6 +145,7 @@ fun TesselApp(
         if (s is LobbyState.Searching && s.invite != null && mode == Mode.HOME) {
             settingsOpen = false
             cardsOpen = false
+            garageOpen = false
             statsOpen = false
             lobbyOpen = true
         }
@@ -252,7 +254,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen,
+            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen,
             enter = fadeIn(Springs.ui()),
             exit = fadeOut(Springs.ui()),
         ) {
@@ -263,6 +265,7 @@ fun TesselApp(
                 onTogether = { lobbyOpen = true },
                 onStats = { statsOpen = true },
                 onCards = { cardsOpen = true },
+                onGarage = { garageOpen = true },
                 onSettings = { settingsOpen = true },
                 onLogo = if (settings.devUnlocked) {
                     {
@@ -275,7 +278,7 @@ fun TesselApp(
 
         // Play with runs waiting asks first: a new one, or one of the saved ones. Drawn after the home
         // screen, or that would cover it.
-        Sheet(visible = playOpen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen, onDismiss = { playOpen = false }) {
+        Sheet(visible = playOpen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen, onDismiss = { playOpen = false }) {
             PlayPanel(
                 saves = savedRuns,
                 difficulty = settings.difficulty,
@@ -290,7 +293,10 @@ fun TesselApp(
                     game.continueRun(slot)
                 },
                 onDelete = game::discardSave,
+                initialCharacter = settings.tankClass,
+                look = settings.tankLook,
                 onNewCharacter = { character ->
+                    store.update { it.copy(tankClass = character) }
                     playOpen = false
                     game.startRun(settings.difficulty, character)
                 },
@@ -334,9 +340,13 @@ fun TesselApp(
             exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
         ) { CardCollectionScreen(ledger, onBack = { cardsOpen = false }) }
 
+        AnimatedVisibility(visible = garageOpen && mode == Mode.HOME, enter = fadeIn(Springs.ui()), exit = fadeOut(Springs.ui())) {
+            dev.david.tessel.ui.screens.GarageScreen(settings, ledger, store::update, onBack = { garageOpen = false })
+        }
+
         // A new install offers the tutorial once. Drawn after the home screen, or that would cover it.
         Sheet(
-            visible = onStart == null && !settings.tutorialSeen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !playOpen,
+            visible = onStart == null && !settings.tutorialSeen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !playOpen,
             onDismiss = { store.update { it.copy(tutorialSeen = true) } },
         ) {
             Column(
@@ -446,7 +456,7 @@ fun TesselApp(
         }
     }
 
-    BackHandler(enabled = settingsOpen || lobbyOpen || statsOpen || cardsOpen || playOpen || mode != Mode.HOME) {
+    BackHandler(enabled = settingsOpen || lobbyOpen || statsOpen || cardsOpen || garageOpen || playOpen || mode != Mode.HOME) {
         when {
             codeOpen -> codeOpen = false
             minutesOpen -> minutesOpen = false
@@ -455,6 +465,7 @@ fun TesselApp(
             settingsOpen -> settingsOpen = false
             statsOpen -> statsOpen = false
             cardsOpen -> cardsOpen = false
+            garageOpen -> garageOpen = false
             playOpen -> playOpen = false
             lobbyOpen -> {
                 lobby.leave()

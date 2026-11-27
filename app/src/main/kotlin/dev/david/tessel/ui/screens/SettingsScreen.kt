@@ -120,6 +120,11 @@ fun SettingsScreen(
                 }
 
                 Group("Display") {
+                    Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
+                        Text("Camera zoom", Type.body, c.ink)
+                        Segmented(listOf("Full arena", "Closer", "Close"), listOf(1f, 1.12f, 1.25f).indexOf(settings.cameraZoom).coerceAtLeast(0), { i -> onChange { it.copy(cameraZoom = listOf(1f, 1.12f, 1.25f)[i]) } })
+                    }
+                    Divider()
                     ToggleRow(
                         "Performance readout",
                         settings.showStats,

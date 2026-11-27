@@ -16,7 +16,12 @@
 
 ## Compatibility and release gates
 - The upstream auto-updater is disabled. Fork application ID, Nearby service ID and NFC AID are distinct; the Kotlin namespace is unchanged. Before production releases, configure stable owner-controlled signing and enable only the owner-controlled update channel. The Kotlin namespace may stay unchanged initially. Keep private signing credentials outside git and Drive source ZIPs. Do not publish under the original developer's identity.
-- Stable upgrade/enemy/perk numeric IDs are serialized; append rather than reorder. Check checkpoint FORMAT=5, ledger FORMAT=1, and Wire.VERSION=16 before making compatibility changes. Migrate or explicitly reject incompatible saves and peers. Cover both host and client in every new gameplay feature. Preserve solo play, team play, duels, touch and controller input.
+- Stable upgrade/enemy/perk numeric IDs are serialized; append rather than reorder. Check checkpoint FORMAT=6, ledger FORMAT=1, and Wire.VERSION=17 before making compatibility changes. Migrate or explicitly reject incompatible saves and peers. Cover both host and client in every new gameplay feature. Preserve solo play, team play, duels, touch and controller input.
 - Use existing fixed-step simulation, pooled objects and deterministic RNG. Avoid allocations or blocking in per-frame loops; do not add unrequested cloud accounts or external services.
 - Default workflow: source updates only. The owner explicitly authorized a debug test APK for alpha.3. Run `gradlew.bat testDebugUnitTest` (or `./gradlew testDebugUnitTest`) when the pinned SDK/toolchain are available, plus focused standalone JVM checks; build `assembleDebug` only when explicitly requested. Do not invoke assembleRelease, distApk or publish releases without approval. Do not claim APK readiness from JVM-only tests.
 - For any requested feature: identify affected files, add or adjust focused tests, run the regression suite, record test outputs and limitations, then update changelog. Keep unrelated behavior unchanged. No release without actual build and signing review.
+
+## Alpha.4 visual constraints
+- Exactly three paid shop slots; never add a fourth. Preserve the original flat, faceted geometric 2D style. No 3D assets, new arena obstacles or glow-heavy redesign.
+- Use GarageCatalog and TankArt for reusable cosmetic parts and previews. Cosmetics never change physics, stats, weapons or collision. Credit balance is derived from completed-run ledger totals, minus owned cosmetic prices; no run coin conversion. IDs and per-slot wire order append only.
+- Viewport zoom is local rendering only. Preserve all-player readiness, NFC, direct Wi-Fi and compressed snapshots. Save FORMAT=6 reads older saves; peers use Wire.VERSION=17.

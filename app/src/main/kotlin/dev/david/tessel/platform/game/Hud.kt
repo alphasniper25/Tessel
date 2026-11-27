@@ -121,32 +121,17 @@ class Hud(private val density: Float, fontScale: Float) {
         val left = insetLeft + 20f * density
         val top = insetTop + 18f * density
 
-        val pip = 12f * density
-        drawPips(canvas, w, palette, me, left, top, pip, 5f * density)
-
-        val coinRow = top + pip + 18f * density
+        val coinRow = top + 6f * density
         fill.color = palette.coin
         canvas.drawCircle(left + 6f * density, coinRow, 6f * density, fill)
         number.color = palette.ink
         buf.clear().put(pl.coins[me])
         canvas.drawText(buf.chars, 0, buf.length, left + 18f * density, coinRow + number.textSize * 0.35f, number)
 
-        // Everyone else's health, smaller, one row each under your own numbers.
-        var rowTop = coinRow + 16f * density
-        val mark = 4f * density
-        for (p in 0 until w.playerCount) {
-            if (p == me || !pl.present[p]) continue
-            line.color = palette.ink2
-            line.strokeWidth = 1.5f * density
-            drawHexagonMark(canvas, left + mark, rowTop + mark, mark)
-            drawPips(canvas, w, palette, p, left + 3 * mark, rowTop + mark * 0.25f, 7f * density, 3f * density)
-            rowTop += 14f * density
-        }
-
         if (practice) return
         if (surgeSeconds > 0 && !w.duel.on) {
             note.color = palette.coin
-            canvas.drawText("Surge $surgeSeconds", insetLeft + 20f * density + 30f * density, coinRow + 22f * density + (w.playerCount - 1) * 14f * density, note)
+            canvas.drawText("Surge $surgeSeconds", insetLeft + 20f * density + 30f * density, coinRow + 22f * density, note)
         }
         if (w.duel.on) drawDuel(canvas, w, palette, insetTop, me) else drawStageBar(canvas, w, palette, insetTop, me)
         drawClock(canvas, w, palette, insetTop, insetRight)

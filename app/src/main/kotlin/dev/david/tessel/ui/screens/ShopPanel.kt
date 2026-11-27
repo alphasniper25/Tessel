@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,14 +26,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.platform.game.ShopOffer
 import dev.david.tessel.platform.game.ShopView
 import dev.david.tessel.ui.components.CoinAmount
 import dev.david.tessel.ui.components.LevelPips
 import dev.david.tessel.ui.components.PrimaryButton
-import dev.david.tessel.ui.components.SecondaryButton
 import dev.david.tessel.ui.components.Text
 import dev.david.tessel.ui.components.pressScale
 import dev.david.tessel.ui.theme.Corner
@@ -63,7 +60,7 @@ fun ShopPanel(
     Column(
         Modifier
             .verticalScroll(rememberScrollState())
-            .padding(start = Space.x6, end = Space.x6, top = Space.x5, bottom = Space.x4),
+            .padding(start = Space.x6, end = Space.x6, top = Space.x2, bottom = Space.x2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -73,7 +70,7 @@ fun ShopPanel(
             }
             CoinAmount(shop.coins, style = Type.title3)
         }
-        Spacer(Modifier.height(Space.x3))
+        Spacer(Modifier.height(Space.x2))
 
         // After a boss: one perk to take before the shop can be left.
         if (shop.perkOffers.isNotEmpty()) {
@@ -103,47 +100,25 @@ fun ShopPanel(
             Spacer(Modifier.height(Space.x4))
         }
 
-        val tiles = ArrayList<@Composable (Modifier) -> Unit>()
-        for (offer in shop.offers) {
-            tiles += { m ->
-                Column(m, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    OfferTile(offer, Modifier.fillMaxWidth(), enabled = !shop.selfReady) {
-                        tap()
-                        onBuy(offer.slot)
+        if (shop.perkOffers.isEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (offer in shop.offers) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OfferTile(offer, Modifier.fillMaxWidth(), enabled = !shop.selfReady) { tap(); onBuy(offer.slot) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            CompactAction(if (offer.locked) "Locked • Unlock" else "Lock", Modifier.weight(1f), !offer.empty && !offer.maxed && !shop.selfReady, offer.locked) { tap(); onLock(offer.slot, !offer.locked) }
+                            CompactAction(if (offer.empty) "Sold" else if (offer.maxed) "Maxed" else "Buy ${offer.price}", Modifier.weight(1f), offer.affordable && !offer.maxed && !offer.empty && !shop.selfReady, false) { tap(); onBuy(offer.slot) }
+                        }
                     }
-                    SecondaryButton(if (offer.locked) "Unlock" else "Lock", { tap(); onLock(offer.slot, !offer.locked) },
-                        Modifier.fillMaxWidth(), enabled = !offer.empty && !offer.maxed && !shop.selfReady)
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
-        tiles += { m ->
-            HealTile(shop, m) {
-                tap()
-                onHeal()
-            }
-        }
-        for (row in tiles.chunked(COLUMNS)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (tile in row) tile(Modifier.weight(1f))
-                repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SecondaryButton(
-                "Refresh",
-                onReroll,
-                enabled = shop.canReroll && !shop.selfReady,
-                trailing = { CoinAmount(shop.rerollPrice, color = if (shop.canReroll) c.ink2 else c.ink3, style = Type.subhead) },
-            )
-            Spacer(Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CompactAction("Heal +${shop.healAmount} · ${shop.healPrice} coins · ${shop.healsLeft} left", Modifier.weight(1.5f), shop.canHeal && !shop.selfReady, false) { tap(); onHeal() }
+            CompactAction("Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }
             val choosing = shop.perkOffers.isNotEmpty()
-            when {
-                !shop.coop -> PrimaryButton("Next Stage", onNext, Modifier.width(220.dp), enabled = !choosing)
-                shop.selfReady -> PrimaryButton("Waiting for Others", {}, Modifier.width(220.dp), enabled = false)
-                else -> PrimaryButton("Ready", onNext, Modifier.width(220.dp), enabled = !choosing)
-            }
+            PrimaryButton(if (shop.selfReady) "Waiting" else if (shop.coop) "Ready" else "Next Stage", onNext, Modifier.weight(1f), enabled = !choosing && !shop.selfReady)
         }
     }
 }
@@ -152,16 +127,17 @@ fun ShopPanel(
 private fun OfferTile(offer: ShopOffer, modifier: Modifier, enabled: Boolean, onBuy: () -> Unit) {
     val c = Theme.colors
     Tile(
-        name = if (offer.empty) "Empty" else "${offer.rarity.label} ${offer.name}",
+        name = if (offer.empty) "Empty" else offer.name,
+        eyebrow = if (offer.empty) null else offer.rarity.label.uppercase(),
         blurb = offer.blurb,
         tint = if (offer.empty) null else when (offer.rarity) {
             CardRarity.COMMON -> null
-            CardRarity.UNCOMMON -> Color(0xFF27995A)
-            CardRarity.RARE -> Color(0xFF3984D8)
-            CardRarity.EPIC -> Color(0xFFAB6DE4)
-            CardRarity.LEGENDARY -> Color(0xFFD9A72A)
+            CardRarity.UNCOMMON -> if (c.dark) Color(0xFF76CF8A) else Color(0xFF007834)
+            CardRarity.RARE -> if (c.dark) Color(0xFF8EB5FF) else Color(0xFF3B5EB2)
+            CardRarity.EPIC -> if (c.dark) Color(0xFFCBA1FA) else Color(0xFF764AA2)
+            CardRarity.LEGENDARY -> c.coin
         },
-        enabled = offer.affordable && enabled,
+        enabled = offer.affordable && enabled && !offer.empty && !offer.maxed,
         faded = offer.maxed,
         onClick = onBuy,
         modifier = modifier,
@@ -179,31 +155,6 @@ private fun OfferTile(offer: ShopOffer, modifier: Modifier, enabled: Boolean, on
 }
 
 @Composable
-private fun HealTile(shop: ShopView, modifier: Modifier, onHeal: () -> Unit) {
-    val c = Theme.colors
-    val full = shop.hp >= shop.maxHp
-    Tile(
-        name = "Heal",
-        blurb = "Restore ${shop.healAmount} health",
-        enabled = shop.canHeal && !shop.selfReady,
-        faded = shop.healsLeft == 0,
-        onClick = onHeal,
-        modifier = modifier,
-    ) {
-        val note = when {
-            shop.healsLeft == 0 -> "None left"
-            full -> "Full health"
-            else -> "${shop.healsLeft} left"
-        }
-        Text(note, Type.footnote, c.ink2)
-        Spacer(Modifier.weight(1f))
-        if (!full && shop.healsLeft > 0) {
-            CoinAmount(shop.healPrice, color = if (shop.canHeal) c.ink else c.ink3, style = Type.subhead)
-        }
-    }
-}
-
-@Composable
 private fun Tile(
     name: String,
     blurb: String,
@@ -212,6 +163,7 @@ private fun Tile(
     faded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier,
+    eyebrow: String? = null,
     footer: @Composable RowScope.() -> Unit,
 ) {
     val c = Theme.colors
@@ -219,7 +171,7 @@ private fun Tile(
     Column(
         modifier
             .pressScale(source, enabled)
-            .height(112.dp)
+            .height(124.dp)
             .alpha(if (faded) 0.45f else 1f)
             .clip(RoundedCornerShape(Corner.button))
             .background(if (c.dark) c.raised else c.ground)
@@ -227,9 +179,20 @@ private fun Tile(
             .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = Space.x3, vertical = 10.dp),
     ) {
-        Text(name, Type.headline, tint ?: c.ink, maxLines = 1)
+        if (eyebrow != null) Text(eyebrow, Type.footnote, tint ?: c.ink2, maxLines = 1)
+        Text(name, Type.headline, c.ink, maxLines = 2)
         Text(blurb, Type.footnote, c.ink2, maxLines = 3)
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, content = footer)
+    }
+}
+
+@Composable
+private fun CompactAction(text: String, modifier: Modifier, enabled: Boolean, active: Boolean, action: () -> Unit) {
+    val c = Theme.colors
+    androidx.compose.foundation.layout.Box(modifier.height(44.dp).clip(RoundedCornerShape(Corner.button))
+        .background(if (active) c.ink else c.track).clickable(enabled = enabled, role = Role.Button, onClick = action)
+        .padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+        Text(text, Type.footnote, if (!enabled) c.ink3 else if (active) c.ground else c.ink, maxLines = 2)
     }
 }
