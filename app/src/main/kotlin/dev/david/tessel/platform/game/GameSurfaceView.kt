@@ -17,6 +17,7 @@ import android.view.SurfaceView
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.CharacterDef
@@ -1247,7 +1248,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 name = def.name,
                 blurb = Upgrades.blurb(u, s.levelsBought(world, me, slot)),
                 level = pl.levels[me][u],
-                maxLevel = def.maxLevel,
+                maxLevel = Upgrades.runCap(u),
                 price = s.price(world, me, slot),
                 maxed = s.maxed(world, me, slot),
                 affordable = s.canBuy(world, me, slot),
@@ -1257,8 +1258,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 locked = s.locked(me, slot),
             )
         }
-        val perkOffers = (0 until Perks.OFFERED).mapNotNull { k ->
-            s.perkOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, Perks.of(it).name, Perks.of(it).blurb) }
+        val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
+            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it)) }
         }
         val ready = host?.ready ?: 0
         publishedReady = ready
@@ -1299,7 +1300,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             key = key * 31 + s.shopLevels[slot]
             key = key * 31 + (if (s.shopLocked[slot]) 1 else 0)
         }
-        for (k in 0 until Perks.OFFERED) key = key * 31 + s.perkOffer[k]
+        for (k in 0 until TankEvolution.REWARD_SLOTS) key = key * 31 + s.perkOffer[k]
         if (key == clientShopKey && shopFlow.value != null) return
         clientShopKey = key
 
@@ -1313,7 +1314,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 name = def.name,
                 blurb = Upgrades.blurb(u, s.shopLevels[slot]),
                 level = s.shopLevel[slot],
-                maxLevel = def.maxLevel,
+                maxLevel = Upgrades.runCap(u),
                 price = s.shopPrice[slot],
                 maxed = s.shopMaxed[slot],
                 affordable = s.shopAffordable[slot],
@@ -1322,8 +1323,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 levels = s.shopLevels[slot],
             )
         }
-        val perkOffers = (0 until Perks.OFFERED).mapNotNull { k ->
-            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, Perks.of(it).name, Perks.of(it).blurb) }
+        val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
+            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it)) }
         }
         shopFlow.value = ShopView(
             stage = s.stage,

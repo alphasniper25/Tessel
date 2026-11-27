@@ -30,6 +30,8 @@ enum class Move {
 /** What it shoots. Hostile shots are always slow, hollow and dodgeable. */
 enum class Attack { NONE, AIMED, FAN, RING, SPIRAL, SPAWN }
 
+enum class StatusEffect { NONE, BURN, POISON, FREEZE }
+
 class EnemyDef(
     val name: String,
     val shape: Shape,
@@ -74,6 +76,8 @@ class EnemyDef(
     val pack: Boolean = false,
     val boss: Boolean = false,
     val blurb: String = "",
+    val status: StatusEffect = StatusEffect.NONE,
+    val trailEvery: Int = 0,
 )
 
 /** Every enemy type, indexed by the type id the sim stores. */
@@ -104,6 +108,12 @@ object Bestiary {
     const val LATTICE = 23
     const val SOWER = 24
     const val CORE = 25
+    const val STALKER = 26
+    const val SENTINEL = 27
+    const val SHREDDER = 28
+    const val EMBER = 29
+    const val VENOM = 30
+    const val FROST = 31
 
     private val defs = arrayOf(
         EnemyDef(
@@ -213,7 +223,7 @@ object Bestiary {
         ),
         EnemyDef(
             "Pendulum", Shape.DIAMOND, radius = 38f, hp = 1800f, speed = 120f, mass = 50f, cost = 0f, coins = 80, hue = 172, tone = -1,
-            move = Move.BOSS, boss = true, blurb = "Swings round the arena and fires as it passes.",
+            move = Move.BOSS, boss = true, blurb = "Swings round the arena and fires as it passes. Stage 30 brings a twin pair.",
         ),
         EnemyDef(
             "Lattice", Shape.CROSS, radius = 46f, hp = 2100f, speed = 30f, mass = 60f, cost = 0f, coins = 90, hue = 237, tone = -1,
@@ -228,6 +238,20 @@ object Bestiary {
             move = Move.BOSS, boss = true, spin = 0.15f,
             blurb = "Lights up squares of the floor and takes your perks. Then it calls the other bosses.",
         ),
+        EnemyDef("Stalker", Shape.DART, radius=10f, hp=4f, speed=175f, mass=.8f, cost=3f, coins=3, hue=290,
+            move=Move.DASH, range=390f, faces=true, from=8, weight=1.05f, group=2, blurb="Fast hunter that telegraphs a charge."),
+        EnemyDef("Sentinel", Shape.HEXAGON, radius=24f, hp=25f, speed=55f, mass=8f, cost=8f, coins=6, hue=208,
+            move=Move.HOVER, range=330f, attack=Attack.FAN, every=1.8f, shots=5, shotSpeed=205f, spread=.25f, from=16, weight=.8f, faces=true, blurb="Heavy ranged fan fire."),
+        EnemyDef("Shredder", Shape.CROSS, radius=18f, hp=12f, speed=105f, mass=3f, cost=7f, coins=5, hue=330,
+            move=Move.ORBIT, range=180f, attack=Attack.RING, every=2.2f, shots=8, shotSpeed=170f, from=24, weight=.85f, spin=1.1f, deathRing=6, blurb="Orbits, pulses rings, and bursts on death."),
+        EnemyDef("Ember", Shape.DIAMOND, radius=18f, hp=20f, speed=120f, mass=4f, cost=8f, coins=6, hue=35,
+            from=16, weight=.40f, group=1, faces=true, status=StatusEffect.BURN, trailEvery=54, blurb="Leaves lingering fire rings. Contact burns."),
+        EnemyDef("Venom", Shape.PENTAGON, radius=19f, hp=24f, speed=82f, mass=4f, cost=9f, coins=7, hue=135,
+            move=Move.HOVER, range=280f, attack=Attack.AIMED, every=3.2f, shots=1, shotSpeed=180f, from=21, weight=.36f, group=1, faces=true,
+            status=StatusEffect.POISON, blurb="Poison ticks three times after a hit."),
+        EnemyDef("Frost", Shape.HEXAGON, radius=22f, hp=30f, speed=62f, mass=5f, cost=10f, coins=8, hue=225,
+            move=Move.PARK, attack=Attack.RING, every=4.5f, shots=8, shotSpeed=140f, from=26, weight=.30f, group=1,
+            status=StatusEffect.FREEZE, blurb="Cold shots briefly freeze movement and fire."),
     )
 
     /** Bosses in the order they appear, every [BOSS_EVERY] stages, then round again. */

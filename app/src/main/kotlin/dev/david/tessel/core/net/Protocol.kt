@@ -1,5 +1,6 @@
 package dev.david.tessel.core.net
 
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Elite
@@ -93,6 +94,12 @@ object Protocol {
         buf.put(w.core.strike.toByte())
         buf.put(w.core.strikeParity.toByte())
         buf.put((w.core.warnShare * 255).toInt().coerceIn(0, 255).toByte())
+        val hazard=w.core.hazards
+        if(w.core.form!=0){
+            buf.put((hazard.shieldShare*255).toInt().toByte());buf.put(hazard.hidden.coerceIn(0,255).toByte());buf.put(hazard.warning.toByte())
+            Wire.putPos(buf,hazard.headX);Wire.putPos(buf,hazard.headY);buf.put(hazard.count.toByte())
+            for(k in 0 until hazard.count){Wire.putPos(buf,hazard.x[k]);Wire.putPos(buf,hazard.y[k])}
+        }
 
         for (p in 0 until w.playerCount) {
             Wire.putPos(buf, pl.x[p])
@@ -102,6 +109,8 @@ object Protocol {
             buf.put(pl.hp[p].toByte())
             buf.put(pl.maxHp[p].toByte())
             buf.put(pl.character[p].ordinal.toByte())
+            buf.put(pl.evolution[p].ordinal.toByte())
+            buf.put(pl.shieldCooldown[p].coerceIn(0,255).toByte())
             buf.putShort(pl.appearance[p].code().toShort())
             var flags = 0
             if (pl.hurt[p] > 0) flags = flags or 1
@@ -132,6 +141,7 @@ object Protocol {
             buf.put((if (pl.surge[p] == 0) 0 else (pl.surge[p] / TICK_HZ + 1).coerceAtMost(255)).toByte())
             buf.put(d.wins[p].toByte())
             buf.put(pl.stun[p].coerceIn(0, 255).toByte())
+            buf.put(pl.poisonTicks[p].coerceIn(0,255).toByte())
         }
 
         val e = w.enemies
@@ -206,7 +216,7 @@ object Protocol {
             buf.put((if (s.canHeal(w, forPlayer)) 1 else 0).toByte())
             buf.putInt(s.rerollPrice(w, forPlayer))
             buf.put((if (s.canReroll(w, forPlayer)) 1 else 0).toByte())
-            for (k in 0 until Perks.OFFERED) buf.put(s.perkOffer(forPlayer, k).toByte())
+            for (k in 0 until TankEvolution.REWARD_SLOTS) buf.put(s.rewardOffer(forPlayer, k).toByte())
         }
     }
 
@@ -242,6 +252,8 @@ object Protocol {
         s.strike = buf.get().toInt()
         s.strikeParity = buf.get().toInt()
         s.strikeShare = (buf.get().toInt() and 0xFF) / 255f
+        s.beamCount=0;s.coreShield=0f;s.coreHidden=0;s.coreWarning=0
+        if(s.coreForm!=0){s.coreShield=(buf.get().toInt() and 255)/255f;s.coreHidden=buf.get().toInt() and 255;s.coreWarning=buf.get().toInt() and 255;s.beamX=Wire.getPos(buf);s.beamY=Wire.getPos(buf);s.beamCount=buf.get().toInt() and 255;require(s.beamCount<=s.beamXs.size);for(k in 0 until s.beamCount){s.beamXs[k]=Wire.getPos(buf);s.beamYs[k]=Wire.getPos(buf)}}
 
         for (p in 0 until s.playerCount) {
             s.px[p] = Wire.getPos(buf)
@@ -251,6 +263,8 @@ object Protocol {
             s.hp[p] = buf.get().toInt()
             s.maxHp[p] = buf.get().toInt()
             s.character[p] = dev.david.tessel.core.content.CharacterDef.fromId(buf.get().toInt())
+            s.evolution[p]=TankEvolution.fromId(buf.get().toInt())
+            s.shieldCooldown[p]=buf.get().toInt() and 255
             val lookCode = buf.short.toInt() and 0xFFFF
             if (s.appearance[p].code() != lookCode) s.appearance[p] = dev.david.tessel.core.content.TankLook.fromCode(lookCode)
             val f = buf.get().toInt()
@@ -280,6 +294,7 @@ object Protocol {
             s.surge[p] = buf.get().toInt() and 0xFF
             s.duelWins[p] = buf.get().toInt()
             s.stun[p] = buf.get().toInt() and 0xFF
+            s.poisonTicks[p]=buf.get().toInt() and 255
         }
 
         s.enemyCount = buf.short.toInt().coerceIn(0, MAX_ENEMIES)
@@ -354,9 +369,9 @@ object Protocol {
             s.canHeal = buf.get().toInt() != 0
             s.rerollPrice = buf.int
             s.canReroll = buf.get().toInt() != 0
-            for (k in 0 until Perks.OFFERED) {
+            for (k in 0 until TankEvolution.REWARD_SLOTS) {
                 val id = buf.get().toInt()
-                s.perkOffer[k] = if (id in 0 until Perks.count) id else -1
+                s.perkOffer[k] = if (TankEvolution.validReward(id)) id else -1
             }
         }
     }
@@ -385,7 +400,7 @@ object Protocol {
             Wire.putUnit(buf, reports.hitY[k])
         }
         buf.put(reports.hurts.toByte())
-        for (k in 0 until reports.hurts) buf.putShort(reports.hurtBy[k].toShort())
+        for (k in 0 until reports.hurts) buf.putInt(reports.hurtBy[k])
         buf.put(reports.pickups.toByte())
         for (k in 0 until reports.pickups) buf.putShort(reports.pickupId[k].toShort())
     }
@@ -407,8 +422,8 @@ object Protocol {
         val hits = buf.get().toInt() and 0xFF
         repeat(hits) { reports.hit(buf.short.toInt() and 0xFFFF, Wire.getUnit(buf), Wire.getUnit(buf)) }
         val hurts = buf.get().toInt() and 0xFF
-        // A touch travels as 0xFFFF, which reads back as -1.
-        repeat(hurts) { reports.hurt(buf.short.toInt()) }
+        // Distinguish the -1 touch sentinel from every possible unsigned 16-bit shot id.
+        repeat(hurts) { reports.hurt(buf.int) }
         val pickups = buf.get().toInt() and 0xFF
         repeat(pickups) { reports.pickup(buf.short.toInt() and 0xFFFF) }
     }

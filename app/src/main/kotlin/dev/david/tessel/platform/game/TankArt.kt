@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.GarageCatalog
 import dev.david.tessel.core.content.TankLook
@@ -24,18 +25,28 @@ class TankArt {
         val start = if (shape == HullVisual.SQUARE) PI/4 else -PI/2
         FloatArray(n*2) { i -> val a=start+(i/2)*2*PI/n; if(i%2==0) cos(a).toFloat() else sin(a).toFloat() }
     }
-    fun draw(c: Canvas, x: Float, y: Float, r: Float, ax: Float, ay: Float, character: CharacterDef, look: TankLook, defaultBody: Int, defaultFacet: Int, ground: Int, hurt: Boolean = false, alpha: Int = 255) {
+    fun draw(c: Canvas, x: Float, y: Float, r: Float, ax: Float, ay: Float, character: CharacterDef, look: TankLook, defaultBody: Int, defaultFacet: Int, ground: Int, hurt: Boolean = false, alpha: Int = 255, evolution: TankEvolution = TankEvolution.BASIC, shieldCooldown: Int = 0) {
         val paint = GarageCatalog.items.getOrNull(look.paint)?.color ?: 0
         val body = if (paint == 0 || hurt) defaultBody else paint
         val facet = if (paint == 0 || hurt) defaultFacet else cosmeticFacets[look.paint]
         line.color = body; line.alpha = alpha; line.strokeCap = Paint.Cap.ROUND; line.strokeWidth = r * .5f
         val turret = GarageCatalog.items[look.turret]
-        val length = turret.barrelLength
-        if (turret.barrels == 2) {
-            line.strokeWidth = r * .24f
-            for (sign in -1..1 step 2) { val ox = -ay * r * .25f * sign; val oy = ax * r * .25f * sign
-                c.drawLine(x + ox, y + oy, x + ax * r * length + ox, y + ay * r * length + oy, line) }
-        } else c.drawLine(x + ax * r * .5f, y + ay * r * .5f, x + ax * r * length, y + ay * r * length, line)
+        val n=evolution.barrels
+        val aim=atan2(ay,ax)
+        val length=if(evolution==TankEvolution.BASIC) turret.barrelLength else evolution.length
+        for(k in 0 until n){
+            val a=evolution.originAngle(aim,k,n); val dx=cos(a); val dy=sin(a)
+            val off=if(evolution.drones)0f else (k-(n-1)/2f)*evolution.lateral*r; val ox=-ay*off; val oy=ax*off
+            if(evolution.drones){
+                val cx=x+dx*r*evolution.lateral+ox; val cy=y+dy*r*evolution.lateral+oy
+                line.strokeWidth=r*.11f; c.drawLine(x+dx*r*.7f,y+dy*r*.7f,cx,cy,line)
+                fill.color=body;fill.alpha=alpha;hull.reset();hull.moveTo(cx+dx*r*.36f,cy+dy*r*.36f)
+                hull.lineTo(cx-dx*r*.30f-dy*r*.27f,cy-dy*r*.30f+dx*r*.27f);hull.lineTo(cx-dx*r*.30f+dy*r*.27f,cy-dy*r*.30f-dx*r*.27f);hull.close();c.drawPath(hull,fill)
+            } else {
+                line.strokeWidth=r*(if(n>1) .25f else if(evolution.damage>=4f) .72f else .5f)
+                c.drawLine(x+ox+dx*r*.35f,y+oy+dy*r*.35f,x+ox+dx*r*length,y+oy+dy*r*length,line)
+            }
+        }
         val shape = GarageCatalog.hull(look,character)
         fill.color = body; fill.alpha = alpha
         if (shape == HullVisual.CIRCLE) {
@@ -54,6 +65,11 @@ class TankArt {
         line.color=ground; line.alpha=alpha; line.strokeWidth=r*.10f
         if(GarageCatalog.items[look.skin].pattern==SkinVisual.STRIPE) c.drawLine(x-r*.55f,y+r*.35f,x+r*.55f,y-r*.35f,line)
         if(GarageCatalog.items[look.skin].pattern==SkinVisual.RING) c.drawCircle(x,y,r*.58f,line)
+        if(evolution.melee){
+            line.color=if(shieldCooldown==0) facet else body;line.alpha=if(shieldCooldown==0) 255 else 100
+            line.strokeWidth=r*.11f;oval.set(x-r*1.35f,y-r*1.35f,x+r*1.35f,y+r*1.35f)
+            c.drawArc(oval,-90f,if(shieldCooldown==0) 360f else (360f*(1f-shieldCooldown/(evolution.shieldSeconds*60f))).coerceIn(0f,360f),false,line)
+        }
         fill.alpha=255; line.alpha=255
     }
 }

@@ -3,7 +3,7 @@ package dev.david.tessel.core.content
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-enum class UpgradeStat { DAMAGE, DAMAGE_BONUS, FIRE_RATE, VOLLEY, VELOCITY, PIERCE, RANGE, SPEED, SPEED_BONUS, MAX_HP, WEALTH, MAGNET, CALIBER, RAM, HEAL }
+enum class UpgradeStat { DAMAGE, DAMAGE_BONUS, FIRE_RATE, VOLLEY, VELOCITY, PIERCE, RANGE, SPEED, SPEED_BONUS, MAX_HP, WEALTH, MAGNET, CALIBER, RAM, HEAL, REGEN, SHIELD_RECHARGE, DRONE_POWER }
 
 data class StatEffect(val stat: UpgradeStat, val amount: Float)
 
@@ -41,6 +41,9 @@ object Upgrades {
     const val AFTERBURNER = 14
     const val TITAN_PLATING = 15
     const val CORE_BREAKER = 16
+    const val REGEN = 17
+    const val SHIELD_RECHARGE = 18
+    const val DRONE_POWER = 19
 
     private val defs = arrayOf(
         UpgradeDef("Damage", "+15% damage per bullet", basePrice = 10, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
@@ -60,9 +63,22 @@ object Upgrades {
         UpgradeDef("Afterburner", "+18% movement speed", basePrice = 46, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED_BONUS),
         UpgradeDef("Titan Plating", "+4 max HP, filled; +3 retaliation damage", basePrice = 112, maxLevel = 1, step = 4f, family = CardFamily.RAM, secondaryStep = 3f, stat = UpgradeStat.MAX_HP, secondaryStat = UpgradeStat.RAM),
         UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 168, maxLevel = 1, step = 0.8f, family = CardFamily.GUN, stat = UpgradeStat.DAMAGE_BONUS),
+        UpgradeDef("Regeneration", "Recover health during combat; each level shortens the interval", basePrice=20, maxLevel=3, step=1f, family=CardFamily.HEALTH, stat=UpgradeStat.REGEN),
+        UpgradeDef("Shield Recharge", "12% faster impact shield recovery", basePrice=23, maxLevel=4, step=.12f, family=CardFamily.RAM, stat=UpgradeStat.SHIELD_RECHARGE),
+        UpgradeDef("Drone Power", "+10% drone projectile damage", basePrice=18, maxLevel=5, step=.10f, stat=UpgradeStat.DRONE_POWER),
     )
 
     val count get() = defs.size
+    fun offered(id: Int, frame: TankEvolution): Boolean {
+        if(id==MULTISHOT || id==VELOCITY) return false
+        if(id==SHIELD_RECHARGE) return frame.melee
+        if(id==DRONE_POWER) return frame.drones
+        if(frame.melee && (id==FIRE_RATE || id==PIERCE || id==RANGE || id==CALIBER || id==CORE_BREAKER)) return false
+        if(!frame.melee && frame!=TankEvolution.BASIC && id==RAM_DAMAGE) return false
+        return true
+    }
+    fun runCap(id: Int) = when(id) { DAMAGE -> 12; FIRE_RATE -> 10; PIERCE -> 3; WEALTH -> 5; MAX_HEALTH -> 7; else -> defs[id].maxLevel }
+
 
     // Compiled once. The hot simulation traverses only the relevant effect(s), without filtering or allocation.
     private class Contribution(val id: Int, val amount: Float)
@@ -85,6 +101,9 @@ object Upgrades {
     /** What [levels] levels bought together add, for a rare upgrade's card. */
     fun blurb(id: Int, levels: Int): String {
         if (levels <= 1) return defs[id].blurb
+        if(id==REGEN) return "+$levels regeneration levels"
+        if(id==SHIELD_RECHARGE) return "+${12*levels}% shield recharge rate"
+        if(id==DRONE_POWER) return "+${10*levels}% drone damage"
         val pct = { step: Float -> "+${(step * 100 * levels).roundToInt()}%" }
         val more = when (levels) {
             2 -> "Two"
@@ -124,7 +143,7 @@ object Upgrades {
     private const val LEVEL_GROWTH = 1.23
     private const val STAGE_GROWTH = 1.12
 
-    const val HEAL_AMOUNT = 2
+    const val HEAL_AMOUNT = 3
     const val HEALS_PER_SHOP = 2
 
     /** Keeps pace with shop inflation, so a heal always costs about the same number of kills. */

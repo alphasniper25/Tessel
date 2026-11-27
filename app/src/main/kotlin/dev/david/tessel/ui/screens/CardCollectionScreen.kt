@@ -22,6 +22,7 @@ fun CardCollectionScreen(ledger: Ledger, onBack: () -> Unit) {
     val xp = AccountProgress.xp(totals)
     val level = AccountProgress.level(xp)
     val unlocked = CardMission.entries.count { it.unlocked(totals) }
+    val activeCount = Upgrades.count - 2
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
             BackButton("Home", onBack, Modifier.align(Alignment.CenterStart))
@@ -32,7 +33,7 @@ fun CardCollectionScreen(ledger: Ledger, onBack: () -> Unit) {
                 item {
                     Text("Level $level · $xp XP", Type.title2, c.ink)
                     Text("${AccountProgress.threshold(level + 1) - xp} XP to next level", Type.subhead, c.ink2)
-                    Text("${Upgrades.count - CardMission.entries.size + unlocked} / ${Upgrades.count} cards unlocked", Type.subhead, c.ink2)
+                    Text("${activeCount - CardMission.entries.size + unlocked} / ${activeCount} cards unlocked", Type.subhead, c.ink2)
                     Text("Unlocked cards enter your shop pool on the next new run. All purchases still cost run coins. XP is earned from survival, kills, bosses and wins.", Type.footnote, c.ink3)
                 }
                 item { Text("Mission cards", Type.title3, c.ink) }
@@ -48,14 +49,25 @@ fun CardCollectionScreen(ledger: Ledger, onBack: () -> Unit) {
                         }
                     }
                 }
-                item { Text("Starter collection", Type.title3, c.ink) }
-                items((0 until Upgrades.count).filter { CardMission.forUpgrade(it) == null }) { id ->
+                item { Text("Stat collection · some cards require a compatible tank", Type.title3, c.ink) }
+                items((0 until Upgrades.count).filter { CardMission.forUpgrade(it) == null && it != Upgrades.MULTISHOT && it != Upgrades.VELOCITY }) { id ->
                     val def = Upgrades.of(id)
                     Group(title = null) {
                         Column(Modifier.fillMaxWidth().padding(Space.x4)) {
                             Text("${def.name} · Unlocked", Type.headline, c.ink)
                             Text(def.blurb, Type.subhead, c.ink2)
                             Text("${def.family.name.lowercase()} · all five rarities", Type.footnote, c.ink3)
+                        }
+                    }
+                }
+                item { Text("Tank evolution guide", Type.title3, c.ink) }
+                item { Text("Secret route: stay Basic and defeat the stage 40 boss.", Type.footnote, c.ink2) }
+                items(TankEvolution.entries.filter { it.tier>0 && !it.secret }) { frame ->
+                    Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment=Alignment.CenterVertically) {
+                        TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(62.dp),frame)
+                        Column(Modifier.weight(1f)) {
+                            Text("${frame.label} · Tier ${frame.tier}",Type.headline,c.ink)
+                            Text("From ${TankEvolution.fromId(frame.parent).label} · ${frame.detail}",Type.footnote,c.ink2)
                         }
                     }
                 }

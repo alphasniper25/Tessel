@@ -4,13 +4,19 @@ package dev.david.tessel.core.content
 object CoreRules {
     /** The stage that ends in the Core. */
     const val STAGE = 50
+    /** The final arena is driven by telegraphed hazards and reinforcement waves, not constant crowd spam. */
+    const val STEADY_SPAWNS = .08f
+    const val HARD_STEADY_SPAWNS = .14f
+    const val REINFORCEMENT_SPAWNS = .22f
+    /** Avoid compounding the ordinary boss-repeat multiplier on all nine final-fight bosses. */
+    const val FINAL_ROUND_SCALE = 1.35f
 
     /** Health, before the usual boss scaling. The second form has less. */
-    const val HP_FIRST = 3000f
-    const val HP_SECOND = 1200f
+    const val HP_FIRST = 2200f
+    const val HP_SECOND = 900f
 
     /** A borrowed boss has this share of its usual health. */
-    const val ESCORT_HP = 0.4f
+    const val ESCORT_HP = 0.30f
 
     // Grid strikes.
     const val CELL = 112f
@@ -20,7 +26,7 @@ object CoreRules {
 
     /** Gap between strikes at the start of the first form, and how much faster it gets. */
     const val STRIKE_GAP = 4.6f
-    const val STRIKE_GAP_MIN = 2.4f
+    const val STRIKE_GAP_MIN = 3.2f
 
     /** Every second of the fight makes the first form this much faster; losing health adds up to [HURRY_BY_HEALTH]. */
     const val HURRY_PER_SECOND = 0.007f
@@ -37,7 +43,7 @@ object CoreRules {
 
     // The second form.
     const val TRANSFORM_SECONDS = 3.5f
-    const val SENT_OUT = 3
+    const val SENT_OUT = 2
     const val BUBBLE_RX = 560f
     const val BUBBLE_RY = 255f
     const val BUBBLE_RADIUS = 60f

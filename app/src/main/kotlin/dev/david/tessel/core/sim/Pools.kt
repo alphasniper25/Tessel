@@ -1,5 +1,6 @@
 package dev.david.tessel.core.sim
 
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.Elite
@@ -24,6 +25,10 @@ class PlayerState {
     val aimY = FloatArray(MAX_PLAYERS)
     val hp = IntArray(MAX_PLAYERS)
     val maxHp = IntArray(MAX_PLAYERS)
+    val evolution = Array(MAX_PLAYERS) { TankEvolution.BASIC }
+    val shieldCooldown = IntArray(MAX_PLAYERS)
+    val lastEvolutionStage = IntArray(MAX_PLAYERS)
+    val upgradeSpent = Array(MAX_PLAYERS) { IntArray(Upgrades.count) }
     val character = Array(MAX_PLAYERS) { CharacterDef.BALANCED }
     val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
 
@@ -84,6 +89,8 @@ class PlayerState {
 
     /** Ticks left of a stun: no moving, no shooting. */
     val stun = IntArray(MAX_PLAYERS)
+    val poisonTicks = IntArray(MAX_PLAYERS)
+    val poisonSource = IntArray(MAX_PLAYERS) { -1 }
 
     fun has(p: Int, perk: Int) = perks[p] shr perk and 1 != 0
 
@@ -92,7 +99,7 @@ class PlayerState {
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
-        return d
+        return d * evolution[p].damage * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
     }
 
     fun fireRate(p: Int): Float {
@@ -100,14 +107,21 @@ class PlayerState {
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
         if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
-        return r
+        return r * evolution[p].rate
     }
-    fun volley(p: Int) = 1 + Upgrades.delta(levels[p], UpgradeStat.VOLLEY).toInt()
-    fun bulletSpeed(p: Int) = scaled(p, UpgradeStat.VELOCITY, Balance.BULLET_SPEED)
-    fun pierce(p: Int) = Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
-    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE)
-    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM)
+    fun volley(p: Int) = if (evolution[p] == TankEvolution.BASIC) 1 + Upgrades.delta(levels[p], UpgradeStat.VOLLEY).toInt() else evolution[p].barrels
+    fun bulletSpeed(p: Int) = scaled(p, UpgradeStat.VELOCITY, Balance.BULLET_SPEED) * evolution[p].velocity
+    fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
+    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach
+    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
+    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE))
+    fun regenSeconds(p: Int): Int {
+        val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
+        val base=if(a==0) b else if(b==0) a else minOf(a,b)
+        val level=Upgrades.delta(levels[p],UpgradeStat.REGEN).toInt()
+        return if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(4)
+    }
+    fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
     fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
     fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
@@ -125,6 +139,10 @@ class PlayerState {
             aimX[i] = 1f
             aimY[i] = 0f
             character[i] = CharacterDef.BALANCED
+            evolution[i] = TankEvolution.BASIC
+            shieldCooldown[i] = 0
+            lastEvolutionStage[i] = 0
+            upgradeSpent[i].fill(0)
             appearance[i] = dev.david.tessel.core.content.TankLook()
             maxHp[i] = (Balance.PLAYER_HP + bonusHp).coerceAtLeast(1)
             hp[i] = if (i < count) maxHp[i] else 0
@@ -150,6 +168,8 @@ class PlayerState {
             sinceHit[i] = OVERCLOCK_TICKS
             surge[i] = 0
             stun[i] = 0
+            poisonTicks[i] = 0
+            poisonSource[i] = -1
         }
     }
 
@@ -188,6 +208,10 @@ class BulletPool(private val capacity: Int) {
 
     /** Id of the enemy it last went through, so a piercing bullet does not hit the same one twice. */
     val lastHit = IntArray(capacity)
+    private val hitCount = IntArray(capacity)
+    private val hitHistory = IntArray(capacity * 64)
+    fun hasHit(i:Int, enemy:Int):Boolean { if(lastHit[i]==enemy)return true; for(k in 0 until hitCount[i])if(hitHistory[i*64+k]==enemy)return true;return false }
+    fun recordHit(i:Int,enemy:Int){lastHit[i]=enemy;val n=hitCount[i];if(n<64){hitHistory[i*64+n]=enemy;hitCount[i]=n+1}}
 
     var count = 0
         private set
@@ -207,6 +231,7 @@ class BulletPool(private val capacity: Int) {
         this.radius[i] = radius
         this.pierce[i] = pierce
         lastHit[i] = -1
+        hitCount[i]=0
         this.owner[i] = owner
         source[i] = -1
         return i
@@ -241,6 +266,8 @@ class BulletPool(private val capacity: Int) {
         radius[i] = radius[last]
         pierce[i] = pierce[last]
         lastHit[i] = lastHit[last]
+        hitCount[i]=hitCount[last]
+        hitHistory.copyInto(hitHistory,i*64,last*64,last*64+hitCount[last])
         owner[i] = owner[last]
         source[i] = source[last]
     }

@@ -17,7 +17,7 @@ enum class Difficulty(
     val bossToughness: Float,
     val shotSpeed: Float,
     val attackRate: Float,
-    /** Health pips on top of the usual six. */
+    /** Health pips on top of the usual ten. */
     val bonusHp: Int,
     val coinValue: Float,
     /** What the run's score is multiplied by. */
@@ -39,7 +39,7 @@ enum class Difficulty(
         shotSpeed = 1.05f, attackRate = 1.1f, bonusHp = 0, coinValue = 1f, score = 1.5f,
     ),
     IMPOSSIBLE(
-        "Impossible", "Everything at once. Four health. Good luck.",
+        "Impossible", "Everything at once. Eight health. Good luck.",
         spawn = 1.6f, speed = 1.2f, toughness = 1.5f, bossToughness = 1.6f,
         shotSpeed = 1.2f, attackRate = 1.35f, bonusHp = -2, coinValue = 0.9f, score = 2.2f,
     ),

@@ -74,11 +74,11 @@ fun ShopPanel(
         Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
         // After a boss: one perk to take before the shop can be left.
         if (shop.perkOffers.isNotEmpty()) {
-            Text("Choose a Perk", Type.headline, c.ink)
+            Text(if(shop.perkOffers.any { it.evolution!=null }) "Choose a Tank Evolution" else "Choose a Perk", Type.headline, c.ink)
             Text("It stays for the rest of the run.", Type.footnote, c.ink3)
             Spacer(Modifier.height(Space.x2))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (offer in shop.perkOffers) {
+                for (offer in shop.perkOffers.filter { it.name != "Stay Basic" }) {
                     Tile(
                         name = offer.name,
                         blurb = offer.blurb,
@@ -90,12 +90,13 @@ fun ShopPanel(
                             onPerk(offer.slot)
                         },
                         modifier = Modifier.weight(1f),
+                        evolution = offer.evolution,
                     ) {
                         Spacer(Modifier.weight(1f))
-                        Text("Take", Type.subhead, c.ink)
+                        Text(if(offer.evolution!=null) "Evolve" else "Take", Type.subhead, c.ink)
                     }
                 }
-                repeat(COLUMNS - shop.perkOffers.size) { Spacer(Modifier.weight(1f)) }
+                repeat((COLUMNS - shop.perkOffers.count { it.name != "Stay Basic" }).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
             }
             Spacer(Modifier.height(Space.x4))
         }
@@ -118,8 +119,10 @@ fun ShopPanel(
         dev.david.tessel.ui.components.Divider()
         Spacer(Modifier.height(Space.x2))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CompactAction("Heal +${shop.healAmount} · ${shop.healPrice} coins · ${shop.healsLeft} left", Modifier.weight(1.5f), shop.canHeal && !shop.selfReady, false) { tap(); onHeal() }
-            CompactAction("Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }
+            if(shop.perkOffers.isEmpty()) CompactAction("Heal +${shop.healAmount} · ${shop.healPrice} coins · ${shop.healsLeft} left", Modifier.weight(1.5f), shop.canHeal && !shop.selfReady, false) { tap(); onHeal() }
+            if(shop.perkOffers.isEmpty()) CompactAction("Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }
+            val skip = shop.perkOffers.firstOrNull { it.name == "Stay Basic" }
+            if(skip!=null) CompactAction("Stay Basic", Modifier.weight(1f), !shop.selfReady, false) { tap(); onPerk(skip.slot) }
             val choosing = shop.perkOffers.isNotEmpty()
             PrimaryButton(if (shop.selfReady) "Waiting" else if (shop.coop) "Ready" else "Next Stage", onNext, Modifier.weight(1f), enabled = !choosing && !shop.selfReady)
         }
@@ -167,6 +170,7 @@ private fun Tile(
     onClick: () -> Unit,
     modifier: Modifier,
     eyebrow: String? = null,
+    evolution: dev.david.tessel.core.content.TankEvolution? = null,
     footer: @Composable RowScope.() -> Unit,
 ) {
     val c = Theme.colors
@@ -174,7 +178,7 @@ private fun Tile(
     Column(
         modifier
             .pressScale(source, enabled)
-            .height(124.dp)
+            .height(if(evolution!=null) 148.dp else 124.dp)
             .alpha(if (faded) 0.45f else 1f)
             .clip(RoundedCornerShape(Corner.button))
             .background(if (c.dark) c.raised else c.ground)
@@ -183,6 +187,7 @@ private fun Tile(
             .padding(horizontal = Space.x3, vertical = 10.dp),
     ) {
         if (eyebrow != null) Text(eyebrow, Type.footnote, tint ?: c.ink2, maxLines = 1)
+        if(evolution!=null) TankPreview(dev.david.tessel.core.content.CharacterDef.BALANCED, dev.david.tessel.core.content.TankLook(), Modifier.fillMaxWidth().height(36.dp), evolution)
         Text(name, Type.headline, c.ink, maxLines = 2)
         Text(blurb, Type.footnote, c.ink2, maxLines = 3)
         Spacer(Modifier.weight(1f))

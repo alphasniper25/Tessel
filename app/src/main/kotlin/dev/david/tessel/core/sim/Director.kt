@@ -1,6 +1,8 @@
 package dev.david.tessel.core.sim
 
 import dev.david.tessel.core.content.Balance
+import dev.david.tessel.core.content.CoreRules
+import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.rng.Rng
 
@@ -11,7 +13,7 @@ private const val EDGE_PAD = 8f
 private const val PERIMETER = 2 * (ARENA_W + ARENA_H)
 
 /** Pips join partway through the first stage. */
-private const val PIPS_FROM = 20f
+private const val PIPS_FROM = 9f
 
 /** In the stage a new kind first turns up, it turns up a lot, so it gets noticed. */
 private const val DEBUT_BOOST = 1.8f
@@ -53,7 +55,11 @@ class Director {
     fun update(w: World) {
         val t = w.stageTicks * TICK_SECONDS
         if (w.stage == 1 && t < FIRST_AT) return
-        val bossScale = if (w.isBossStage()) Balance.BOSS_STAGE_SPAWNS else 1f
+        val bossScale = when {
+            w.stage==CoreRules.STAGE -> if(w.core.hazards.hidden>0)CoreRules.REINFORCEMENT_SPAWNS else if(w.difficulty==Difficulty.HARD || w.difficulty==Difficulty.IMPOSSIBLE)CoreRules.HARD_STEADY_SPAWNS else CoreRules.STEADY_SPAWNS
+            w.isBossStage() -> Balance.BOSS_STAGE_SPAWNS
+            else -> 1f
+        }
         budget += ratePerSecond(w.stage, w.stageProgress()) * w.difficulty.spawn * w.crowd() * bossScale * TICK_SECONDS
         if (type < 0) choose(w.rng, w.stage, t)
         if (type < 0) return
@@ -65,7 +71,7 @@ class Director {
     }
 
     /** Threat per second; one Dot costs one. */
-    fun ratePerSecond(stage: Int, progress: Float) = (0.6f + 0.3f * (stage - 1)) * (0.8f + 0.4f * progress)
+    fun ratePerSecond(stage: Int, progress: Float) = (0.9f + 0.45f * (stage - 1) + 0.14f * maxOf(0,stage-10)) * (0.8f + 0.4f * progress)
 
     /** How likely [type] is to be picked at [seconds] into [stage]; 0 when it is not on offer yet. */
     fun weight(type: Int, stage: Int, seconds: Float): Float {

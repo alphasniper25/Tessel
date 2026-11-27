@@ -9,7 +9,7 @@ object Balance {
 
     /** Cut from 220 after user test #2 ("too overpowered at the start"); Speed upgrades buy it back. */
     const val PLAYER_SPEED = 195f
-    const val PLAYER_HP = 6
+    const val PLAYER_HP = 10
     const val INVULN_SECONDS = 0.85f
 
     /** Cut from 3.5 after user test #2; Fire Rate upgrades buy it back. */
@@ -41,10 +41,10 @@ object Balance {
     /** A remote player's reported position is accepted, but it may not move faster than this times its speed. */
     const val REMOTE_SLACK = 1.6f
 
-    const val STAGE_SECONDS = 60
+    const val STAGE_SECONDS = 25
 
     /** After a stage ends the stragglers get this long before the shop opens anyway. */
-    const val CLEAR_SECONDS = 8
+    const val CLEAR_SECONDS = 4
 
     // Enemy speed starts well below the listed speeds and grows each stage,
     // plus a little within a stage, up to a ceiling.
@@ -58,7 +58,7 @@ object Balance {
     const val ENEMY_HP_FROM_STAGE = 4
 
     /** Coin value multiplies by this each stage. */
-    const val COIN_GROWTH = 1.14
+    const val COIN_GROWTH = 1.105
 
     // Enemy shots: hollow, slow enough to read, a little faster and more frequent each stage.
     const val HOSTILE_RADIUS = 5.5f

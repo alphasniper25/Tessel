@@ -253,7 +253,6 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         }
         steps++
         if (pilot.step(input, s, me)) view.events.add(Events.SHOT, me)
-        stayOutOfBoss()
         bumpIntoOthers(s)
         val before = reports.hits
         collisions.rebuild(view.enemies)
@@ -263,6 +262,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         if (localInvuln > 0) localInvuln--
         if (localHurt > 0) localHurt--
         if (s.hp[me] > 0 && !s.invuln[me] && localInvuln == 0) checkHurt()
+        stayOutOfBoss()
         if (s.hp[me] > 0) checkPickups()
 
         val now = HostSession.millis(nowNanos)
@@ -328,6 +328,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         dv.champion = top.duelChampion
         for (p in 0 until top.playerCount) dv.wins[p] = top.duelWins[p]
         v.core.show(top.coreForm, top.strike, top.strikeParity, top.strikeShare)
+        v.core.hazards.show(top.coreShield,top.coreHidden,top.coreWarning,top.beamX,top.beamY,top.beamCount,top.beamXs,top.beamYs)
 
         val pl = v.players
         for (p in 0 until top.playerCount) {
@@ -349,6 +350,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             pl.hp[p] = top.hp[p]
             pl.maxHp[p] = top.maxHp[p]
             pl.character[p] = top.character[p]
+            pl.evolution[p]=top.evolution[p]; pl.shieldCooldown[p]=top.shieldCooldown[p];pl.poisonTicks[p]=top.poisonTicks[p];pl.stun[p]=top.stun[p]
             pl.appearance[p] = top.appearance[p]
             pl.hurt[p] = if (top.hurt[p]) 1 else 0
             pl.invuln[p] = if (top.invuln[p]) 1 else 0
@@ -463,12 +465,14 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         }
         val e = view.enemies
         for (j in 0 until e.count) {
+            if(inBubble(j) || (e.type[j]==Bestiary.CORE && view.core.hazards.hidden>0)) continue
             val reach = Balance.PLAYER_RADIUS + Bestiary.of(e.type[j]).radius
             val dx = e.x[j] - px
             val dy = e.y[j] - py
             if (dx * dx + dy * dy >= reach * reach) continue
-            reports.hurt(-1)
-            hurt()
+            reports.hurt(-((e.id[j] and 0xFFFF)+2))
+            val s=latest
+            if(s!=null && s.evolution[me].melee && s.shieldCooldown[me]==0) localInvuln=(.25f*TICK_HZ).toInt() else hurt()
             return
         }
     }
@@ -541,7 +545,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         val r = Balance.PLAYER_RADIUS
         for (j in 0 until e.count) {
             val def = Bestiary.of(e.type[j])
-            if (!def.boss || inBubble(j)) continue
+            if (!def.boss || inBubble(j) || (e.type[j]==Bestiary.CORE && view.core.hazards.hidden>0)) continue
             val reach = def.radius + r
             val dx = pilot.x - e.x[j]
             val dy = pilot.y - e.y[j]
@@ -602,14 +606,15 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         val speed = s.bulletSpeed[who]
         if (speed <= 0f) return
         val life = (s.range[who] / speed * TICK_HZ).toInt()
-        val muzzle = Balance.PLAYER_RADIUS * 1.3f
-        val n = s.volley[who].coerceAtLeast(1)
+        val frame=s.evolution[who]
+        val muzzle = frame.muzzle()
+        val n = s.volley[who].coerceAtLeast(0)
         val aim = atan2(aimY, aimX)
         for (k in 0 until n) {
-            val a = aim + (k - (n - 1) / 2f) * Balance.MULTISHOT_SPREAD
-            val dx = cos(a)
-            val dy = sin(a)
-            ghosts.add(ghostId--, x + dx * muzzle, y + dy * muzzle, dx * speed, dy * speed, life, 0f, s.bulletRadius[who], s.pierce[who], who)
+            val origin=frame.originAngle(aim,k,n); val offset=if(frame.drones)0f else frame.offset(k,n)
+            val ox=x+cos(origin)*muzzle-aimY*offset; val oy=y+sin(origin)*muzzle+aimX*offset
+            val a=if(frame.drones)frame.droneAim(aim,ox,oy,s.range[who],s.enemyCount,{s.enemyX[it]},{s.enemyY[it]},{s.enemyHp[it]>0f})else origin
+            ghosts.add(ghostId--, ox, oy, cos(a)*speed, sin(a)*speed, life, 0f, s.bulletRadius[who], s.pierce[who], who)
         }
     }
 

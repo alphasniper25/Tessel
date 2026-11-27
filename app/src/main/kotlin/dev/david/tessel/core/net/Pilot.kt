@@ -64,11 +64,17 @@ class Pilot {
         x = (x + mx * travel).coerceIn(r, ARENA_W - r)
         y = (y + my * travel).coerceIn(r, ARENA_H - r)
 
-        val aimLen = sqrt(input.aimX * input.aimX + input.aimY * input.aimY)
+        var ax=input.aimX; var ay=input.aimY; var firing=input.fire
+        if(s.evolution[me].drones && !firing){
+            var best=s.range[me]*s.range[me]; var target=-1
+            for(j in 0 until s.enemyCount){val dx=s.enemyX[j]-x;val dy=s.enemyY[j]-y;val ds=dx*dx+dy*dy;if(ds<best){best=ds;target=j}}
+            if(target>=0){ax=s.enemyX[target]-x;ay=s.enemyY[target]-y;firing=true}
+        }
+        val aimLen = sqrt(ax*ax+ay*ay)
         val aiming = aimLen > 0.0001f
         if (aiming) {
-            aimX = input.aimX / aimLen
-            aimY = input.aimY / aimLen
+            aimX = ax / aimLen
+            aimY = ay / aimLen
         }
 
         shots.remember()
@@ -82,7 +88,7 @@ class Pilot {
 
         reload -= TICK_SECONDS
         var fired = false
-        if (standing && input.fire && aiming && !held) {
+        if (standing && firing && aiming && !held && !s.evolution[me].melee) {
             if (reload <= 0f) {
                 volley(s, me)
                 reload += 1f / s.fireRate[me]
@@ -100,14 +106,15 @@ class Pilot {
     private fun volley(s: Snapshot, me: Int) {
         val speed = s.bulletSpeed[me]
         val life = (s.range[me] / speed * TICK_HZ).toInt()
-        val muzzle = Balance.PLAYER_RADIUS * 1.3f
-        val n = s.volley[me].coerceAtLeast(1)
+        val frame=s.evolution[me]
+        val muzzle = frame.muzzle()
+        val n = s.volley[me].coerceAtLeast(0)
         val aim = atan2(aimY, aimX)
         for (k in 0 until n) {
-            val a = aim + (k - (n - 1) / 2f) * Balance.MULTISHOT_SPREAD
-            val dx = cos(a)
-            val dy = sin(a)
-            shots.add(nextId--, x + dx * muzzle, y + dy * muzzle, dx * speed, dy * speed, life, 0f, s.bulletRadius[me], s.pierce[me], me)
+            val origin=frame.originAngle(aim,k,n); val offset=if(frame.drones)0f else frame.offset(k,n)
+            val ox=x+cos(origin)*muzzle-aimY*offset; val oy=y+sin(origin)*muzzle+aimX*offset
+            val a=if(frame.drones)frame.droneAim(aim,ox,oy,s.range[me],s.enemyCount,{s.enemyX[it]},{s.enemyY[it]},{s.enemyHp[it]>0f})else origin
+            shots.add(nextId--, ox, oy, cos(a)*speed, sin(a)*speed, life, 0f, s.bulletRadius[me], s.pierce[me], me)
         }
     }
 
@@ -130,14 +137,14 @@ class Pilot {
                 val n = candidates?.query(ax, ay, shots.x[i], shots.y[i], shots.radius[i]) ?: e.count
                 for (k in 0 until n) {
                     val j = candidates?.indices?.get(k) ?: k
-                    if (e.id[j] == shots.lastHit[i] || e.hp[j] <= 0f) continue
+                    if (shots.hasHit(i,e.id[j]) || e.hp[j] <= 0f || (e.type[j]==Bestiary.CORE && view.core.hazards.hidden>0)) continue
                     val reach = shots.radius[i] + Bestiary.of(e.type[j]).radius
                     // Closest point of this step's path to the enemy's centre.
                     val along = (((e.x[j] - ax) * sx + (e.y[j] - ay) * sy) / len2).coerceIn(0f, 1f)
                     val dx = e.x[j] - (ax + sx * along)
                     val dy = e.y[j] - (ay + sy * along)
                     if (dx * dx + dy * dy >= reach * reach) continue
-                    shots.lastHit[i] = e.id[j]
+                    shots.recordHit(i,e.id[j])
                     if (reports != null) {
                         val speed = sqrt(shots.vx[i] * shots.vx[i] + shots.vy[i] * shots.vy[i]).coerceAtLeast(0.001f)
                         reports.hit(e.id[j] and 0xFFFF, shots.vx[i] / speed, shots.vy[i] / speed)

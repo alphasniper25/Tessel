@@ -12,7 +12,7 @@ class Reports {
     var hits = 0
         private set
 
-    /** Low 16 bits of the enemy shot that hit, or -1 for touching an enemy. */
+    /** Low 16 bits of the enemy shot; -1 for unknown contact; -(enemyId16+2) for known contact. */
     val hurtBy = IntArray(MAX_HURTS)
     var hurts = 0
         private set

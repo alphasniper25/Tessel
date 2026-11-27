@@ -21,6 +21,7 @@ import kotlin.math.sqrt
  * 2 changing, 3 second.
  */
 class CoreFight(private val w: World) {
+    val hazards=CoreHazards(w)
     var strike = STRIKE_NONE
         private set
     var strikeParity = 0
@@ -66,6 +67,7 @@ class CoreFight(private val w: World) {
         private set
 
     fun reset() {
+        hazards.reset()
         strike = STRIKE_NONE
         strikeTicks = 0
         gapTicks = 0
@@ -97,13 +99,14 @@ class CoreFight(private val w: World) {
     fun think(i: Int, rate: Float) {
         val e = w.enemies
         form = e.mode[i]
+        if(form==1 || form==3) hazards.tick(i,form) else hazards.reset()
         when (e.mode[i]) {
             1 -> {
                 elapsed++
                 if (elapsed == 1) nextTheft = secs(CoreRules.FIRST_THEFT_SECONDS)
                 val share = e.hp[i] / e.maxHp[i]
                 val hurry = 1f + CoreRules.HURRY_PER_SECOND * (elapsed / TICK_HZ.toFloat()) + CoreRules.HURRY_BY_HEALTH * (1f - share)
-                strikes(hurry * rate, 1f)
+                if(strike!=STRIKE_NONE || (hazards.hidden==0 && !hazards.beamActive)) strikes(hurry * rate, 1f)
                 if (nextTheft > 0 && --nextTheft == 0) takeFromEveryone()
                 if (!halfTaken && share < 0.5f) {
                     halfTaken = true
@@ -123,7 +126,7 @@ class CoreFight(private val w: World) {
             }
             3 -> {
                 elapsed++
-                strikes(rate, CoreRules.SECOND_FORM_SLOWER)
+                if(strike!=STRIKE_NONE || (hazards.hidden==0 && !hazards.beamActive)) strikes(rate, CoreRules.SECOND_FORM_SLOWER)
                 if (nextTheft > 0 && --nextTheft == 0) {
                     takeFromEveryone()
                     nextTheft = secs(max(CoreRules.THEFT_GAP_MIN, CoreRules.THEFT_GAP - CoreRules.THEFT_GAP_SHRINK * thefts))
@@ -167,6 +170,7 @@ class CoreFight(private val w: World) {
         val e = w.enemies
         if (e.type[j] == Bestiary.CORE) {
             coreAlive = false
+            hazards.reset()
             strike = STRIKE_NONE
             form = 0
             giveBack()
@@ -229,7 +233,7 @@ class CoreFight(private val w: World) {
         val pl = w.players
         for (p in 0 until w.playerCount) {
             if (!pl.alive(p)) continue
-            val mask = pl.perks[p]
+            val mask = pl.perks[p] and (1 shl Perks.SIPHON).inv()
             if (mask == 0) continue
             var pick = w.rng.int(0, Integer.bitCount(mask) - 1)
             var perk = 0

@@ -2,6 +2,7 @@ package dev.david.tessel.core.sim
 
 import dev.david.tessel.core.content.Attack
 import dev.david.tessel.core.content.Balance
+import dev.david.tessel.core.content.CampaignScaling
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.EnemyDef
@@ -110,6 +111,10 @@ internal class Brains(private val w: World) {
             e.y[i] += (dvy + e.ky[i]) * TICK_SECONDS
             e.kx[i] *= KNOCK_DECAY
             e.ky[i] *= KNOCK_DECAY
+            if(def.trailEvery>0 && (w.tick+e.id[i]) % def.trailEvery==0 && inside(i,0f)) {
+                // Stationary pooled projectiles, using the existing spawn protocol and expiry.
+                w.spawnHostile(e.prevX[i], e.prevY[i], 0f, 0f, shooter)
+            }
 
             val locked = def.move == Move.DASH && e.mode[i] != APPROACH
             if (def.faces && !locked && def.move != Move.BOSS && target >= 0) {
@@ -351,7 +356,11 @@ internal class Brains(private val w: World) {
             Bestiary.APIARY -> apiary(i, def, target, scale, rate, phase)
             Bestiary.GYRE -> gyre(i, def, target, scale, rate, phase)
             Bestiary.RAMPART -> rampart(i, def, target, scale, rate, phase)
-            Bestiary.PENDULUM -> pendulum(i, def, target, scale, rate, phase)
+            Bestiary.PENDULUM -> {
+                var twin=false
+                if(w.stage==CampaignScaling.TWIN_STAGE && e.elite[i]!=Elite.TETHERED)for(j in 0 until e.count)if(j!=i && e.type[j]==Bestiary.PENDULUM && e.hp[j]>0f){twin=true;break}
+                pendulum(i, def, target, scale, rate*(if(twin)CampaignScaling.TWIN_FIRE_SHARE else 1f), phase,twin)
+            }
             Bestiary.LATTICE -> lattice(i, def, target, scale, rate, phase)
             Bestiary.SOWER -> sower(i, def, target, scale, rate, phase)
             Bestiary.CORE -> core(i, def, target, scale, rate)
@@ -541,7 +550,7 @@ internal class Brains(private val w: World) {
     }
 
     /** Circles the arena, firing at the player on the way past; faster and wider with each phase. */
-    private fun pendulum(i: Int, def: EnemyDef, target: Int, scale: Float, rate: Float, phase: Int) {
+    private fun pendulum(i: Int, def: EnemyDef, target: Int, scale: Float, rate: Float, phase: Int, twin: Boolean) {
         val e = w.enemies
         val turn = (if (phase == 1) 0.5f else if (phase == 2) 0.8f else 1.1f) * TICK_SECONDS
         val dir = if (e.modeTicks[i] / seconds(6f) % 2 == 0) 1f else -1f
@@ -554,7 +563,7 @@ internal class Brains(private val w: World) {
             val n = if (phase == 1) 3 else if (phase == 2) 5 else 8
             fan(e.x[i], e.y[i], angleTo(i, target), n, if (phase == 3) 0.22f else 0.16f, 205f, def.radius)
         }
-        if (phase >= 2 && e.modeTicks[i] % seconds(3f) == 0) ring(e.x[i], e.y[i], if (phase == 3) 16 else 12, e.aux[i], 150f, def.radius)
+        if (phase >= 2 && e.modeTicks[i] % seconds(if(twin)4.5f else 3f) == 0) ring(e.x[i], e.y[i], if (phase == 3) 16 else 12, e.aux[i], 150f, def.radius)
     }
 
     /** Three beats of streaming shots along a plus, then along a cross; later both together and turning. */

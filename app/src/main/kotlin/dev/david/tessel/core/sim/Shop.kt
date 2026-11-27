@@ -1,5 +1,6 @@
 package dev.david.tessel.core.sim
 
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.CardFamily
 import dev.david.tessel.core.content.CardCode
@@ -20,12 +21,13 @@ class Shop {
     private val quotes = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) }
     private val rerolls = IntArray(MAX_PLAYERS)
     private val heals = IntArray(MAX_PLAYERS)
+    private val evolutions = Array(MAX_PLAYERS) { IntArray(TankEvolution.REWARD_SLOTS) { -1 } }
     private val offers = Array(MAX_PLAYERS) { IntArray(Perks.OFFERED) { -1 } }
 
     fun reset() {
         for (p in 0 until MAX_PLAYERS) {
             stock[p].fill(-1); locks[p].fill(false); quotes[p].fill(0)
-            offers[p].fill(-1); rerolls[p] = 0; heals[p] = 0
+            offers[p].fill(-1); evolutions[p].fill(-1); rerolls[p] = 0; heals[p] = 0
         }
     }
 
@@ -41,6 +43,7 @@ class Shop {
     /** After a boss stage a player is offered a choice of perks to take. */
     private fun offerPerks(w: World, p: Int) {
         offers[p].fill(-1)
+        if (offerEvolution(w,p)) return
         if (w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
         var n = 0
         val free = IntArray(Perks.count)
@@ -57,10 +60,44 @@ class Shop {
     /** Perk id offered in [slot], or -1. */
     fun perkOffer(p: Int, slot: Int) = offers[p][slot]
 
-    fun perkPending(p: Int) = offers[p].any { it >= 0 }
+    fun rewardOffer(p: Int, slot: Int) = if (evolutions[p][0]>=0) evolutions[p][slot] else offers[p].getOrElse(slot){-1}
+    fun perkPending(p: Int) = evolutions[p][0]>=0 || offers[p].any { it >= 0 }
+    private fun offerEvolution(w: World,p: Int): Boolean {
+        val out=evolutions[p]; out.fill(-1)
+        val frame=w.players.evolution[p]
+        if(frame==TankEvolution.BASIC && w.stage!=5 && w.stage!=15 && w.stage!=25 && w.stage!=40) return false
+        if(frame!=TankEvolution.BASIC && w.stage!=15 && w.stage!=25 && w.stage!=35) return false
+        if(w.devBoss>=0 || w.stage%Bestiary.BOSS_EVERY!=0 || frame.tier>=TankEvolution.targetTier(w.stage) || w.players.lastEvolutionStage[p]==w.stage) return false
+        val options=TankEvolution.options(frame,w.stage)
+        for(i in options.indices) out[i]=TankEvolution.REWARD_BASE+options[i].ordinal
+        if(frame==TankEvolution.BASIC && options.isNotEmpty() && w.stage<TankEvolution.SECRET_STAGE) out[options.size]=TankEvolution.STAY_BASIC
+        return options.isNotEmpty()
+    }
 
     fun pickPerk(w: World, p: Int, slot: Int): Boolean {
         if (p !in 0 until w.playerCount) return false
+        if(evolutions[p][0]>=0){
+            val chosen=evolutions[p].getOrElse(slot){-1}
+            val pl=w.players
+            if(chosen==TankEvolution.STAY_BASIC && pl.evolution[p]==TankEvolution.BASIC){
+                pl.lastEvolutionStage[p]=w.stage; evolutions[p].fill(-1); offers[p].fill(-1); return true
+            }
+            val next=TankEvolution.fromReward(chosen) ?: return false
+            if(next.parent!=pl.evolution[p].ordinal) return false
+            // Refund legacy multishot; pre-evolution gun cards have a use in melee except these incompatible effects.
+            for(u in 0 until Upgrades.count) if(!Upgrades.offered(u,next) && pl.levels[p][u]>0){
+                // Refund actual spend; legacy saves estimate from uninflated base prices.
+                pl.coins[p] += (pl.upgradeSpent[p][u]*.7).toInt()
+                pl.upgradeSpent[p][u]=0
+                pl.levels[p][u]=0
+            }
+            val hpGain=(next.hullBonus-pl.evolution[p].hullBonus).coerceAtLeast(0)
+            pl.maxHp[p]+=hpGain; if(pl.hp[p]>0) pl.hp[p]=min(pl.maxHp[p],pl.hp[p]+hpGain)
+            pl.evolution[p]=next; pl.shieldCooldown[p]=0; pl.lastEvolutionStage[p]=w.stage
+            evolutions[p].fill(-1); offers[p].fill(-1)
+            restock(w,p)
+            return true
+        }
         val k = offers.getOrNull(p)?.getOrNull(slot) ?: return false
         if (k < 0) return false
         val pl = w.players
@@ -82,7 +119,7 @@ class Shop {
     fun levelsBought(w: World, p: Int, slot: Int): Int {
         val u = item(p, slot)
         if (u < 0) return 0
-        return minOf(rarity(p, slot).levels, Upgrades.of(u).maxLevel - w.players.levels[p][u]).coerceAtLeast(0)
+        return minOf(rarity(p, slot).levels, Upgrades.runCap(u) - w.players.levels[p][u]).coerceAtLeast(0)
     }
 
     fun maxed(w: World, p: Int, slot: Int) = levelsBought(w, p, slot) == 0
@@ -94,6 +131,7 @@ class Shop {
         for (k in 0 until levelsBought(w, p, slot)) total += Upgrades.price(u, w.players.levels[p][u] + k, w.stage)
         total *= rarity(p, slot).premium
         if (w.players.has(p, Perks.HAGGLER)) total *= 0.9
+        if(w.players.character[p] == dev.david.tessel.core.content.CharacterDef.BALANCED) total *= 0.9
         return total.roundToInt().coerceAtLeast(1)
     }
 
@@ -109,14 +147,16 @@ class Shop {
     }
 
     fun canBuy(w: World, p: Int, slot: Int) = p in 0 until w.playerCount && slot in 0 until SHOP_SLOTS &&
-        !maxed(w, p, slot) && CardMission.eligible(item(p, slot), w.players.missionMask[p], rarity(p, slot)) && w.players.coins[p] >= price(w, p, slot)
+        !perkPending(p) && Upgrades.offered(item(p,slot),w.players.evolution[p]) && !maxed(w, p, slot) && CardMission.eligible(item(p, slot), w.players.missionMask[p], rarity(p, slot)) && w.players.coins[p] >= price(w, p, slot)
 
     fun buy(w: World, p: Int, slot: Int): Boolean {
         if (!canBuy(w, p, slot)) return false
         val u = item(p, slot)
         val pl = w.players
         val n = levelsBought(w, p, slot)
-        pl.coins[p] -= price(w, p, slot)
+        val paid=price(w,p,slot)
+        pl.coins[p] -= paid
+        pl.upgradeSpent[p][u] = (pl.upgradeSpent[p][u].toLong()+paid).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         pl.levels[p][u] += n
         val addedHp = (n * Upgrades.amount(u, UpgradeStat.MAX_HP)).toInt()
         if (addedHp > 0) {
@@ -150,8 +190,8 @@ class Shop {
     fun rerollPrice(w: World, p: Int) = Upgrades.rerollPrice(w.stage, rerolls[p])
 
     fun canReroll(w: World, p: Int) = p in 0 until w.playerCount &&
-        locks[p].any { !it } && w.players.coins[p] >= rerollPrice(w, p) &&
-        (0 until Upgrades.count).any { u -> CardMission.eligible(u, w.players.missionMask[p]) && w.players.levels[p][u] < Upgrades.of(u).maxLevel &&
+        !perkPending(p) && locks[p].any { !it } && w.players.coins[p] >= rerollPrice(w, p) &&
+        (0 until Upgrades.count).any { u -> CardMission.eligible(u, w.players.missionMask[p]) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u] < Upgrades.runCap(u) &&
             (0 until SHOP_SLOTS).none { slot -> locked(p, slot) && item(p, slot) == u } }
 
     fun reroll(w: World, p: Int): Boolean {
@@ -184,6 +224,9 @@ class Shop {
             cp.quotes[p].copyInto(quotes[p])
             if (!cp.stockSaved[p]) restock(w, p)
             cp.perkOffer[p].copyInto(offers[p])
+            if(offerEvolution(w,p)) offers[p].fill(-1)
+            // Old saved offers may contain retired cards.
+            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && !Upgrades.offered(item(p,slot),w.players.evolution[p])) {stock[p][slot]=-1;locks[p][slot]=false;quotes[p][slot]=0}
         }
     }
 
@@ -192,13 +235,13 @@ class Shop {
         // Reserve every retained offer before drawing anything, even a lock in the last slot.
         for (slot in 0 until SHOP_SLOTS) {
             val u = item(p, slot)
-            if (locked(p, slot) && u >= 0 && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) used[u] = true
+            if (locked(p, slot) && u >= 0 && Upgrades.offered(u,w.players.evolution[p]) && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) used[u] = true
             else { locks[p][slot] = false; stock[p][slot] = -1; quotes[p][slot] = 0 }
         }
         val character = w.players.character[p]
         for (slot in 0 until SHOP_SLOTS) {
             if (locked(p, slot)) continue
-            val available = (0 until Upgrades.count).filter { !used[it] && CardMission.eligible(it, w.players.missionMask[p]) && w.players.levels[p][it] < Upgrades.of(it).maxLevel }
+            val available = (0 until Upgrades.count).filter { !used[it] && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
             if (available.isEmpty()) continue
             var tier = CardRarity.roll(w.rng)
             var pool = available.filter { CardMission.eligible(it, w.players.missionMask[p], tier) }
@@ -209,8 +252,12 @@ class Shop {
             }
             // Roll family first: adding more cards to a family does not inflate its odds.
             val families = CardFamily.entries.filter { family -> pool.any { Upgrades.of(it).family == family } }
-            var ticket = w.rng.int(1, families.sumOf { character.weight(it) })
-            val family = families.first { ticket -= character.weight(it); ticket <= 0 }
+            fun weight(f: CardFamily): Int {
+                val frame=w.players.evolution[p]
+                return character.weight(f) * when { frame.melee && (f==CardFamily.RAM || f==CardFamily.HEALTH) -> 3; !frame.melee && frame.tier>0 && f==CardFamily.GUN -> 2; else -> 1 }
+            }
+            var ticket = w.rng.int(1, families.sumOf { weight(it) })
+            val family = families.first { ticket -= weight(it); ticket <= 0 }
             val candidates = pool.filter { Upgrades.of(it).family == family }
             val u = candidates[w.rng.int(0, candidates.lastIndex)]
             used[u] = true

@@ -23,14 +23,14 @@ import dev.david.tessel.ui.components.*
 import dev.david.tessel.ui.theme.*
 
 @Composable
-fun TankPreview(character: CharacterDef, look: TankLook, modifier: Modifier = Modifier) {
+fun TankPreview(character: CharacterDef, look: TankLook, modifier: Modifier = Modifier, evolution: TankEvolution = TankEvolution.BASIC) {
     val colors = Theme.colors
     val art = remember { TankArt() }
     Canvas(modifier) {
         art.draw(drawContext.canvas.nativeCanvas, size.width * .46f, size.height * .5f,
-            minOf(size.width,size.height)*.30f, .8f, -.6f, character, look,
+            minOf(size.width,size.height)*(if(evolution==TankEvolution.BASIC) .30f else .20f), .8f, -.6f, character, look,
             if (colors.dark) dev.david.tessel.design.mix(colors.ink.toArgb(), colors.ground.toArgb(), .16f) else colors.ink.toArgb(),
-            if (colors.dark) colors.ink.toArgb() else dev.david.tessel.design.mix(colors.ink.toArgb(), colors.ground.toArgb(), .32f), colors.ground.toArgb())
+            if (colors.dark) colors.ink.toArgb() else dev.david.tessel.design.mix(colors.ink.toArgb(), colors.ground.toArgb(), .32f), colors.ground.toArgb(), evolution=evolution)
     }
 }
 

@@ -1,6 +1,9 @@
 package dev.david.tessel.core.sim
 
+import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Balance
+import dev.david.tessel.core.content.StatusEffect
+import dev.david.tessel.core.content.CampaignScaling
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.CoreRules
 import dev.david.tessel.core.content.Difficulty
@@ -253,7 +256,12 @@ class World(seed: Long = 1L) {
 
         for (p in 0 until playerCount) if (players.present[p]) {
             updatePlayer(p, inputs[p])
-            val regen = players.character[p].regenSeconds * TICK_HZ
+            if(players.shieldCooldown[p] > 0) players.shieldCooldown[p]--
+            if(players.poisonTicks[p] > 0 && players.alive(p)) {
+                players.poisonTicks[p]--
+                if(players.poisonTicks[p] % TICK_HZ == 0) poisonTick(p)
+            }
+            val regen = players.regenSeconds(p) * TICK_HZ
             if (!duel.on && !practice && phase == Phase.FIGHT && regen > 0 && stageTicks % regen == 0 && players.alive(p) && players.hp[p] < players.maxHp[p]) players.hp[p]++
         }
         bumpPlayers()
@@ -302,7 +310,7 @@ class World(seed: Long = 1L) {
                 players.killedBy[p] = Cause.NONE
             }
         }
-        for (p in 0 until playerCount) players.windUsed[p] = false
+        for (p in 0 until playerCount) { players.windUsed[p] = false; players.shieldCooldown[p] = 0; players.poisonTicks[p] = 0; players.poisonSource[p]=-1; players.stun[p]=0 }
         players.remember()
         director.startStage()
         bossDue = if (isBossStage()) BOSS_DELAY_TICKS else -1
@@ -332,6 +340,9 @@ class World(seed: Long = 1L) {
             pl.levels[p].copyInto(cp.levels[p])
             cp.perks[p] = pl.perks[p]
             cp.character[p] = pl.character[p]
+            cp.evolution[p] = pl.evolution[p]
+            cp.lastEvolutionStage[p] = pl.lastEvolutionStage[p]
+            pl.upgradeSpent[p].copyInto(cp.upgradeSpent[p])
             cp.appearance[p] = pl.appearance[p]
             cp.missionMask[p] = pl.missionMask[p]
         }
@@ -362,6 +373,9 @@ class World(seed: Long = 1L) {
             cp.levels[p].copyInto(pl.levels[p])
             pl.perks[p] = cp.perks[p]
             pl.character[p] = cp.character[p]
+            pl.evolution[p] = cp.evolution[p]
+            pl.lastEvolutionStage[p] = cp.lastEvolutionStage[p]
+            cp.upgradeSpent[p].copyInto(pl.upgradeSpent[p])
             pl.appearance[p] = cp.appearance[p]
             pl.missionMask[p] = cp.missionMask[p]
             pl.present[p] = seated(p)
@@ -504,8 +518,12 @@ class World(seed: Long = 1L) {
                 break
             }
         }
+        if(shot16<=-2){
+            val id=-shot16-2
+            for(j in 0 until enemies.count)if(enemies.id[j] and 0xFFFF==id && enemies.hp[j]>0f){cause=Cause.touch(enemies.type[j]);break}
+        }
         // Their phone saw the hit, the host may already have lost the shot or the body: blame what is nearest.
-        if (cause == Cause.NONE) cause = Cause.touch(nearestEnemyType(players.x[p], players.y[p]))
+        if (cause == Cause.NONE) { val near=nearestEnemyType(players.x[p], players.y[p]); cause=if(shot16<0) Cause.touch(near) else Cause.shot(near) }
         if (players.alive(p) && players.invuln[p] == 0) hurtPlayer(p, cause, allowRam = shot16 < 0)
     }
 
@@ -543,14 +561,14 @@ class World(seed: Long = 1L) {
     }
 
     fun enemyHpScale() = difficulty.toughness *
-        (1f + Balance.ENEMY_HP_PER_STAGE * max(0, stage - Balance.ENEMY_HP_FROM_STAGE + 1)) *
+        (1f + Balance.ENEMY_HP_PER_STAGE * max(0, stage - Balance.ENEMY_HP_FROM_STAGE + 1)) * (1f + .035f * max(0,stage-10)) *
         (1f + Balance.HP_PER_PLAYER * (presentCount() - 1))
 
     fun bossHpScale(): Float {
         val round = (stage / Bestiary.BOSS_EVERY - 1).coerceAtLeast(0) / Bestiary.bossOrder.size
-        return difficulty.bossToughness *
+        return difficulty.bossToughness * (if(stage==5 && (difficulty==Difficulty.EASY || difficulty==Difficulty.NORMAL)) .70f else if(stage==5) .8f else 1f) *
             (1f + Balance.BOSS_HP_PER_PLAYER * (presentCount() - 1)) *
-            (1f + Balance.BOSS_HP_PER_ROUND * round)
+            (if(stage==CoreRules.STAGE) CoreRules.FINAL_ROUND_SCALE else 1f + Balance.BOSS_HP_PER_ROUND * round) * (1f + .018f * max(0,stage-10))
     }
 
     /** Enemies attack more often as stages go by. */
@@ -599,9 +617,15 @@ class World(seed: Long = 1L) {
             else -> Bestiary.bossOrder[round % Bestiary.bossOrder.size]
         }
         val r = Bestiary.of(type).radius
-        val i = spawnEnemy(type, ARENA_W / 2f, -r - 8f)
+        val twin = devBoss<0 && stage==CampaignScaling.TWIN_STAGE
+        val i = spawnEnemy(type, ARENA_W / 2f - if(twin) 235f else 0f, -r - 8f)
         if (i >= 0) {
             boss = i
+            if(twin) {
+                val other=spawnEnemy(type,ARENA_W/2f+235f,-r-8f)
+                enemies.hp[i]*=CampaignScaling.TWIN_HP_SHARE;enemies.maxHp[i]=enemies.hp[i]
+                if(other>=0){enemies.hp[other]*=CampaignScaling.TWIN_HP_SHARE;enemies.maxHp[other]=enemies.hp[other];enemies.aux[other]=3.14f}
+            }
             if (type == Bestiary.CORE) core.begin()
             events.add(Events.BOSS_IN, type, ARENA_W / 2f, 0f)
         }
@@ -671,19 +695,23 @@ class World(seed: Long = 1L) {
         pl.x[p] = pl.x[p].coerceIn(r, ARENA_W - r)
         pl.y[p] = pl.y[p].coerceIn(r, ARENA_H - r)
 
-        val aimLen = sqrt(input.aimX * input.aimX + input.aimY * input.aimY)
-        val aiming = aimLen > 0.0001f
-        if (aiming) {
-            pl.aimX[p] = input.aimX / aimLen
-            pl.aimY[p] = input.aimY / aimLen
+        var ax=input.aimX; var ay=input.aimY
+        var firing=input.fire
+        if(pl.evolution[p].drones && !firing) {
+            var best = pl.range(p)*pl.range(p); var target=-1
+            for(j in 0 until enemies.count) { if(enemies.hp[j]<=0f) continue; val dx=enemies.x[j]-pl.x[p]; val dy=enemies.y[j]-pl.y[p]; val ds=dx*dx+dy*dy; if(ds<best){best=ds;target=j} }
+            if(target>=0){ax=enemies.x[target]-pl.x[p];ay=enemies.y[target]-pl.y[p];firing=true}
         }
+        val aimLen = sqrt(ax*ax+ay*ay)
+        val aiming = aimLen > 0.0001f
+        if (aiming) { pl.aimX[p] = ax / aimLen; pl.aimY[p] = ay / aimLen }
 
         if (!standing) {
             pl.reload[p] = 0f
             return
         }
         pl.reload[p] -= TICK_SECONDS
-        if (input.fire && aiming && !stunned) {
+        if (firing && aiming && !stunned && !pl.evolution[p].melee) {
             if (pl.reload[p] <= 0f) {
                 shoot(p)
                 pl.reload[p] += 1f / pl.fireRate(p)
@@ -845,14 +873,17 @@ class World(seed: Long = 1L) {
         val damage = if (remote[p]) 0f else pl.damage(p)
         val radius = pl.bulletRadius(p)
         val pierce = pl.pierce(p)
-        val muzzle = Balance.PLAYER_RADIUS * MUZZLE
+        val frame = pl.evolution[p]
+        val muzzle = frame.muzzle()
         val n = pl.volley(p)
         val aim = atan2(pl.aimY[p], pl.aimX[p])
         for (k in 0 until n) {
-            val a = aim + (k - (n - 1) / 2f) * Balance.MULTISHOT_SPREAD
-            val dx = cos(a)
-            val dy = sin(a)
-            bullets.add(nextId++, pl.x[p] + dx * muzzle, pl.y[p] + dy * muzzle, dx * speed, dy * speed, life, damage, radius, pierce, p)
+            val origin=frame.originAngle(aim,k,n)
+            val offset=if(frame.drones) 0f else frame.offset(k,n)
+            val ox=pl.x[p]+cos(origin)*muzzle-pl.aimY[p]*offset
+            val oy=pl.y[p]+sin(origin)*muzzle+pl.aimX[p]*offset
+            val a=if(frame.drones) frame.droneAim(aim,ox,oy,pl.range(p),enemies.count,{enemies.x[it]},{enemies.y[it]},{enemies.hp[it]>0f && !core.docked(it)}) else origin
+            bullets.add(nextId++, ox, oy, cos(a)*speed, sin(a)*speed, life, damage, radius, pierce, p)
         }
         pl.fired[p] += n
         events.add(Events.SHOT, p, pl.x[p], pl.y[p], pl.aimX[p], pl.aimY[p])
@@ -890,7 +921,7 @@ class World(seed: Long = 1L) {
         }
         for (k in 0 until bigCount) {
             val b = bigs[k]
-            if (core.docked(b)) continue
+            if (core.docked(b) || (e.type[b]==Bestiary.CORE && core.hazards.hidden>0)) continue
             val br = Bestiary.of(e.type[b]).radius
             forEnemiesNear(e.x[b], e.y[b], br + Bestiary.maxRegularRadius) { j ->
                 val reach = br + Bestiary.of(e.type[j]).radius
@@ -929,9 +960,9 @@ class World(seed: Long = 1L) {
                     b.life[i] = 0
                     break
                 }
-                val j = enemyTouching(b.x[i], b.y[i], b.radius[i], b.lastHit[i])
+                val j = enemyTouching(b.x[i], b.y[i], b.radius[i], i)
                 if (j < 0) continue
-                b.lastHit[i] = enemies.id[j]
+                b.recordHit(i,enemies.id[j])
                 if (b.damage[i] > 0f) hitEnemy(j, i)
                 if (b.pierce[i] > 0) {
                     b.pierce[i]--
@@ -959,7 +990,9 @@ class World(seed: Long = 1L) {
         if (core.docked(j)) return
         val shielded = e.type[j] == Bestiary.APIARY && brains.escorts > 0
         val armored = e.elite[j] == Elite.ARMORED
-        val dealt = damage * (if (shielded) SHIELDED_DAMAGE else 1f) * (if (armored) Elite.ARMOR else 1f)
+        val raw = damage * (if (shielded) SHIELDED_DAMAGE else 1f) * (if (armored) Elite.ARMOR else 1f)
+        val dealt=if(e.type[j]==Bestiary.CORE) core.hazards.absorb(raw) else raw
+        if(dealt<=0f)return
         // Overkill does not count: a huge shot into a nearly dead enemy dealt what it had left.
         if (owner in 0 until playerCount) players.dealt[owner] += min(dealt, max(e.hp[j], 0f))
         e.hp[j] -= dealt
@@ -998,7 +1031,7 @@ class World(seed: Long = 1L) {
             events.add(Events.BOSS_DOWN, e.type[j], e.x[j], e.y[j])
             if (e.type[j] == Bestiary.CORE || e.elite[j] == Elite.TETHERED) {
                 core.died(j)
-            } else if (phase == Phase.FIGHT) {
+            } else if (phase == Phase.FIGHT && (0 until e.count).none { it!=j && e.hp[it]>0f && Bestiary.of(e.type[it]).boss }) {
                 // The rest of the stage's enemies scatter once the boss falls.
                 endFight()
             }
@@ -1059,7 +1092,7 @@ class World(seed: Long = 1L) {
             }
             for (k in 0 until bigCount) {
                 val b = bigs[k]
-                if (e.hp[b] <= 0f || core.docked(b)) continue
+                if (e.hp[b] <= 0f || core.docked(b) || (e.type[b]==Bestiary.CORE && core.hazards.hidden>0)) continue
                 val reach = r + Bestiary.of(e.type[b]).radius
                 val dx = e.x[b] - px
                 val dy = e.y[b] - py
@@ -1099,9 +1132,18 @@ class World(seed: Long = 1L) {
         val px = pl.x[p]
         val py = pl.y[p]
         pl.sinceHit[p] = 0
-        if (!practice && !invincible) {
+        val protected = allowRam && !Cause.isShot(cause) && Cause.type(cause)>=0 && !duel.on && pl.evolution[p].melee && pl.shieldCooldown[p] == 0
+        if(protected) pl.shieldCooldown[p]=pl.shieldTicks(p)
+        if (!practice && !invincible && !protected) {
             val by = Cause.type(cause)
-            val amount = if (loss > 0) loss else if (by in 0 until Bestiary.size) devDamage[by] else 1
+            val base = if (by in 0 until Bestiary.size) devDamage[by] else 1
+            val late=CampaignScaling.damage(stage,difficulty,by in 0 until Bestiary.size && Bestiary.of(by).boss)
+            val amount = if(loss>0) loss else (base+late-if(pl.evolution[p].melee && Cause.isShot(cause))1 else 0).coerceAtLeast(1)
+            if(by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
+                StatusEffect.BURN, StatusEffect.POISON -> if(pl.poisonTicks[p]==0) {pl.poisonTicks[p]=(if(Bestiary.of(by).status==StatusEffect.BURN)2 else 3)*TICK_HZ;pl.poisonSource[p]=by}
+                StatusEffect.FREEZE -> pl.stun[p]=max(pl.stun[p], (TICK_HZ*.45f).toInt())
+                else -> Unit
+            }
             if (pl.hp[p] - amount <= 0 && pl.has(p, Perks.SECOND_WIND) && !pl.windUsed[p]) {
                 // A hit that would down the player leaves them on one health, once a stage.
                 pl.hp[p] = 1
@@ -1110,10 +1152,9 @@ class World(seed: Long = 1L) {
                 pl.hp[p] -= amount
             }
         }
-        pl.taken[p]++
-        pl.invuln[p] = INVULN_TICKS
-        pl.hurt[p] = HURT_TICKS
-        events.add(Events.PLAYER_HIT, p, px, py)
+        if(!protected) pl.taken[p]++
+        pl.invuln[p] = if(protected) (0.25f*TICK_HZ).toInt() else INVULN_TICKS
+        if(!protected) { pl.hurt[p] = HURT_TICKS; events.add(Events.PLAYER_HIT, p, px, py) }
 
         // Ram damage is a trade: it triggers only on an accepted contact hit, not a projectile or PvP hit.
         if (allowRam && !practice && !duel.on && !Cause.isShot(cause) && Cause.type(cause) >= 0 && pl.ramDamage(p) > 0f) {
@@ -1123,7 +1164,7 @@ class World(seed: Long = 1L) {
                 if (e.hp[j] <= 0f || e.type[j] != Cause.type(cause) || core.docked(j)) continue
                 val dx = e.x[j] - px; val dy = e.y[j] - py
                 val d2 = dx * dx + dy * dy
-                val reach = Balance.PLAYER_RADIUS + Bestiary.of(e.type[j]).radius + 8f
+                val reach = Balance.PLAYER_RADIUS + Bestiary.of(e.type[j]).radius + 18f
                 if (d2 <= reach * reach && d2 < nearestDistance) { nearest = j; nearestDistance = d2 }
             }
             if (nearest >= 0) {
@@ -1147,10 +1188,22 @@ class World(seed: Long = 1L) {
 
         if (pl.hp[p] <= 0) {
             pl.hp[p] = 0
+            pl.poisonTicks[p]=0
             pl.killedBy[p] = cause
             pl.downs[p]++
             events.add(Events.PLAYER_DOWN, p, px, py)
         }
+    }
+
+    /** A status tick is damage, not a new collision: no knockback, extra hit grace or reapplication. */
+    private fun poisonTick(p:Int) {
+        val pl=players
+        if(practice || invincible || duel.on || !pl.alive(p)) return
+        if(pl.hp[p]==1 && pl.has(p,Perks.SECOND_WIND) && !pl.windUsed[p]) pl.windUsed[p]=true
+        else pl.hp[p]--
+        pl.taken[p]++;pl.hurt[p]=HURT_TICKS
+        events.add(Events.PLAYER_HIT,p,pl.x[p],pl.y[p])
+        if(pl.hp[p]<=0){pl.hp[p]=0;pl.poisonTicks[p]=0;pl.killedBy[p]=Cause.shot(pl.poisonSource[p]);pl.downs[p]++;events.add(Events.PLAYER_DOWN,p,pl.x[p],pl.y[p])}
     }
 
     /** A downed player comes back once a standing teammate has stayed close long enough. */
@@ -1294,6 +1347,9 @@ class World(seed: Long = 1L) {
             val bonus = dev.david.tessel.core.content.StageRewards.coins(stage, players.earned[p] - stageEarned[p], players.kills[p] - stageKills[p])
             players.coins[p] += bonus
             players.earned[p] += bonus
+            val growth=CampaignScaling.hullGrowth(stage)
+            players.maxHp[p]+=growth
+            if(players.hp[p]>0)players.hp[p]=min(players.maxHp[p],players.hp[p]+growth+CampaignScaling.repair(stage))
         }
         shop.open(this)
         events.add(Events.SHOP_OPEN, stage)
@@ -1304,14 +1360,14 @@ class World(seed: Long = 1L) {
         return true
     }
 
-    private fun enemyTouching(x: Float, y: Float, r: Float, skipId: Int): Int {
+    private fun enemyTouching(x: Float, y: Float, r: Float, bullet: Int): Int {
         val e = enemies
         val reach = r + Bestiary.maxRegularRadius
         for (row in grid.row(y - reach)..grid.row(y + reach)) {
             for (col in grid.col(x - reach)..grid.col(x + reach)) {
                 var j = grid.head[row * grid.cols + col]
                 while (j >= 0) {
-                    if (e.hp[j] > 0f && e.id[j] != skipId) {
+                    if (e.hp[j] > 0f && !bullets.hasHit(bullet,e.id[j])) {
                         val rr = r + Bestiary.of(e.type[j]).radius
                         val dx = e.x[j] - x
                         val dy = e.y[j] - y
@@ -1323,7 +1379,7 @@ class World(seed: Long = 1L) {
         }
         for (k in 0 until bigCount) {
             val b = bigs[k]
-            if (e.hp[b] <= 0f || e.id[b] == skipId || core.docked(b)) continue
+            if (e.hp[b] <= 0f || bullets.hasHit(bullet,e.id[b]) || core.docked(b) || (e.type[b]==Bestiary.CORE && core.hazards.hidden>0)) continue
             val rr = r + Bestiary.of(e.type[b]).radius
             val dx = e.x[b] - x
             val dy = e.y[b] - y

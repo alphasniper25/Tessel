@@ -68,7 +68,7 @@ fun PlayPanel(
                     Text("Difficulty", Type.footnote, c.ink2)
                     Segmented(Difficulty.entries.map { it.label }, difficulty.ordinal, { onDifficulty(Difficulty.entries[it]) })
                     if (onNewCharacter != null) {
-                        Text("Tank type", Type.footnote, c.ink2)
+                        Text("Starting passive · evolve after stage 5", Type.footnote, c.ink2)
                         Segmented(CharacterDef.entries.map { it.label }, selected, { selected = it })
                         CharacterPreview(CharacterDef.fromId(selected), look, difficulty,
                             Modifier.clip(RoundedCornerShape(Corner.chip)).background(c.raised).padding(horizontal = Space.x2, vertical = Space.x1), compact = true)

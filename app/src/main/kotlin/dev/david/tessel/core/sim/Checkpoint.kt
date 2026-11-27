@@ -44,6 +44,9 @@ class Checkpoint(
     val locked = Array(MAX_PLAYERS) { BooleanArray(SHOP_SLOTS) }
     val quotes = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) }
     val stockSaved = BooleanArray(MAX_PLAYERS)
+    val lastEvolutionStage = IntArray(MAX_PLAYERS)
+    val upgradeSpent = Array(MAX_PLAYERS) { IntArray(Upgrades.count) }
+    val evolution = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankEvolution.BASIC }
     val character = Array(MAX_PLAYERS) { CharacterDef.BALANCED }
     val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
     val missionMask = IntArray(MAX_PLAYERS)
@@ -68,7 +71,7 @@ class Checkpoint(
     val names = Array(MAX_PLAYERS) { "" }
 
     fun write(): ByteArray {
-        val buf = ByteBuffer.allocate(64 + players * (162 + Upgrades.count + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = ByteBuffer.allocate(64 + players * (166 + Upgrades.count * 5 + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
         buf.put('T'.code.toByte())
         buf.put('C'.code.toByte())
         buf.put(FORMAT.toByte())
@@ -106,6 +109,9 @@ class Checkpoint(
             buf.put(character[p].ordinal.toByte())
             buf.putInt(missionMask[p])
             buf.putShort(appearance[p].code().toShort())
+            buf.put(evolution[p].ordinal.toByte())
+            buf.putShort(lastEvolutionStage[p].toShort())
+            for(u in 0 until Upgrades.count) buf.putInt(upgradeSpent[p][u])
             buf.put(if (stockSaved[p]) 1.toByte() else 0.toByte())
             for (slot in 0 until SHOP_SLOTS) {
                 buf.put(if (locked[p][slot]) 1.toByte() else 0.toByte())
@@ -120,7 +126,7 @@ class Checkpoint(
 
     companion object {
         /** Bump when the layout changes. Saves from a version before [OLDEST] are dropped rather than misread. */
-        const val FORMAT = 6
+        const val FORMAT = 7
         private const val OLDEST = 1
 
         /** Null when [bytes] are not a save this version can read. */
@@ -180,6 +186,11 @@ class Checkpoint(
                         cp.character[p] = CharacterDef.fromId(buf.get().toInt())
                         if (format >= 5) cp.missionMask[p] = buf.int and CardMission.allMask
                         if (format >= 6) cp.appearance[p] = dev.david.tessel.core.content.TankLook.fromCode(buf.short.toInt() and 0xFFFF)
+                        if(format >= 7) {
+                            cp.evolution[p] = dev.david.tessel.core.content.TankEvolution.fromId(buf.get().toInt())
+                            cp.lastEvolutionStage[p] = buf.short.toInt().coerceAtLeast(0)
+                            for(u in 0 until upgrades) { val spent=buf.int.coerceAtLeast(0); if(u<Upgrades.count) cp.upgradeSpent[p][u]=spent }
+                        } else for(u in 0 until Upgrades.count) cp.upgradeSpent[p][u]=Upgrades.of(u).basePrice*cp.levels[p][u]
                         cp.stockSaved[p] = buf.get().toInt() != 0
                         for (slot in 0 until slots) {
                             val locked = buf.get().toInt() != 0

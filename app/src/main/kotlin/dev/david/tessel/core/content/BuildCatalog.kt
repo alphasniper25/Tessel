@@ -11,7 +11,7 @@ enum class CharacterDef(
     private val weights: List<Int>,
     val fireScale: Float = 1f, val regenSeconds: Int = 0,
 ) {
-    BALANCED("Balanced", "All-rounder with even card weights.", 0, 1f, 1f, 0f, listOf(10,10,10,10,10)),
+    BALANCED("Balanced", "All-rounder with 10% shop discount; even card weights.", 0, 1f, 1f, 0f, listOf(10,10,10,10,10)),
     VANGUARD("Vanguard", "+3 HP; regenerates 1 HP every 20 seconds of combat; slower fire and movement.", 3, 0.95f, 0.92f, 0f, listOf(12,30,8,10,10), fireScale = 0.95f, regenSeconds = 20),
     STRIKER("Striker", "-1 HP; +35% bullet damage; slightly slower fire.", -1, 1.35f, 1f, 0f, listOf(28,8,8,10,10), fireScale = 0.95f),
     // Keep the old serialized RAM ID so existing profiles and saves remain readable.

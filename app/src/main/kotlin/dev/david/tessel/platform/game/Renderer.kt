@@ -97,6 +97,7 @@ class Renderer(private val density: Float, palette: Palette) {
         canvas.drawRect(view.left, view.top, view.right, view.bottom, fill)
 
         drawStrike(canvas, w, view)
+        drawCoreTrail(canvas,w,view)
         drawCoins(canvas, w, blend, view)
         drawLines(canvas, w, blend, view)
         drawBubbles(canvas, w, blend, view)
@@ -153,6 +154,18 @@ class Renderer(private val density: Float, palette: Palette) {
             stripes.shader = BitmapShader(bmp, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
         }
         return stripes
+    }
+
+    private fun drawCoreTrail(canvas:Canvas,w:World,view:Viewport){
+        val h=w.core.hazards
+        val radius=dev.david.tessel.core.sim.CoreHazards.RADIUS*view.scale
+        fill.color=palette.danger;fill.alpha=95
+        for(k in 0 until h.count){canvas.drawCircle(view.screenX(h.x[k]),view.screenY(h.y[k]),radius,fill)}
+        fill.alpha=255
+        line.color=palette.danger;line.strokeCap=Paint.Cap.ROUND;line.strokeWidth=radius*.35f;line.alpha=230
+        for(k in 1 until h.count)canvas.drawLine(view.screenX(h.x[k-1]),view.screenY(h.y[k-1]),view.screenX(h.x[k]),view.screenY(h.y[k]),line)
+        line.alpha=255;line.strokeCap=Paint.Cap.BUTT
+        if(h.warning>0){line.color=palette.danger;line.strokeWidth=2f*density;line.alpha=180;canvas.drawCircle(view.screenX(h.headX),view.screenY(h.headY),30f*view.scale,line);line.alpha=255}
     }
 
     private fun drawStrike(canvas: Canvas, w: World, view: Viewport) {
@@ -245,6 +258,7 @@ class Renderer(private val density: Float, palette: Palette) {
             val x = view.screenX(lerp(e.prevX[i], e.x[i], blend))
             val y = view.screenY(lerp(e.prevY[i], e.y[i], blend))
             val r = def.radius * view.scale
+            if(type==Bestiary.CORE && w.core.hazards.hidden>0){line.color=palette.ink3;line.strokeWidth=2f*density;line.alpha=100;canvas.drawCircle(x,y,r,line);line.alpha=255;continue}
             val flashing = e.flash[i] > 0
             val body = if (flashing) palette.ink else enemyBody[type]
             val facet = if (flashing) palette.ink else enemyFacet[type]
@@ -283,6 +297,7 @@ class Renderer(private val density: Float, palette: Palette) {
                     canvas.drawCircle(x, y, r * 1.3f + 7f * density, line)
                 }
             }
+            if(type==Bestiary.CORE && w.core.hazards.shieldShare>0f){line.color=palette.ink;line.strokeWidth=3f*density;oval.set(x-r*1.35f,y-r*1.35f,x+r*1.35f,y+r*1.35f);canvas.drawArc(oval,-90f,360f*w.core.hazards.shieldShare,false,line)}
             // The Apiary's shield while its drones fly.
             if (type == Bestiary.APIARY && drones > 0) {
                 line.strokeCap = Paint.Cap.BUTT
@@ -326,9 +341,12 @@ class Renderer(private val density: Float, palette: Palette) {
         for (i in 0 until h.count) {
             val x = view.screenX(lerp(h.prevX[i], h.x[i], blend))
             val y = view.screenY(lerp(h.prevY[i], h.y[i], blend))
-            val r = h.radius[i] * view.scale
+            val stationary = h.vx[i]==0f && h.vy[i]==0f
+            val r = h.radius[i] * view.scale * if(stationary) 1.5f else 1f
+            line.color=palette.danger
             line.strokeWidth = r * 0.5f
             canvas.drawCircle(x, y, r * 0.75f, line)
+            if(stationary){line.alpha=100;canvas.drawCircle(x,y,r*1.25f,line);line.alpha=255}
         }
     }
 
@@ -343,7 +361,9 @@ class Renderer(private val density: Float, palette: Palette) {
             val y = view.screenY(lerp(b.prevY[i], b.y[i], blend))
             val speed = sqrt(b.vx[i] * b.vx[i] + b.vy[i] * b.vy[i])
             // A short streak behind each shot reads as speed without any blur.
-            val tail = STREAK * view.scale / speed
+            val laser = b.owner[i] in 0 until w.playerCount && w.players.evolution[b.owner[i]].laser
+            line.color=if(laser) palette.zone(4) else palette.ink
+            val tail = (if(laser) 95f else STREAK) * view.scale / speed
             line.strokeWidth = b.radius[i] * 2f * view.scale
             canvas.drawLine(x - b.vx[i] * tail, y - b.vy[i] * tail, x, y, line)
         }
@@ -356,7 +376,7 @@ class Renderer(private val density: Float, palette: Palette) {
         val hurt = pl.hurt[p] > 0
         tankArt.draw(canvas, x, y, Balance.PLAYER_RADIUS * view.scale, pl.aimX[p], pl.aimY[p], pl.character[p], pl.appearance[p],
             if (hurt) palette.danger else playerBody, if (hurt) palette.danger else playerFacet, palette.ground, hurt,
-            if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255)
+            if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255, pl.evolution[p], pl.shieldCooldown[p])
     }
 
     private fun drawHealth(canvas: Canvas, w: World, p: Int, blend: Float, view: Viewport, self: Boolean) {
@@ -370,6 +390,7 @@ class Renderer(private val density: Float, palette: Palette) {
             line.color = teamColors[p % teamColors.size]; line.strokeWidth = 2f*density; line.alpha = 255
             canvas.drawCircle(rawX, centerY, r + 3f*density, line)
         }
+        if(pl.poisonTicks[p]>0 || pl.stun[p]>0){line.color=if(pl.stun[p]>0) 0xFF8EB5FF.toInt() else 0xFF76CF8A.toInt();line.strokeWidth=2f*density;canvas.drawCircle(rawX,centerY,r+7f*density,line)}
         val y = (if (centerY-r-22*density < 44*density) centerY+r+14*density else centerY-r-10*density).coerceIn(14f*density, max(14f*density, canvas.height-6f*density))
         val half = max(r*1.25f, 19f*density)
         val h = if(self) 4f*density else 3f*density
@@ -385,39 +406,7 @@ class Renderer(private val density: Float, palette: Palette) {
      * always the round one and never confused with a teammate.
      */
     private fun drawPartner(canvas: Canvas, w: World, p: Int, blend: Float, view: Viewport) {
-        val pl = w.players
-        val x = view.screenX(lerp(pl.prevX[p], pl.x[p], blend))
-        val y = view.screenY(lerp(pl.prevY[p], pl.y[p], blend))
-        val r = Balance.PLAYER_RADIUS * view.scale
-        val hurt = pl.hurt[p] > 0
-        val alpha = if (pl.invuln[p] > 0 && !hurt) GRACE_ALPHA else 255
-        if (pl.character[p] != dev.david.tessel.core.content.CharacterDef.BALANCED || pl.appearance[p].code() != 0) {
-            tankArt.draw(canvas,x,y,r,pl.aimX[p],pl.aimY[p],pl.character[p],pl.appearance[p],
-                if(hurt) palette.danger else playerBody, if(hurt) palette.danger else playerFacet, palette.ground,hurt,alpha)
-            return
-        }
-        val body = if (hurt) palette.danger else playerBody
-        val facet = if (hurt) palette.danger else playerFacet
-
-        line.strokeCap = Paint.Cap.ROUND
-        line.color = body
-        line.alpha = alpha
-        line.strokeWidth = r * 0.5f
-        canvas.drawLine(x + pl.aimX[p] * r * 0.5f, y + pl.aimY[p] * r * 0.5f, x + pl.aimX[p] * r * 1.15f, y + pl.aimY[p] * r * 1.15f, line)
-        line.alpha = 255
-
-        val k = r * 1.08f / PATH_UNIT
-        canvas.save()
-        canvas.translate(x, y)
-        canvas.scale(k, k)
-        fill.color = body
-        fill.alpha = alpha
-        canvas.drawPath(hexagon, fill)
-        fill.color = facet
-        fill.alpha = alpha
-        canvas.drawPath(hexagonFacet, fill)
-        fill.alpha = 255
-        canvas.restore()
+        drawPlayer(canvas,w,p,blend,view)
     }
 
     /** A player at zero health: an empty outline, filling up as the partner revives them. */

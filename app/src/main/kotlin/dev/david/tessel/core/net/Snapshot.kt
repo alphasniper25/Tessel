@@ -47,6 +47,9 @@ class Snapshot {
 
     // The final fight: which form the Core is in and its grid strike.
     var coreForm = 0
+    var coreShield=0f;var coreHidden=0;var coreWarning=0;var beamX=0f;var beamY=0f;var beamCount=0
+    val beamXs=FloatArray(dev.david.tessel.core.sim.CoreHazards.CAP);val beamYs=FloatArray(dev.david.tessel.core.sim.CoreHazards.CAP)
+    val poisonTicks=IntArray(MAX_PLAYERS)
     var strike = 0
     var strikeParity = 0
     var strikeShare = 0f
@@ -72,6 +75,8 @@ class Snapshot {
     val aimY = FloatArray(MAX_PLAYERS)
     val hp = IntArray(MAX_PLAYERS)
     val maxHp = IntArray(MAX_PLAYERS)
+    val evolution = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankEvolution.BASIC }
+    val shieldCooldown = IntArray(MAX_PLAYERS)
     val character = Array(MAX_PLAYERS) { dev.david.tessel.core.content.CharacterDef.BALANCED }
     val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
     val hurt = BooleanArray(MAX_PLAYERS)
@@ -155,7 +160,7 @@ class Snapshot {
     var healAmount = 2
 
     /** Perk ids on offer to the receiving player, -1 for none. */
-    val perkOffer = IntArray(3) { -1 }
+    val perkOffer = IntArray(dev.david.tessel.core.content.TankEvolution.REWARD_SLOTS) { -1 }
     var healPrice = 0
     var healsLeft = 0
     var canHeal = false
