@@ -443,7 +443,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
                     ev.kind[n] == Events.PLAYER_HIT && ev.who[n] == me -> Unit
                     // Already shown breaking here, the moment this phone's shot finished it.
                     (ev.kind[n] == Events.ENEMY_KILLED || ev.kind[n] == Events.ENEMY_GONE) && settle(ev.ref[n]) -> Unit
-                    else -> v.events.add(ev.kind[n], ev.who[n], ev.x[n], ev.y[n], ev.dx[n], ev.dy[n], ev.angle[n])
+                    else -> v.events.add(ev.kind[n], ev.who[n], ev.x[n], ev.y[n], ev.dx[n], ev.dy[n], ev.angle[n], ev.ref[n])
                 }
             }
             eventsThrough = s.seq
@@ -524,6 +524,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             if (dx * dx + dy * dy >= reach * reach) continue
             c.value[i] = 0
             reports.pickup(c.id[i])
+            view.events.add(Events.COIN,me,c.x[i],c.y[i])
             takenId[takenNext] = c.id[i]
             takenUntil[takenNext] = steps + GUESS_STEPS
             takenNext = (takenNext + 1) % GUESSES

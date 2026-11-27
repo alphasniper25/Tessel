@@ -104,7 +104,15 @@ fun SettingsScreen(
                 }
 
                 Group("Sound") {
-                    ToggleRow("Sound effects", settings.sound, { v -> onChange { it.copy(sound = v) } }, detail = "Short synthesised sounds for shots, hits, coins and bosses.")
+                    ToggleRow("Sound effects", settings.sound, { v -> onChange { it.copy(sound = v) } }, detail = "Original layered combat and reward sounds.")
+                    Divider()
+                    ToggleRow("Menu sounds", settings.menuSounds, { v -> onChange { it.copy(menuSounds = v) } }, enabled = settings.sound)
+                    Divider()
+                    Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
+                        Text("Master volume · ${settings.soundVolume}%", Type.body,c.ink)
+                        val volumes = listOf(25,50,75,100)
+                        Segmented(volumes.map { "$it%" }, volumes.indexOf(settings.soundVolume).coerceAtLeast(0), { i -> onChange { it.copy(soundVolume=volumes[i]) } })
+                    }
                 }
 
                 Group("Vibration") {

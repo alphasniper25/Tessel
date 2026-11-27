@@ -72,7 +72,12 @@ class DroneWing {
             }
         }
     }
-    private fun eligible(w:World,j:Int):Boolean {val e=w.enemies;return e.hp[j]>0&&!w.core.docked(j)&&!(e.type[j]==Bestiary.CORE&&w.core.hazards.hidden>0)}
+    private fun eligible(w:World,j:Int):Boolean {
+        val e=w.enemies;val type=e.type[j]
+        if(e.hp[j]<=0 || w.core.docked(j)) return false
+        if(Bestiary.of(type).boss && (e.mode[j]==0 || (type==Bestiary.GYRE && e.mode[j]==1 && e.elite[j]!=Elite.TETHERED))) return false
+        return type!=Bestiary.CORE || (e.mode[j]!=2 && w.core.hazards.hidden==0)
+    }
     private fun touches(w:World,j:Int,i:Int):Boolean{if(!eligible(w,j))return false;val e=w.enemies;val r=RADIUS+Bestiary.of(e.type[j]).radius;val dx=e.x[j]-x[i];val dy=e.y[j]-y[i];return dx*dx+dy*dy<r*r}
     fun intercept(px:Float,py:Float,radius:Float):Boolean{if(!anyLiving)return false;val r=radius+RADIUS;for(i in 0 until CAPACITY){if(hp[i]<=0)continue;val dx=x[i]-px;val dy=y[i]-py;if(dx*dx+dy*dy<r*r){hp[i]--;return true}};return false}
 }

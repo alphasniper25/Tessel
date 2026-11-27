@@ -81,6 +81,8 @@ data class Settings(
     val cosmeticOwned: Int = GarageCatalog.defaultMask,
     val tankLook: TankLook = TankLook(),
     val cameraZoom: Float = 1.60f,
+    val soundVolume: Int = 75,
+    val menuSounds: Boolean = true,
 )
 
 /** Settings in one small preferences file. Writes happen off the main thread. */
@@ -102,6 +104,8 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_VIBRATION, next.vibration)
             .putBoolean(KEY_SHOT_VIBRATION, next.shotVibration)
             .putBoolean(KEY_SOUND, next.sound)
+            .putInt("sound_volume", next.soundVolume.coerceIn(0,100))
+            .putBoolean("menu_sounds", next.menuSounds)
             .putBoolean(KEY_STATS, next.showStats)
             .putBoolean(KEY_LINK, next.showLink)
             .putInt(KEY_BREAK, next.breakEvery)
@@ -132,6 +136,8 @@ class SettingsStore(context: Context) {
         vibration = prefs.getBoolean(KEY_VIBRATION, true),
         shotVibration = prefs.getBoolean(KEY_SHOT_VIBRATION, true),
         sound = prefs.getBoolean(KEY_SOUND, true),
+        soundVolume = prefs.getInt("sound_volume",75).coerceIn(0,100),
+        menuSounds = prefs.getBoolean("menu_sounds",true),
         showStats = prefs.getBoolean(KEY_STATS, debuggable),
         showLink = prefs.getBoolean(KEY_LINK, true),
         breakEvery = prefs.getInt(KEY_BREAK, 0).coerceIn(0, MAX_BREAK_MINUTES),
