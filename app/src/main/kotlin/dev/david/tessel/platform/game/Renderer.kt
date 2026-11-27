@@ -363,7 +363,7 @@ class Renderer(private val density: Float, palette: Palette) {
             // A short streak behind each shot reads as speed without any blur.
             val laser = b.owner[i] in 0 until w.playerCount && w.players.evolution[b.owner[i]].laser
             line.color=if(laser) palette.zone(4) else palette.ink
-            val tail = (if(laser) 95f else STREAK) * view.scale / speed
+            val tail = (if(laser) 440f else STREAK) * view.scale / speed
             line.strokeWidth = b.radius[i] * 2f * view.scale
             canvas.drawLine(x - b.vx[i] * tail, y - b.vy[i] * tail, x, y, line)
         }

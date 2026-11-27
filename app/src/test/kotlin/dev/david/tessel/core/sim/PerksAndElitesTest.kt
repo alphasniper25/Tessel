@@ -28,7 +28,7 @@ class PerksAndElitesTest {
 
     @Test
     fun aBossStageShopOffersThreePerksAndPickingOneKeepsIt() {
-        val w = world(5)
+        val w = world(10)
         w.shop.open(w)
         assertTrue(w.shop.perkPending(0))
         val offered = (0 until 3).map { w.shop.perkOffer(0, it) }

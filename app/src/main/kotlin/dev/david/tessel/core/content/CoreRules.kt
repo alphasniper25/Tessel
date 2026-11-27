@@ -31,6 +31,8 @@ object CoreRules {
     /** Every second of the fight makes the first form this much faster; losing health adds up to [HURRY_BY_HEALTH]. */
     const val HURRY_PER_SECOND = 0.007f
     const val HURRY_BY_HEALTH = 0.6f
+    fun hurry(seconds:Float, healthShare:Float) = 1f + HURRY_PER_SECOND*seconds + HURRY_BY_HEALTH*(1f-healthShare)
+    fun strikeGap(speed:Float, slower:Float=1f) = maxOf(STRIKE_GAP_MIN, STRIKE_GAP*slower/speed)
 
     /** The second form strikes this much less often, since eight bosses are already out. */
     const val SECOND_FORM_SLOWER = 1.5f

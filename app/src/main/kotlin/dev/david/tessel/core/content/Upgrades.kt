@@ -57,7 +57,7 @@ object Upgrades {
         UpgradeDef("Wealth", "+15% coin value", basePrice = 18, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY, stat = UpgradeStat.WEALTH),
         UpgradeDef("Magnet", "+25% coin pickup reach", basePrice = 6, maxLevel = 8, step = 0.25f, family = CardFamily.ECONOMY, stat = UpgradeStat.MAGNET),
         UpgradeDef("Caliber", "+15% bullet size", basePrice = 8, maxLevel = 8, step = 0.15f, stat = UpgradeStat.CALIBER),
-        UpgradeDef("Ram Damage", "+1 contact retaliation damage", basePrice = 15, maxLevel = 15, step = 1f, family = CardFamily.RAM, stat = UpgradeStat.RAM),
+        UpgradeDef("Ram Damage", "+1 retaliation damage; Rammer also gains 7.5% base impact per level", basePrice = 15, maxLevel = 15, step = 1f, family = CardFamily.RAM, stat = UpgradeStat.RAM),
         UpgradeDef("Heal Power", "Shop healing restores one more pip", basePrice = 17, maxLevel = 5, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
         UpgradeDef("Field Medic", "Shop healing restores two extra pips", basePrice = 22, maxLevel = 1, step = 2f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
         UpgradeDef("Afterburner", "+18% movement speed", basePrice = 46, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED_BONUS),
@@ -122,7 +122,7 @@ object Upgrades {
             WEALTH -> "${pct(defs[id].step)} coin value"
             MAGNET -> "${pct(defs[id].step)} coin pickup reach"
             CALIBER -> "${pct(defs[id].step)} bullet size"
-            RAM_DAMAGE -> "+$levels contact retaliation damage"
+            RAM_DAMAGE -> "+$levels retaliation; +${(7.5f*levels).roundToInt()}% Rammer base impact"
             HEAL_POWER -> "Shop healing restores $levels more pips"
             else -> defs[id].blurb
         }

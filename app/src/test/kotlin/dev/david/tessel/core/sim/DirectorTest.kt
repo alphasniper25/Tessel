@@ -73,7 +73,7 @@ class DirectorTest {
     @Test
     fun onlyDotsEarlyInTheFirstStage() {
         val world = World(seed = 33)
-        world.run(TICK_HZ * 19) {
+        world.run(TICK_HZ * 8) {
             for (i in 0 until world.enemies.count) assertEquals(Bestiary.DOT, world.enemies.type[i])
         }
     }

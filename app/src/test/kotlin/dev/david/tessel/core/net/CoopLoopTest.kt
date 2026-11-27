@@ -275,7 +275,7 @@ class CoopLoopTest {
         run(0.5f)
         world.players.hp[HOST_PLAYER] = 0
         world.players.x[HOST_PLAYER] = 400f
-        world.players.y[HOST_PLAYER] = 360f
+        world.players.y[HOST_PLAYER] = dev.david.tessel.core.sim.ARENA_H / 2f
         // The client walks over and waits.
         while (abs(client.view.players.x[CLIENT] - 400f) > 30f) {
             clientStick.moveX = if (client.view.players.x[CLIENT] > 400f) -1f else 1f

@@ -1138,7 +1138,7 @@ class World(seed: Long = 1L) {
             val by = Cause.type(cause)
             val base = if (by in 0 until Bestiary.size) devDamage[by] else 1
             val late=CampaignScaling.damage(stage,difficulty,by in 0 until Bestiary.size && Bestiary.of(by).boss)
-            val amount = if(loss>0) loss else (base+late-if(pl.evolution[p].melee && Cause.isShot(cause))1 else 0).coerceAtLeast(1)
+            val amount = if(loss>0) loss else (base+late-if(Cause.isShot(cause)) pl.evolution[p].projectileArmor else 0).coerceAtLeast(1)
             if(by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
                 StatusEffect.BURN, StatusEffect.POISON -> if(pl.poisonTicks[p]==0) {pl.poisonTicks[p]=(if(Bestiary.of(by).status==StatusEffect.BURN)2 else 3)*TICK_HZ;pl.poisonSource[p]=by}
                 StatusEffect.FREEZE -> pl.stun[p]=max(pl.stun[p], (TICK_HZ*.45f).toInt())
@@ -1169,10 +1169,24 @@ class World(seed: Long = 1L) {
             }
             if (nearest >= 0) {
                 val d = sqrt(nearestDistance).coerceAtLeast(0.001f)
-                damageEnemy(nearest, pl.ramDamage(p), (e.x[nearest] - px) / d, (e.y[nearest] - py) / d, p)
+                val frame = pl.evolution[p]
+                val impact = pl.ramDamage(p)
+                // Shielded contact has a bounded splash; use the actual collision centre and
+                // only the enemies already present, never newly spawned fragments.
+                val cx=e.x[nearest]; val cy=e.y[nearest]; val n=e.count
+                damageEnemy(nearest, impact, (cx - px) / d, (cy - py) / d, p)
+                if(protected && frame.impactRadius>0f) {
+                    for(j in 0 until n) {
+                        if(j==nearest || e.hp[j]<=0f || core.docked(j) || Bestiary.of(e.type[j]).boss) continue
+                        val dx=e.x[j]-cx; val dy=e.y[j]-cy; val ds=dx*dx+dy*dy
+                        if(ds>=frame.impactRadius*frame.impactRadius) continue
+                        val dist=sqrt(ds).coerceAtLeast(.001f)
+                        damageEnemy(j, impact*frame.impactSplash, dx/dist, dy/dist,p)
+                    }
+                }
             }
         }
-        val radius = Balance.HIT_SHOVE_RADIUS
+        val radius = if(protected) Balance.PLAYER_RADIUS*2f else Balance.HIT_SHOVE_RADIUS
         for (j in 0 until e.count) {
             if (j == boss) continue
             val dx = e.x[j] - px

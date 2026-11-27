@@ -81,7 +81,7 @@ class EnemyTest {
     @Test
     fun aBroodLetsOutPipsUntilItRunsOut() {
         place(Bestiary.BROOD, 400f, 360f)
-        repeat(TICK_HZ * 30) {
+        repeat(STAGE_TICKS - 1) {
             world.players.hp[0] = Balance.PLAYER_HP
             world.step(idle)
         }

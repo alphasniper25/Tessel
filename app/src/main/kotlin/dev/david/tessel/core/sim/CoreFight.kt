@@ -105,7 +105,7 @@ class CoreFight(private val w: World) {
                 elapsed++
                 if (elapsed == 1) nextTheft = secs(CoreRules.FIRST_THEFT_SECONDS)
                 val share = e.hp[i] / e.maxHp[i]
-                val hurry = 1f + CoreRules.HURRY_PER_SECOND * (elapsed / TICK_HZ.toFloat()) + CoreRules.HURRY_BY_HEALTH * (1f - share)
+                val hurry = CoreRules.hurry(elapsed / TICK_HZ.toFloat(), share)
                 if(strike!=STRIKE_NONE || (hazards.hidden==0 && !hazards.beamActive)) strikes(hurry * rate, 1f)
                 if (nextTheft > 0 && --nextTheft == 0) takeFromEveryone()
                 if (!halfTaken && share < 0.5f) {
@@ -208,7 +208,7 @@ class CoreFight(private val w: World) {
                 if (--strikeTicks <= 0) {
                     strike = STRIKE_NONE
                     warnShare = 0f
-                    gapTicks = secs(max(CoreRules.STRIKE_GAP_MIN, CoreRules.STRIKE_GAP * slower / speed))
+                    gapTicks = secs(CoreRules.strikeGap(speed, slower))
                 }
             }
         }
@@ -244,7 +244,7 @@ class CoreFight(private val w: World) {
                     break
                 }
             }
-            pl.perks[p] = mask and (1 shl perk).inv()
+            pl.perks[p] = pl.perks[p] and (1 shl perk).inv()
             stolen[p] = stolen[p] or (1 shl perk)
             if (perk == Perks.THICK_SKIN) {
                 pl.maxHp[p] = max(1, pl.maxHp[p] - 2)

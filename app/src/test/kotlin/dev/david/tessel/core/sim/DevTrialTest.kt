@@ -15,7 +15,7 @@ class DevTrialTest {
     fun onlyTickedKindsComeAndFromTheFirstStage() {
         val w = world()
         w.devAllow(BooleanArray(Bestiary.size) { it == Bestiary.FANNER })
-        repeat(40 * TICK_HZ) { w.step(inputs) }
+        repeat(20 * TICK_HZ) { w.step(inputs) }
         assertTrue(w.enemies.count > 0)
         for (i in 0 until w.enemies.count) assertEquals(Bestiary.FANNER, w.enemies.type[i])
     }

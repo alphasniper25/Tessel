@@ -46,8 +46,8 @@ class StageTest {
         stepUntil(STAGE_TICKS) { world.stageTicks == STAGE_TICKS - 1 }
         world.coins.add(id = 900, x = 1500f, y = 600f, vx = 0f, vy = 0f, value = 4)
         stepUntil(TICK_HZ * 20) { world.phase == Phase.SHOP }
-        assertEquals(25, world.players.coins[0])
-        assertEquals(25, world.players.earned[0])
+        assertEquals(dev.david.tessel.core.content.StageRewards.coins(1,0,0), world.players.coins[0])
+        assertEquals(dev.david.tessel.core.content.StageRewards.coins(1,0,0), world.players.earned[0])
         assertEquals(0, world.coins.count)
     }
 
@@ -56,7 +56,7 @@ class StageTest {
         stepUntil(STAGE_TICKS) { world.stageTicks == STAGE_TICKS - 1 }
         world.coins.add(id = 901, x = world.players.x[0] + 6f, y = world.players.y[0], vx = 0f, vy = 0f, value = 4)
         stepUntil(TICK_HZ * 20) { world.phase == Phase.SHOP }
-        assertEquals(33, world.players.coins[0])
+        assertEquals(4 + dev.david.tessel.core.content.StageRewards.coins(1,4,0), world.players.coins[0])
     }
 
     @Test

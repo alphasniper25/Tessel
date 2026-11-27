@@ -68,10 +68,11 @@ class CombatTest {
     }
 
     @Test
-    fun aSlabTakesSixHits() {
+    fun aSlabTakesItsScaledNumberOfHits() {
         val px = world.players.x[0]
         val py = world.players.y[0]
-        world.spawnEnemy(Bestiary.SLAB, px + 300f, py)
+        val slab = world.spawnEnemy(Bestiary.SLAB, px + 300f, py)
+        val expectedHits = kotlin.math.ceil(world.enemies.hp[slab] / world.players.damage(0)).toInt() - 1
         aimRight()
         var hits = 0
         var kills = 0
@@ -85,7 +86,7 @@ class CombatTest {
             }
             world.events.clear()
         }
-        assertEquals(5, hits)
+        assertEquals(expectedHits, hits)
         assertEquals(1, kills)
     }
 

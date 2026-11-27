@@ -1,7 +1,7 @@
 # TESSEL fork development instructions
 
 ## Baseline and intent
-- Source supplied by the project owner: Tessel 1.0.1 (versionCode 21), copyright David Steenvoorden, MIT. Preserve LICENSE and upstream attribution. Approved scope: three paid shop cards with refresh/locks, weighted class builds, personal progression, boss improvements and multiplayer improvements. See development/CHANGELOG-1.1.0-alpha.7.md for what is implemented versus planned.
+- Source supplied by the project owner: Tessel 1.0.1 (versionCode 21), copyright David Steenvoorden, MIT. Preserve LICENSE and upstream attribution. Approved scope: three paid shop cards with refresh/locks, weighted class builds, personal progression, boss improvements and multiplayer improvements. See development/CHANGELOG-1.1.0-alpha.8.md for what is implemented versus planned.
 - Build on the native Android Kotlin/Compose game; do not rewrite or replace the engine unless explicitly requested.
 - Work on one approved feature or coherent change set at a time. Preserve original ZIP separately. Maintain a changelog, test report and versioned source ZIP for every release candidate.
 
@@ -16,7 +16,7 @@
 
 ## Compatibility and release gates
 - The upstream auto-updater is disabled. Fork application ID, Nearby service ID and NFC AID are distinct; the Kotlin namespace is unchanged. Before production releases, configure stable owner-controlled signing and enable only the owner-controlled update channel. The Kotlin namespace may stay unchanged initially. Keep private signing credentials outside git and Drive source ZIPs. Do not publish under the original developer's identity.
-- Stable upgrade/enemy/perk numeric IDs are serialized; append rather than reorder. Check checkpoint FORMAT=7, ledger FORMAT=1, and Wire.VERSION=21 before making compatibility changes. Migrate or explicitly reject incompatible saves and peers. Cover both host and client in every new gameplay feature. Preserve solo play, team play, duels, touch and controller input.
+- Stable upgrade/enemy/perk numeric IDs are serialized; append rather than reorder. Check checkpoint FORMAT=7, ledger FORMAT=1, and Wire.VERSION=22 before making compatibility changes. Migrate or explicitly reject incompatible saves and peers. Cover both host and client in every new gameplay feature. Preserve solo play, team play, duels, touch and controller input.
 - Use existing fixed-step simulation, pooled objects and deterministic RNG. Avoid allocations or blocking in per-frame loops; do not add unrequested cloud accounts or external services.
 - Default workflow: source updates only. The owner explicitly authorized a debug test APK for alpha.3. Run `gradlew.bat testDebugUnitTest` (or `./gradlew testDebugUnitTest`) when the pinned SDK/toolchain are available, plus focused standalone JVM checks; build `assembleDebug` only when explicitly requested. Do not invoke assembleRelease, distApk or publish releases without approval. Do not claim APK readiness from JVM-only tests.
 - For any requested feature: identify affected files, add or adjust focused tests, run the regression suite, record test outputs and limitations, then update changelog. Keep unrelated behavior unchanged. No release without actual build and signing review.
@@ -24,7 +24,7 @@
 ## Alpha.4 visual constraints
 - Exactly three paid shop slots; never add a fourth. Preserve the original flat, faceted geometric 2D style. No 3D assets, new arena obstacles or glow-heavy redesign.
 - Use GarageCatalog and TankArt for reusable cosmetic parts and previews. Cosmetics never change physics, stats, weapons or collision. Credit balance is derived from completed-run ledger totals, minus owned cosmetic prices; no run coin conversion. IDs and per-slot wire order append only.
-- Viewport zoom is local rendering only. Preserve all-player readiness, NFC, direct Wi-Fi and compressed snapshots. Save FORMAT=7 reads older saves; peers use Wire.VERSION=21.
+- Viewport zoom is local rendering only. Preserve all-player readiness, NFC, direct Wi-Fi and compressed snapshots. Save FORMAT=7 reads older saves; peers use Wire.VERSION=22.
 
 ## Permanent test APK signing — mandatory distribution gate
 - The original alpha.3 CI debug signing key was ephemeral and is not recoverable from the APK. The initial alpha.4 CI artifact likewise uses a different ephemeral key. Do not redistribute those as update-compatible packages.

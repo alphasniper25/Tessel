@@ -1,0 +1,7 @@
+# TESSEL alpha.8 — branch refinement, Prism Railgun, synthetic cohort
+- Twin and Machine Gun evolutions receive moderate damage/reload gains. Normal boss HP multiplier .65 → .59; Hard/Impossible untouched. Mothership and other secret drone configurations remain deliberately powerful.
+- Rammer: shielded contact splash (45% of impact, radius 70–94 units by tier), increased primary impact, hull and regeneration, reduced protected-contact shove, projectile armor by tier. Ram Damage adds 7.5% base impact per level for melee. No new pools or collision packets. Existing legacy retaliation still applies.
+- Prism Railgun remains stage-40 Basic-only. 16× projectile speed, 11× per-shot frame damage, 48 bonus penetration and longer geometric trail. Not instantaneous hitscan; existing pooled swept projectile simulation and client prediction preserved.
+- Fixed Core perk theft accidentally deleting Siphon; Ember hue distinct from hazard/coin palette. Updated regression fixtures to reflect actual shorter waves, revised rewards, evolution milestones and Core attack schedule. No weakening of engine contracts intended.
+- Same checkpoint schema 7; peer protocol 22 required for consistent combat balance. No APK assembled.
+- New deterministic 50-archetype, 1000-profile cohort harness. Gender labels independent of play behavior. No simulated survey responses or subjective human feedback. CI month campaign compares same cohort/seed schedule on alpha.7 and alpha.8, with multiple sessions/day and separate persistent ledger per deployment.

@@ -114,12 +114,12 @@ class PlayerState {
     fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
     fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach
     fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE))
+    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)
         val level=Upgrades.delta(levels[p],UpgradeStat.REGEN).toInt()
-        return if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(4)
+        return if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(if(evolution[p].melee) 2 else 4)
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
