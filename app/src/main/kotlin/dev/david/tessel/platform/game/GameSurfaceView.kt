@@ -25,6 +25,7 @@ import dev.david.tessel.core.content.TankLook
 import dev.david.tessel.core.net.LobbyChoice
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.net.ClientSession
@@ -1252,7 +1253,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), dev.david.tessel.core.content.SkillTree.isNode(it)) }
+            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it)) }
         }
         val ready = host?.ready ?: 0
         publishedReady = ready
@@ -1319,7 +1320,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), dev.david.tessel.core.content.SkillTree.isNode(it)) }
+            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it)) }
         }
         shopFlow.value = ShopView(
             stage = s.stage,
