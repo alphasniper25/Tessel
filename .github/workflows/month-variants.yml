@@ -1,0 +1,76 @@
+name: TESSEL Arsenal and Access experimental cohorts
+on:
+  push:
+    branches: [sim/alpha8-variants]
+permissions:
+  contents: read
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        version: [alpha8-arsenal, alpha8-access]
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Pin Kotlin compiler
+        run: |
+          curl --fail --location --retry 3 https://github.com/JetBrains/kotlin/releases/download/v1.9.0/kotlin-compiler-1.9.0.zip -o "$RUNNER_TEMP/kotlin.zip"
+          unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP/kotlin"
+          echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Compile production simulation and shared cohort harness
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          if [ "$VERSION" = alpha8-arsenal ]; then REV=ef42eecb7c4ba874a23616db5b2d75001dd8409d; else REV=d693758d5c89685dbeed18726af86d8c84d4cec2; fi
+          mkdir -p "$RUNNER_TEMP/engine"
+          git archive "$REV" app/src/main/kotlin/dev/david/tessel/core | tar -x -C "$RUNNER_TEMP/engine"
+          kotlinc $(find "$RUNNER_TEMP/engine/app/src/main/kotlin/dev/david/tessel/core" -name '*.kt') development/HeadlessCohort.kt -include-runtime -d "$RUNNER_TEMP/cohort.jar"
+      - name: Simulate 50 profiles over 30 days
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p result
+          java -Xmx2g -cp "$RUNNER_TEMP/cohort.jar" dev.david.tessel.core.sim.HeadlessCohortKt 50 30 4 result 2100 1 "$((SHARD*50))" 4
+      - name: Preserve completed session records
+        if: always()
+        run: |
+          mkdir -p result
+          if [ ! -f result/sessions.csv ]; then
+            echo 'profile,archetype,motive,preferred_branch,gender,day,session,skill,chosen_branch,class,difficulty,team,seed,stage,victory,ended,seconds,first_coins,first_buys,purchases,first_evolution,final_evolution,kills,earned,hits,bosses,peak_enemies,cause,unlock_before,unlock_after' > result/sessions.csv
+            find result -name 'p*.csv' -type f -print0 | sort -z | xargs -0 -r cat >> result/sessions.csv
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cohort-${{ matrix.version }}-${{ matrix.shard }}
+          path: result/sessions.csv
+          retention-days: 30
+  summarize:
+    if: always() && !cancelled()
+    needs: simulate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cohort-*
+          path: results
+      - run: |
+          sed -i "s/('alpha7','alpha8')/('alpha8-arsenal','alpha8-access')/" development/summarize_cohort.py
+          python3 development/summarize_cohort.py results --out cohort-summary.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpha8-variant-cohort-summary
+          path: cohort-summary.json
+          retention-days: 30
