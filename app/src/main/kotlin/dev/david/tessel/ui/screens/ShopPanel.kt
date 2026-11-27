@@ -59,7 +59,6 @@ fun ShopPanel(
 
     Column(
         Modifier
-            .verticalScroll(rememberScrollState())
             .padding(start = Space.x6, end = Space.x6, top = Space.x2, bottom = Space.x2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -72,6 +71,7 @@ fun ShopPanel(
         }
         Spacer(Modifier.height(Space.x2))
 
+        Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
         // After a boss: one perk to take before the shop can be left.
         if (shop.perkOffers.isNotEmpty()) {
             Text("Choose a Perk", Type.headline, c.ink)
@@ -114,6 +114,9 @@ fun ShopPanel(
             }
             Spacer(Modifier.height(8.dp))
         }
+        }
+        dev.david.tessel.ui.components.Divider()
+        Spacer(Modifier.height(Space.x2))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             CompactAction("Heal +${shop.healAmount} · ${shop.healPrice} coins · ${shop.healsLeft} left", Modifier.weight(1.5f), shop.canHeal && !shop.selfReady, false) { tap(); onHeal() }
             CompactAction("Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }

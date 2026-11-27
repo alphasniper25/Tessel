@@ -1,6 +1,9 @@
 package dev.david.tessel.platform.game
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
@@ -17,6 +20,7 @@ import dev.david.tessel.ui.TesselApp
 import dev.david.tessel.ui.theme.TesselTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -66,6 +70,22 @@ class PlayDialogTest {
             if (System.currentTimeMillis() > until) throw AssertionError("still ${game.mode.value}, wanted $mode")
             Thread.sleep(10)
         }
+    }
+
+    @Test
+    @Config(qualifiers = "w740dp-h320dp-land-night-420dpi")
+    fun newRunActionIsFullyVisibleOnShortLandscapeWithoutScrolling() {
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Play").performClick()
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onNodeWithText("Ram").performClick()
+        val action = compose.onNodeWithText("New Run")
+        action.assertIsDisplayed()
+        val bounds = action.getUnclippedBoundsInRoot()
+        val root = compose.onRoot().getUnclippedBoundsInRoot()
+        assertTrue("New Run must be above the bottom edge: $bounds / $root", bounds.bottom <= root.bottom)
+        action.performClick()
+        waitForMode(Mode.PLAYING)
     }
 
     @Test

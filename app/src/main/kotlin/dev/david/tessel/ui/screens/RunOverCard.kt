@@ -3,6 +3,8 @@ package dev.david.tessel.ui.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,6 +93,7 @@ fun RunOverCard(visible: Boolean, summary: RunSummary?, onAgain: () -> Unit, onH
             }
             // What ended it and what it was worth, with the way out.
             Column(Modifier.width(310.dp)) {
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 val failedAtCore = !summary.won && summary.stage >= dev.david.tessel.core.content.CoreRules.STAGE
                 Text(if (summary.won) "Run completed" else if (failedAtCore) "Run failed" else "Run over", Type.title1, c.ink)
                 val sub = summary.difficulty.label + if (summary.newBest) "  ·  New best" else ""
@@ -98,15 +101,15 @@ fun RunOverCard(visible: Boolean, summary: RunSummary?, onAgain: () -> Unit, onH
                 Spacer(Modifier.height(Space.x4))
                 KilledBy(summary.killedBy)
                 ScoreBlock(summary)
-                Spacer(Modifier.weight(1f, fill = false))
-                Spacer(Modifier.height(Space.x5))
+                }
+                Spacer(Modifier.height(Space.x2))
                 if (rematch != null) Text("${rematch.ready} / ${rematch.team} ready for rematch", Type.footnote, c.ink2)
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x3)) {
                     SecondaryButton("Home", onHome, Modifier.weight(1f))
                     PrimaryButton(if (rematch == null) "Play Again" else if (rematch.selfReady) "Waiting" else "Ready", onAgain, Modifier.weight(1f), enabled = rematch == null || (!rematch.selfReady && rematch.team >= 2))
                 }
             }
-            RunStats(summary, Modifier.weight(1f, fill = false).padding(top = Space.x2))
+            RunStats(summary, Modifier.weight(1f, fill = false).padding(top = Space.x2).verticalScroll(rememberScrollState()))
         }
     }
 }

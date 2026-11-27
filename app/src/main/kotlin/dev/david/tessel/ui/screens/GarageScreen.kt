@@ -35,15 +35,15 @@ fun TankPreview(character: CharacterDef, look: TankLook, modifier: Modifier = Mo
 }
 
 @Composable
-fun CharacterPreview(character: CharacterDef, look: TankLook, difficulty: Difficulty, modifier: Modifier = Modifier) {
+fun CharacterPreview(character: CharacterDef, look: TankLook, difficulty: Difficulty, modifier: Modifier = Modifier, compact: Boolean = false) {
     val c = Theme.colors
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TankPreview(character, look, Modifier.size(66.dp))
+        TankPreview(character, look, Modifier.size(if (compact) 48.dp else 66.dp))
         Column(Modifier.weight(1f)) {
             Text(character.label, Type.headline, c.ink)
             Text("HP ${(Balance.PLAYER_HP + difficulty.bonusHp + character.extraHp).coerceAtLeast(1)}  ·  Damage ${(character.damageScale*100).toInt()}%", Type.footnote, c.ink)
             Text("Speed ${(character.speedScale*100).toInt()}%  ·  Ram ${character.ramBase}", Type.footnote, c.ink)
-            Text(character.description, Type.footnote, c.ink2)
+            if (!compact) Text(character.description, Type.footnote, c.ink2)
         }
     }
 }
@@ -89,14 +89,14 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
                     }
                 }
             }
-            if(selected!=null) {
+        }
+        if(selected!=null) {
                 val owned=GarageCatalog.owned(settings.cosmeticOwned,selected.id)
                 PrimaryButton(if(owned) "Equip ${selected.label}" else "Buy & equip · ${selected.cost}", {
                     onChange { old -> val mask=GarageCatalog.purchase(ledger.totals,old.cosmeticOwned,selected.id)
                         old.copy(cosmeticOwned=mask,tankLook=old.tankLook.equip(selected.id,mask)) }
                 }, Modifier.fillMaxWidth(), enabled=owned || balance>=selected.cost)
             }
-            Spacer(Modifier.height(8.dp))
-        }
+        Spacer(Modifier.height(8.dp))
     }
 }

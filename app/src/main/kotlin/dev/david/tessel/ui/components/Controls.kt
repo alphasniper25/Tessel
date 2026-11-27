@@ -122,7 +122,7 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
             .clip(RoundedCornerShape(Corner.button))
             .background(if (enabled) c.ink else c.track)
             .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.x5),
+            .padding(horizontal = Space.x3),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, Type.headline, if (enabled) c.ground else c.ink3, maxLines = 1)
@@ -147,7 +147,7 @@ fun SecondaryButton(
             .clip(RoundedCornerShape(Corner.button))
             .background(c.track)
             .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = Space.x5),
+            .padding(horizontal = Space.x3),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {

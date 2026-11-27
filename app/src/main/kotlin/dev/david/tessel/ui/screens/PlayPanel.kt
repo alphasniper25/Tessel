@@ -1,13 +1,14 @@
 package dev.david.tessel.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -55,45 +56,41 @@ fun PlayPanel(
     val c = Theme.colors
     val full = saves.size >= SoloSaves.SLOTS
     var selected by remember(initialCharacter) { mutableIntStateOf(initialCharacter.ordinal) }
-    Row(
-        Modifier.padding(start = Space.x6, end = Space.x6, top = Space.x3, bottom = Space.x5),
-        horizontalArrangement = Arrangement.spacedBy(Space.x8),
-    ) {
-        Column(Modifier.width(340.dp).heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
-            Text("New Run", Type.title2, c.ink)
-            Spacer(Modifier.height(Space.x3))
-            Segmented(
-                options = Difficulty.entries.map { it.label },
-                selected = difficulty.ordinal,
-                onSelect = { onDifficulty(Difficulty.entries[it]) },
-            )
-            Spacer(Modifier.height(Space.x1))
-            Text("${difficulty.blurb} Play Together uses this too.", Type.footnote, c.ink3, Modifier.padding(start = Space.x1))
-            Spacer(Modifier.height(Space.x4))
-            if (onNewCharacter != null) {
-                Text("Tank type", Type.headline, c.ink)
-                Segmented(options = CharacterDef.entries.map { it.label }, selected = selected, onSelect = { selected = it })
-                CharacterPreview(CharacterDef.fromId(selected), look, difficulty)
-                Spacer(Modifier.height(Space.x3))
+    // Reserve the action row before measuring scrollable content. The sheet can
+    // be shorter than the preferred layout on a phone with a large font scale.
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Space.x4, vertical = Space.x2)) {
+        val panelHeight = minOf(maxHeight, 292.dp)
+        Column(Modifier.fillMaxWidth().height(panelHeight), verticalArrangement = Arrangement.spacedBy(Space.x2)) {
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.x4)) {
+                Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Space.x1)) {
+                    Text("Start a run", Type.title2, c.ink)
+                    Text("Difficulty", Type.footnote, c.ink2)
+                    Segmented(Difficulty.entries.map { it.label }, difficulty.ordinal, { onDifficulty(Difficulty.entries[it]) })
+                    if (onNewCharacter != null) {
+                        Text("Tank type", Type.footnote, c.ink2)
+                        Segmented(CharacterDef.entries.map { it.label }, selected, { selected = it })
+                        CharacterPreview(CharacterDef.fromId(selected), look, difficulty,
+                            Modifier.clip(RoundedCornerShape(Corner.chip)).background(c.raised).padding(horizontal = Space.x2, vertical = Space.x1), compact = true)
+                    }
+                }
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Saved Runs", Type.title2, c.ink, Modifier.weight(1f))
+                        Text("${saves.size} / ${SoloSaves.SLOTS}", Type.footnote.merge(Type.numbers), c.ink3)
+                    }
+                    Spacer(Modifier.height(Space.x2))
+                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(Space.x2)) {
+                        if (saves.isEmpty()) Text("No saved runs. Save and quit during a run to continue later.", Type.subhead, c.ink3)
+                        for (save in saves) SavedRun(save, now, { onContinue(save.slot) }, { onDelete(save.slot) })
+                    }
+                }
             }
-            PrimaryButton("New Run", { if (onNewCharacter == null) onNew() else onNewCharacter(CharacterDef.fromId(selected)) }, Modifier.fillMaxWidth(), enabled = !full)
-            if (full) {
-                Spacer(Modifier.height(Space.x2))
-                Text("All ${SoloSaves.SLOTS} slots are in use. Delete a saved run to start another.", Type.footnote, c.ink2)
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text("Saved Runs", Type.title2, c.ink, Modifier.weight(1f))
-                Text("${saves.size} of ${SoloSaves.SLOTS}", Type.footnote.merge(Type.numbers), c.ink3)
-            }
-            Spacer(Modifier.height(Space.x3))
-            Column(
-                Modifier.heightIn(max = 250.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Space.x2),
-            ) {
-                if (saves.isEmpty()) Text("Nothing saved yet. A run you leave is kept here.", Type.subhead, c.ink3)
-                for (save in saves) SavedRun(save, now, { onContinue(save.slot) }, { onDelete(save.slot) })
+            dev.david.tessel.ui.components.Divider()
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.x4)) {
+                PrimaryButton("New Run", { if (onNewCharacter == null) onNew() else onNewCharacter(CharacterDef.fromId(selected)) }, Modifier.weight(1.05f), enabled = !full)
+                Text(if (full) "All slots are in use. Delete a saved run to start another." else "${difficulty.label} · ${CharacterDef.fromId(selected).label}", Type.footnote, c.ink2, Modifier.weight(1f), maxLines = 2)
             }
         }
     }
@@ -111,19 +108,14 @@ private fun SavedRun(save: SoloSave, now: Long, onContinue: () -> Unit, onDelete
             .background(c.raised)
             .padding(Space.x3),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
-            Column(Modifier.weight(1f)) {
-                Text("Stage ${cp.nextStage}  ·  ${cp.difficulty.label}", Type.headline, c.ink, maxLines = 1)
-                Text(
-                    "Score ${grouped(cp.score())}  ·  ${clock(cp.seconds)}  ·  ${ago(save.savedAt, now)}",
-                    Type.footnote.merge(Type.numbers),
-                    c.ink2,
-                    maxLines = 1,
-                )
-            }
-            if (asking == 0) {
-                SecondaryButton("Delete", { asking = 1 }, Modifier.width(92.dp), tint = c.danger)
-                PrimaryButton("Continue", onContinue, Modifier.width(112.dp))
+        Text("Stage ${cp.nextStage}  ·  ${cp.difficulty.label}", Type.headline, c.ink, maxLines = 1)
+        Text("Score ${grouped(cp.score())}  ·  ${clock(cp.seconds)}  ·  ${ago(save.savedAt, now)}",
+            Type.footnote.merge(Type.numbers), c.ink2, maxLines = 1)
+        if (asking == 0) {
+            Spacer(Modifier.height(Space.x2))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
+                SecondaryButton("Delete", { asking = 1 }, Modifier.weight(1f), tint = c.danger)
+                PrimaryButton("Continue", onContinue, Modifier.weight(1.2f))
             }
         }
         if (asking == 1) {

@@ -1,5 +1,7 @@
 package dev.david.tessel.ui.screens
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -100,7 +102,7 @@ fun PausePanel(
             }
         }
         if (stats != null && !practice) {
-            Column(Modifier.weight(1f).padding(top = Space.x1)) {
+            Column(Modifier.weight(1f).padding(top = Space.x1).verticalScroll(rememberScrollState())) {
                 RunStats(stats)
                 if (stats.perks.isNotEmpty()) {
                     Spacer(Modifier.height(Space.x3))

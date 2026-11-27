@@ -359,7 +359,7 @@ private fun LobbyReadyControls(lobby: CoopLobby, status: LobbyStatus?, settings:
     if (choice == null) { WaitingLine("Synchronizing lobby…"); return }
     if (canChoose) {
         Segmented(CharacterDef.entries.map { it.label }, choice.character.ordinal, { lobby.chooseCharacter(CharacterDef.fromId(it)) })
-        CharacterPreview(choice.character, settings.tankLook, settings.difficulty)
+        CharacterPreview(choice.character, settings.tankLook, settings.difficulty, compact = true)
         Text("Character applies to new co-op runs; saved games and duels keep their original stats.", Type.footnote, c.ink3)
     }
     Spacer(Modifier.height(Space.x3))
