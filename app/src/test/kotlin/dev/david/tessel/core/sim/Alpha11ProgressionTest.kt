@@ -48,8 +48,8 @@ class Alpha11ProgressionTest {
         assertEquals(setOf(Upgrades.RESERVE_POWER, Upgrades.RESERVE_HULL, Upgrades.RESERVE_DRIVE),
             (0 until SHOP_SLOTS).map { w.shop.item(0,it) }.toSet())
         assertEquals(2,SkillTree.unspent(17,0))
-        assertTrue(w.shop.pickPerk(w,0))
-        assertTrue(w.shop.pickPerk(w,0))
+        assertTrue(w.shop.pickPerk(w,0,0))
+        assertTrue(w.shop.pickPerk(w,0,0))
         assertFalse(w.shop.perkPending(0))
         assertEquals(2,SkillTree.freeRefreshes(w.players.perks[0]))
     }
