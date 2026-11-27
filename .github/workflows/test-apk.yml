@@ -16,11 +16,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Install Android command-line tools
+        uses: android-actions/setup-android@v3
       - name: Install pinned Android SDK platform
         shell: bash
         run: |
           echo "SDK: $ANDROID_HOME"
-          sdkmanager "platforms;android-37"
+          sdkmanager --install "platforms;android-37"
       - name: Build signed debug test APK
         run: |
           chmod +x gradlew
