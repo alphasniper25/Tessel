@@ -5,6 +5,7 @@ import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.content.UpgradeStat
 
 /** Ticks without a hit before Overclock kicks in. */
 const val OVERCLOCK_TICKS = 8 * TICK_HZ
@@ -86,7 +87,7 @@ class PlayerState {
     fun has(p: Int, perk: Int) = perks[p] shr perk and 1 != 0
 
     fun damage(p: Int): Float {
-        var d = scaled(p, Upgrades.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + levels[p][Upgrades.CORE_BREAKER] * Upgrades.of(Upgrades.CORE_BREAKER).step)
+        var d = scaled(p, UpgradeStat.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE_BONUS))
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
@@ -94,23 +95,23 @@ class PlayerState {
     }
 
     fun fireRate(p: Int): Float {
-        var r = scaled(p, Upgrades.FIRE_RATE, Balance.FIRE_RATE)
+        var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE)
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
         if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
         return r
     }
-    fun volley(p: Int) = 1 + levels[p][Upgrades.MULTISHOT]
-    fun bulletSpeed(p: Int) = scaled(p, Upgrades.VELOCITY, Balance.BULLET_SPEED)
-    fun pierce(p: Int) = levels[p][Upgrades.PIERCE] + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
-    fun range(p: Int) = scaled(p, Upgrades.RANGE, Balance.BULLET_RANGE)
-    fun moveSpeed(p: Int) = scaled(p, Upgrades.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * (1f + levels[p][Upgrades.AFTERBURNER] * Upgrades.of(Upgrades.AFTERBURNER).step) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = character[p].ramBase + levels[p][Upgrades.RAM_DAMAGE] * Upgrades.of(Upgrades.RAM_DAMAGE).step + Upgrades.of(Upgrades.TITAN_PLATING).secondaryStep * levels[p][Upgrades.TITAN_PLATING]
-    fun wealth(p: Int) = Upgrades.of(Upgrades.WEALTH).step * levels[p][Upgrades.WEALTH]
-    fun magnet(p: Int) = scaled(p, Upgrades.MAGNET, Balance.MAGNET_RADIUS) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
-    fun bulletRadius(p: Int) = scaled(p, Upgrades.CALIBER, Balance.BULLET_RADIUS)
+    fun volley(p: Int) = 1 + Upgrades.delta(levels[p], UpgradeStat.VOLLEY).toInt()
+    fun bulletSpeed(p: Int) = scaled(p, UpgradeStat.VELOCITY, Balance.BULLET_SPEED)
+    fun pierce(p: Int) = Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
+    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE)
+    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
+    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM)
+    fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
+    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
+    fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
 
-    private fun scaled(p: Int, upgrade: Int, base: Float) = base * (1f + Upgrades.of(upgrade).step * levels[p][upgrade])
+    private fun scaled(p: Int, stat: UpgradeStat, base: Float) = base * (1f + Upgrades.delta(levels[p], stat))
 
     /** [bonusHp] comes from the difficulty: Easy starts with more health, Impossible with less. */
     fun reset(count: Int, bonusHp: Int = 0) {

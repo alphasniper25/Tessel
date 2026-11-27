@@ -15,7 +15,7 @@ import dev.david.tessel.platform.net.Link
  * Debug builds only: a pretend host phone running inside this one, with a
  * bot as its player and an artificial delay on every message. It lets the
  * joining side of co-op be played and checked with a single phone.
- * Start with: adb shell am start -n dev.david.tessel.debug/dev.david.tessel.MainActivity --ez loopback true
+ * Start with: adb shell am start -n com.kreatonik.tessel.debug/dev.david.tessel.MainActivity --ez loopback true
  */
 class LoopbackHost(
     private val handler: Handler,
@@ -52,6 +52,8 @@ class LoopbackHost(
             return true
         }
     }
+
+    fun close() = session.close()
 
     fun begin() {
         session.announceStart()

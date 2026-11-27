@@ -23,6 +23,6 @@ fun main() {
     restored.nextStage()
     check(restored.phase == Phase.FIGHT && restored.stage == w.stage + 1)
     println("PASS: next stage after checkpoint")
-    check(Upgrades.count == 11 && Perks.count == 10)
-    println("PASS: baseline upgrade and perk counts")
+    check(Upgrades.count == 17 && Perks.count == 10)
+    println("PASS: current upgrade and perk counts")
 }

@@ -7,6 +7,7 @@ import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.content.UpgradeStat
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -117,7 +118,7 @@ class Shop {
         val n = levelsBought(w, p, slot)
         pl.coins[p] -= price(w, p, slot)
         pl.levels[p][u] += n
-        val addedHp = when (u) { Upgrades.MAX_HEALTH -> n; Upgrades.TITAN_PLATING -> n * Upgrades.of(u).step.toInt(); else -> 0 }
+        val addedHp = (n * Upgrades.amount(u, UpgradeStat.MAX_HP)).toInt()
         if (addedHp > 0) {
             pl.maxHp[p] += addedHp
             pl.hp[p] = min(pl.hp[p] + addedHp, pl.maxHp[p])
@@ -130,7 +131,7 @@ class Shop {
 
     fun healPrice(w: World) = Upgrades.healPrice(w.stage)
 
-    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + w.players.levels[p][Upgrades.HEAL_POWER] + Upgrades.of(Upgrades.FIELD_MEDIC).step.toInt() * w.players.levels[p][Upgrades.FIELD_MEDIC]
+    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + Upgrades.delta(w.players.levels[p], UpgradeStat.HEAL).toInt()
 
     fun healsLeft(p: Int) = Upgrades.HEALS_PER_SHOP - heals[p]
 

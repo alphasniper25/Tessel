@@ -95,7 +95,7 @@ class Pilot {
     }
 
     /** Shots that reached a drawn enemy are used up, and each hit goes into [reports] for the host. */
-    fun cull(view: World, reports: Reports) = cullShots(shots, view, reports)
+    fun cull(view: World, reports: Reports, candidates: ShotCandidates? = null) = cullShots(shots, view, reports, candidates)
 
     private fun volley(s: Snapshot, me: Int) {
         val speed = s.bulletSpeed[me]
@@ -118,7 +118,7 @@ class Pilot {
          * [reports], hits are recorded for the host; without, the shots are
          * someone else's and only vanish.
          */
-        fun cullShots(shots: BulletPool, view: World, reports: Reports?) {
+        fun cullShots(shots: BulletPool, view: World, reports: Reports?, candidates: ShotCandidates? = null) {
             val e = view.enemies
             for (i in 0 until shots.count) {
                 if (shots.life[i] <= 0) continue
@@ -127,7 +127,9 @@ class Pilot {
                 val sx = shots.x[i] - ax
                 val sy = shots.y[i] - ay
                 val len2 = (sx * sx + sy * sy).coerceAtLeast(0.0001f)
-                for (j in 0 until e.count) {
+                val n = candidates?.query(ax, ay, shots.x[i], shots.y[i], shots.radius[i]) ?: e.count
+                for (k in 0 until n) {
+                    val j = candidates?.indices?.get(k) ?: k
                     if (e.id[j] == shots.lastHit[i] || e.hp[j] <= 0f) continue
                     val reach = shots.radius[i] + Bestiary.of(e.type[j]).radius
                     // Closest point of this step's path to the enemy's centre.

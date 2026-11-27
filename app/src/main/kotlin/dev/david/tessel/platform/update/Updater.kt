@@ -61,7 +61,7 @@ class Updater(private val activity: ComponentActivity) {
         InstallBus.listener = { result -> onInstallResult(result) }
     }
 
-    val updatesEnabled = false // Source-only fork; configure an owned channel before enabling.
+    val updatesEnabled = false // Keep disabled until the owner configures stable signing and approves releases.
 
     fun check() {
         if (!updatesEnabled) { stateFlow.value = UpdateState.Failed("No fork update channel configured."); return }
@@ -201,8 +201,8 @@ class Updater(private val activity: ComponentActivity) {
     }
 
     companion object {
-        private const val LATEST = "https://api.github.com/repos/davidsteenvoorden/tessel/releases/latest"
-        private const val RELEASE_PACKAGE = "dev.david.tessel"
+        private const val LATEST = "https://api.github.com/repos/alphasniper25/Tessel/releases/latest"
+        private const val RELEASE_PACKAGE = "com.kreatonik.tessel"
         private const val TIMEOUT_MS = 15_000
     }
 }

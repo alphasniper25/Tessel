@@ -41,6 +41,10 @@ class HostSession(private val world: World, private val send: (player: Int, byte
     private val stampAt = IntArray(MAX_PLAYERS)
     private val roundTrip = FloatArray(MAX_PLAYERS) { -1f }
     private val buf = Wire.buffer(MAX_MESSAGE * 2)
+    private val packetEncoder = SnapshotPacket.Encoder()
+    private val lastState = IntArray(MAX_PLAYERS) { -1 }
+    private var shopRevision = 0
+    private val sentShopRevision = IntArray(MAX_PLAYERS) { -1 }
 
     // Per player: where their phone said they were, by that phone's clock, played back smoothly.
     private val trail = Array(MAX_PLAYERS) { Trail() }
@@ -69,6 +73,9 @@ class HostSession(private val world: World, private val send: (player: Int, byte
         born[player].clear()
         gone[player].clear()
         nextSendNanos[player] = 0L
+        lastState[player] = -1
+        sentShopRevision[player] = -1
+        slow[player] = false
         trail[player].reset()
     }
 
@@ -101,7 +108,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
                 if (buf.remaining() < 2) return
                 val kind = buf.get().toInt()
                 val arg = buf.get().toInt()
-                if (kind in setOf(Wire.BUY, Wire.HEAL, Wire.REROLL, Wire.PERK, Wire.LOCK_CARD, Wire.UNLOCK_CARD) &&
+                if (isShopAction(kind) &&
                     (world.phase != Phase.SHOP || ready and (1 shl player) != 0 || !world.players.present[player])) return
                 val changed = when (kind) {
                     Wire.LOCK_CARD -> world.shop.setLocked(world, player, arg, true)
@@ -114,7 +121,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
                     Wire.PERK -> world.shop.pickPerk(world, player, arg)
                     else -> { onRequest?.invoke(kind); false }
                 }
-                if (changed) onShopChanged?.invoke()
+                if (changed) { shopRevision++; onShopChanged?.invoke() }
             }
         }
     }
@@ -189,7 +196,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
                     Events.HOSTILE_GONE -> gone[p]
                     else -> outbox[p]
                 }
-                to.add(kind, events.who[i], events.x[i], events.y[i], events.dx[i], events.dy[i], events.angle[i])
+                to.add(kind, events.who[i], events.x[i], events.y[i], events.dx[i], events.dy[i], events.angle[i], events.ref[i])
             }
         }
     }
@@ -198,20 +205,26 @@ class HostSession(private val world: World, private val send: (player: Int, byte
     fun pump(nowNanos: Long, paused: Boolean, waiting: Boolean, breaking: Boolean = false) {
         for (p in 1 until world.playerCount) {
             if (linked and (1 shl p) == 0) continue
-            // Due on an even beat, give or take a few milliseconds, so frame timing never turns two frames into three.
-            if (nowNanos < nextSendNanos[p] - SEND_SLACK_NANOS) continue
+            // Menus need fewer updates, but phase/ready changes and purchases are sent immediately.
+            val idle = paused || waiting || world.phase == Phase.SHOP || world.phase == Phase.OVER
+            val state = (world.stage shl 16) or (ready shl 8) or (world.phase.ordinal shl 3) or
+                (if (paused) 1 else 0) or (if (waiting) 2 else 0) or (if (breaking) 4 else 0)
+            val urgent = state != lastState[p] || (world.phase == Phase.SHOP && shopRevision != sentShopRevision[p])
+            if (!urgent && nowNanos < nextSendNanos[p] - SEND_SLACK_NANOS) continue
             val now = millis(nowNanos)
             echoOut.seq = lastSeq[p]
             echoOut.stamp = now
             echoOut.echo = lastStamp[p]
             echoOut.held = if (lastStamp[p] == 0) 0 else now - stampAt[p]
             Protocol.writeSnapshot(buf, world, paused, waiting, ready, outbox[p], born[p], gone[p], p, echoOut, breaking)
-            if (send(p, Wire.finish(buf), true)) {
+            if (send(p, packetEncoder.encode(buf), true)) {
+                lastState[p] = state
+                sentShopRevision[p] = shopRevision
                 outbox[p].clear()
                 born[p].clear()
                 gone[p].clear()
-                val step = SNAPSHOT_NANOS * beatsFor(p)
-                val due = nextSendNanos[p] + step
+                val step = SNAPSHOT_NANOS * if (idle) 3 else beatsFor(p)
+                val due = if (urgent) nowNanos + step else nextSendNanos[p] + step
                 nextSendNanos[p] = if (due < nowNanos) nowNanos + step else due
             }
         }
@@ -242,10 +255,19 @@ class HostSession(private val world: World, private val send: (player: Int, byte
             born[p].clear()
             gone[p].clear()
             nextSendNanos[p] = 0L
+            lastState[p] = -1
+            sentShopRevision[p] = -1
             trail[p].reset()
             if (linked and (1 shl p) != 0) send(p, Wire.start(world.difficulty.ordinal, p, world.playerCount), false)
         }
         clearReady()
+    }
+
+    fun close() = packetEncoder.close()
+
+    private fun isShopAction(kind: Int) = when (kind) {
+        Wire.BUY, Wire.HEAL, Wire.REROLL, Wire.PERK, Wire.LOCK_CARD, Wire.UNLOCK_CARD -> true
+        else -> false
     }
 
     companion object {

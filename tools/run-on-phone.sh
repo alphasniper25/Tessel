@@ -10,4 +10,4 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n dev.david.tessel.debug/dev.david.tessel.MainActivity
+adb shell am start -n com.kreatonik.tessel.debug/dev.david.tessel.MainActivity

@@ -16,11 +16,11 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "dev.david.tessel"
+        applicationId = "com.kreatonik.tessel"
         minSdk = 26
         targetSdk = 37
-        versionCode = 23
-        versionName = "1.1.0-alpha.2"
+        versionCode = 24
+        versionName = "1.1.0-alpha.3"
         resValue("string", "app_name", "Tessel")
     }
 
@@ -39,7 +39,7 @@ android {
         debug {
             // lets a debug build sit next to a release install on the same phone, under its own name
             applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "Tessel Dev")
+            resValue("string", "app_name", "Tessel Test")
         }
         release {
             isMinifyEnabled = true

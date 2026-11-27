@@ -22,8 +22,8 @@ import java.io.IOException
  * other phone answers with its name, then the host sends "CODE|host name".
  */
 
-/** Ours alone: F0 marks a private id, then "Tessel" in ASCII. Must match res/xml/tap_service.xml. */
-private val AID = byteArrayOf(0xF0.toByte(), 0x54, 0x65, 0x73, 0x73, 0x65, 0x6C)
+/** Ours alone: F0 marks a private id, then "KTessel" in ASCII. Must match res/xml/tap_service.xml. */
+private val AID = byteArrayOf(0xF0.toByte(), 0x4B, 0x54, 0x65, 0x73, 0x73, 0x65, 0x6C)
 private val OK = byteArrayOf(0x90.toByte(), 0x00)
 
 /** "Conditions of use not satisfied": Tessel is not open, or is busy in a run. */

@@ -12,7 +12,7 @@ import kotlin.math.sin
 /**
  * Debug builds only: keeps the arena packed and the player alive and firing,
  * so frame times can be read at the enemy budget without playing to minute five.
- * Start with: adb shell am start -n dev.david.tessel.debug/dev.david.tessel.MainActivity --ez stress true
+ * Start with: adb shell am start -n com.kreatonik.tessel.debug/dev.david.tessel.MainActivity --ez stress true
  */
 class StressRig(private val target: Int = 300) {
     private val rng = Rng(99)

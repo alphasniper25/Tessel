@@ -8,6 +8,7 @@ import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.content.UpgradeStat
 import dev.david.tessel.core.rng.Rng
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -124,8 +125,9 @@ class World(seed: Long = 1L) {
             if (id !in 0 until Upgrades.count) continue
             val n = level.coerceIn(0, Upgrades.of(id).maxLevel)
             players.levels[0][id] = n
-            if (id == Upgrades.MAX_HEALTH || id == Upgrades.TITAN_PLATING) {
-                players.maxHp[0] += if (id == Upgrades.TITAN_PLATING) n * Upgrades.of(id).step.toInt() else n
+            val addedHp = (n * Upgrades.amount(id, UpgradeStat.MAX_HP)).toInt()
+            if (addedHp > 0) {
+                players.maxHp[0] += addedHp
                 players.hp[0] = players.maxHp[0]
             }
         }

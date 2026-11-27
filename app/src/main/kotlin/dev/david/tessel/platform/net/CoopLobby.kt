@@ -1084,7 +1084,7 @@ class CoopLobby(private val activity: ComponentActivity, private val game: GameS
         const val SAVED_TITLE = "Saved for later"
 
         /** Fixed rather than the package name: debug builds carry a suffix and must still find release builds. */
-        const val SERVICE_ID = "dev.david.tessel.coop"
+        const val SERVICE_ID = "com.kreatonik.tessel.coop"
 
         /**
          * One host, up to seven others: a star. The host keeps a link to each

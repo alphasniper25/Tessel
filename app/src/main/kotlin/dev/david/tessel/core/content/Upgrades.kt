@@ -3,6 +3,10 @@ package dev.david.tessel.core.content
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
+enum class UpgradeStat { DAMAGE, DAMAGE_BONUS, FIRE_RATE, VOLLEY, VELOCITY, PIERCE, RANGE, SPEED, SPEED_BONUS, MAX_HP, WEALTH, MAGNET, CALIBER, RAM, HEAL }
+
+data class StatEffect(val stat: UpgradeStat, val amount: Float)
+
 class UpgradeDef(
     val name: String,
     val blurb: String,
@@ -12,7 +16,11 @@ class UpgradeDef(
     val step: Float,
     val family: CardFamily = CardFamily.GUN,
     val secondaryStep: Float = 0f,
-)
+    val stat: UpgradeStat,
+    val secondaryStat: UpgradeStat? = null,
+) {
+    val effects = if (secondaryStat == null) listOf(StatEffect(stat, step)) else listOf(StatEffect(stat, step), StatEffect(secondaryStat, secondaryStep))
+}
 
 /** Everything the between-stage shop sells. Ids index into each player's level array. */
 object Upgrades {
@@ -35,26 +43,44 @@ object Upgrades {
     const val CORE_BREAKER = 16
 
     private val defs = arrayOf(
-        UpgradeDef("Damage", "+15% damage per bullet", basePrice = 15, maxLevel = 25, step = 0.15f),
-        UpgradeDef("Fire Rate", "+10% shots per second", basePrice = 18, maxLevel = 20, step = 0.10f),
-        UpgradeDef("Multishot", "One more bullet per shot", basePrice = 45, maxLevel = 8, step = 1f),
-        UpgradeDef("Velocity", "+10% bullet speed", basePrice = 10, maxLevel = 10, step = 0.10f),
-        UpgradeDef("Pierce", "Bullets go through one more enemy", basePrice = 40, maxLevel = 5, step = 1f),
-        UpgradeDef("Range", "+12% bullet range", basePrice = 10, maxLevel = 10, step = 0.12f),
-        UpgradeDef("Speed", "+6% move speed", basePrice = 15, maxLevel = 10, step = 0.06f, family = CardFamily.MOBILITY),
-        UpgradeDef("Max Health", "One more health pip, filled", basePrice = 30, maxLevel = 10, step = 1f, family = CardFamily.HEALTH),
-        UpgradeDef("Wealth", "+15% coin value", basePrice = 25, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY),
-        UpgradeDef("Magnet", "+25% coin pickup reach", basePrice = 8, maxLevel = 8, step = 0.25f, family = CardFamily.ECONOMY),
-        UpgradeDef("Caliber", "+15% bullet size", basePrice = 12, maxLevel = 8, step = 0.15f),
-        UpgradeDef("Ram Damage", "+1 contact retaliation damage", basePrice = 22, maxLevel = 15, step = 1f, family = CardFamily.RAM),
-        UpgradeDef("Heal Power", "Shop healing restores one more pip", basePrice = 24, maxLevel = 5, step = 1f, family = CardFamily.HEALTH),
-        UpgradeDef("Field Medic", "Shop healing restores two extra pips", basePrice = 32, maxLevel = 1, step = 2f, family = CardFamily.HEALTH),
-        UpgradeDef("Afterburner", "+18% movement speed", basePrice = 65, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY),
-        UpgradeDef("Titan Plating", "+4 max HP, filled; +3 retaliation damage", basePrice = 160, maxLevel = 1, step = 4f, family = CardFamily.RAM, secondaryStep = 3f),
-        UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 240, maxLevel = 1, step = 0.8f, family = CardFamily.GUN),
+        UpgradeDef("Damage", "+15% damage per bullet", basePrice = 15, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
+        UpgradeDef("Fire Rate", "+10% shots per second", basePrice = 18, maxLevel = 20, step = 0.10f, stat = UpgradeStat.FIRE_RATE),
+        UpgradeDef("Multishot", "One more bullet per shot", basePrice = 45, maxLevel = 8, step = 1f, stat = UpgradeStat.VOLLEY),
+        UpgradeDef("Velocity", "+10% bullet speed", basePrice = 10, maxLevel = 10, step = 0.10f, stat = UpgradeStat.VELOCITY),
+        UpgradeDef("Pierce", "Bullets go through one more enemy", basePrice = 40, maxLevel = 5, step = 1f, stat = UpgradeStat.PIERCE),
+        UpgradeDef("Range", "+12% bullet range", basePrice = 10, maxLevel = 10, step = 0.12f, stat = UpgradeStat.RANGE),
+        UpgradeDef("Speed", "+6% move speed", basePrice = 15, maxLevel = 10, step = 0.06f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED),
+        UpgradeDef("Max Health", "One more health pip, filled", basePrice = 30, maxLevel = 10, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.MAX_HP),
+        UpgradeDef("Wealth", "+15% coin value", basePrice = 25, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY, stat = UpgradeStat.WEALTH),
+        UpgradeDef("Magnet", "+25% coin pickup reach", basePrice = 8, maxLevel = 8, step = 0.25f, family = CardFamily.ECONOMY, stat = UpgradeStat.MAGNET),
+        UpgradeDef("Caliber", "+15% bullet size", basePrice = 12, maxLevel = 8, step = 0.15f, stat = UpgradeStat.CALIBER),
+        UpgradeDef("Ram Damage", "+1 contact retaliation damage", basePrice = 22, maxLevel = 15, step = 1f, family = CardFamily.RAM, stat = UpgradeStat.RAM),
+        UpgradeDef("Heal Power", "Shop healing restores one more pip", basePrice = 24, maxLevel = 5, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
+        UpgradeDef("Field Medic", "Shop healing restores two extra pips", basePrice = 32, maxLevel = 1, step = 2f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
+        UpgradeDef("Afterburner", "+18% movement speed", basePrice = 65, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED_BONUS),
+        UpgradeDef("Titan Plating", "+4 max HP, filled; +3 retaliation damage", basePrice = 160, maxLevel = 1, step = 4f, family = CardFamily.RAM, secondaryStep = 3f, stat = UpgradeStat.MAX_HP, secondaryStat = UpgradeStat.RAM),
+        UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 240, maxLevel = 1, step = 0.8f, family = CardFamily.GUN, stat = UpgradeStat.DAMAGE_BONUS),
     )
 
     val count get() = defs.size
+
+    // Compiled once. The hot simulation traverses only the relevant effect(s), without filtering or allocation.
+    private class Contribution(val id: Int, val amount: Float)
+    private val byStat = Array(UpgradeStat.entries.size) { i ->
+        defs.flatMapIndexed { id, def -> def.effects.filter { it.stat.ordinal == i }.map { Contribution(id, it.amount) } }.toTypedArray()
+    }
+
+    fun delta(levels: IntArray, stat: UpgradeStat): Float {
+        var result = 0f
+        for (c in byStat[stat.ordinal]) result += levels[c.id] * c.amount
+        return result
+    }
+
+    /** Used when buying a card with an immediate effect, or setting up a developer run. */
+    fun amount(id: Int, stat: UpgradeStat): Float {
+        val d = defs[id]
+        return (if (d.stat == stat) d.step else 0f) + (if (d.secondaryStat == stat) d.secondaryStep else 0f)
+    }
 
     /** What [levels] levels bought together add, for a rare upgrade's card. */
     fun blurb(id: Int, levels: Int): String {

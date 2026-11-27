@@ -1187,6 +1187,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         checkpoint = null
         duelSetup = null
         duelFlow.value = false
+        host?.close()
+        client?.close()
+        loopback?.close()
         host = null
         client = null
         loopback = null

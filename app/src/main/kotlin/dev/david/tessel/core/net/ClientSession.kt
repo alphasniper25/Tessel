@@ -96,6 +96,8 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
     private var placedForRound = -1
     private val bump = dev.david.tessel.core.sim.Bump()
     private val buf = Wire.buffer(1024)
+    private val packetDecoder = SnapshotPacket.Decoder()
+    private val collisions = ShotCandidates()
     private val reports = Reports()
     private val echo = Echo()
     private var inputSeq = 0
@@ -150,6 +152,8 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
     var starvedFrames = 0
         private set
 
+    fun close() = packetDecoder.close()
+
     fun reset() {
         newest = -1
         stored = 0
@@ -169,12 +173,12 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
     }
 
     fun receive(bytes: ByteArray, nowNanos: Long) {
-        if (Wire.typeOf(bytes) != Wire.SNAPSHOT) return
+        val packet = packetDecoder.decode(bytes) ?: return
         val slot = (newest + 1) % RING
         val s = ring[slot]
         val previous = latest
         val previousTick = previous?.tick ?: -1
-        Protocol.readSnapshot(Wire.open(bytes), s)
+        Protocol.readSnapshot(packet, s)
         s.arrivalNanos = nowNanos
         s.seq = ++arrivals
         if (previous != null && s.tick < previousTick) {
@@ -252,7 +256,8 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         stayOutOfBoss()
         bumpIntoOthers(s)
         val before = reports.hits
-        pilot.cull(view, reports)
+        collisions.rebuild(view.enemies)
+        pilot.cull(view, reports, collisions)
         for (k in before until reports.hits) landed(s, reports.hitId[k], reports.hitX[k], reports.hitY[k])
         flyGhosts()
         if (localInvuln > 0) localInvuln--
@@ -615,6 +620,6 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             g.life[i] -= 1
             if (g.x[i] < -MARGIN || g.x[i] > ARENA_W + MARGIN || g.y[i] < -MARGIN || g.y[i] > ARENA_H + MARGIN) g.life[i] = 0
         }
-        Pilot.cullShots(g, view, null)
+        Pilot.cullShots(g, view, null, collisions)
     }
 }
