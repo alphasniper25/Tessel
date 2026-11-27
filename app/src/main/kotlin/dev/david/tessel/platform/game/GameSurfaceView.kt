@@ -237,13 +237,13 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     // Commands from the menus and the lobby. Each one runs on the game thread, in order.
 
     /** A normal run: developer options stay out of it. */
-    fun startRun(difficulty: Difficulty, character: dev.david.tessel.core.content.CharacterDef = dev.david.tessel.core.content.CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
+    fun startRun(difficulty: Difficulty, character: CharacterDef = CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
 
     /** A trial run from the developer page, with its options on. */
     fun startDevRun(difficulty: Difficulty) = onGameThread { beginSolo(difficulty, withDev = true) }
 
     /** A new solo run in a free slot. With every slot taken it does not start; the menus ask for one to be freed first. */
-    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: dev.david.tessel.core.content.CharacterDef = dev.david.tessel.core.content.CharacterDef.BALANCED) {
+    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED) {
         // A run that uses developer options goes into no save slot and no record.
         val cheat = withDev && dev.active
         val slot = if (cheat) -1 else saves?.free() ?: 0
