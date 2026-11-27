@@ -566,7 +566,7 @@ class World(seed: Long = 1L) {
 
     fun bossHpScale(): Float {
         val round = (stage / Bestiary.BOSS_EVERY - 1).coerceAtLeast(0) / Bestiary.bossOrder.size
-        return difficulty.bossToughness * (if(stage==5 && (difficulty==Difficulty.EASY || difficulty==Difficulty.NORMAL)) .70f else if(stage==5) .8f else 1f) *
+        return difficulty.bossToughness * (when { difficulty==Difficulty.NORMAL && stage==5 -> .63f; difficulty==Difficulty.NORMAL && stage==10 -> .90f; difficulty==Difficulty.NORMAL && stage==15 -> .95f; stage==5 && difficulty==Difficulty.EASY -> .70f; stage==5 -> .8f; else -> 1f }) *
             (1f + Balance.BOSS_HP_PER_PLAYER * (presentCount() - 1)) *
             (if(stage==CoreRules.STAGE) CoreRules.FINAL_ROUND_SCALE else 1f + Balance.BOSS_HP_PER_ROUND * round) * (1f + .018f * max(0,stage-10))
     }
