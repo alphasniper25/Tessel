@@ -1,0 +1,1400 @@
+package dev.david.tessel.platform.game
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.res.Configuration
+import android.graphics.Rect
+import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.SystemClock
+import android.util.Log
+import android.view.Choreographer
+import android.view.MotionEvent
+import android.view.SurfaceHolder
+import android.view.SurfaceView
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import dev.david.tessel.core.content.Bestiary
+import dev.david.tessel.core.content.CardMission
+import dev.david.tessel.core.content.CharacterDef
+import dev.david.tessel.core.net.LobbyChoice
+import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.Scoring
+import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.net.ClientSession
+import dev.david.tessel.core.net.HOST_PLAYER
+import dev.david.tessel.core.net.HostSession
+import dev.david.tessel.core.net.Snapshot
+import dev.david.tessel.core.net.Wire
+import dev.david.tessel.core.sim.Bot
+import dev.david.tessel.core.sim.Cause
+import dev.david.tessel.core.sim.Checkpoint
+import dev.david.tessel.core.sim.DuelSetup
+import dev.david.tessel.core.sim.Events
+import dev.david.tessel.core.sim.MAX_PLAYERS
+import dev.david.tessel.core.sim.Phase
+import dev.david.tessel.core.sim.PlayerInput
+import dev.david.tessel.core.sim.SHOP_SLOTS
+import dev.david.tessel.core.sim.TICK_HZ
+import dev.david.tessel.core.sim.World
+import dev.david.tessel.core.stats.RunEntry
+import dev.david.tessel.core.stats.Tally
+import dev.david.tessel.core.tutorial.Tutorial
+import dev.david.tessel.design.Palette
+import dev.david.tessel.core.audio.Synth.Sound
+import dev.david.tessel.platform.audio.Haptics
+import dev.david.tessel.platform.audio.Sfx
+import dev.david.tessel.platform.dev.Trace
+import dev.david.tessel.platform.input.Gamepad
+import dev.david.tessel.platform.input.StickView
+import dev.david.tessel.platform.input.TwinStickController
+import dev.david.tessel.platform.net.HostLink
+import dev.david.tessel.platform.net.Link
+import dev.david.tessel.platform.store.Dev
+import dev.david.tessel.platform.store.LedgerStore
+import dev.david.tessel.platform.store.Settings
+import dev.david.tessel.platform.store.SoloSaves
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+/** Alone, running the game for a team, or drawing what the host runs. */
+enum class Role { SOLO, HOST, CLIENT }
+
+/**
+ * Owns the game thread and the run. The sim advances in fixed 60 Hz steps no
+ * matter how fast the screen refreshes; drawing blends between the last two.
+ *
+ * Menus talk to it through the commands below, which hop onto the game
+ * thread, and read back through the state flows. In co-op the host phone
+ * runs the only simulation; the phones that joined follow its snapshots.
+ */
+@SuppressLint("ViewConstructor")
+class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Choreographer.FrameCallback {
+
+    private val density = resources.displayMetrics.density
+    private val debuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private val controller = TwinStickController(density)
+
+    /** A game controller, if one is connected. MainActivity hands it the axis events. */
+    val gamepad = Gamepad()
+    private val world = World(seed = SystemClock.elapsedRealtimeNanos())
+    private val viewport = Viewport()
+    private val renderer = Renderer(density, paletteFor(resources.configuration)).apply {
+        stickRadius = controller.stickRadius
+    }
+    private val hud = Hud(density, resources.configuration.fontScale)
+    private val shards = Shards()
+    private val haptics = Haptics(context)
+    private val sfx = Sfx(context)
+    private val stats = FrameStats()
+    private val inputs = Array(MAX_PLAYERS) { PlayerInput() }
+    private val moveView = StickView()
+    private val aimView = StickView()
+
+    /** Set before the first frame; only honoured in debug builds. */
+    var stress: StressRig? = null
+        set(value) {
+            field = if (debuggable) value else null
+        }
+
+    /** Debug builds: a bot plays this phone's player, so a two-phone test can run hands-free. */
+    var autopilot: Bot? = null
+        set(value) {
+            field = if (debuggable) value else null
+        }
+
+    private val modeFlow = MutableStateFlow(Mode.HOME)
+    val mode: StateFlow<Mode> = modeFlow
+    private val shopFlow = MutableStateFlow<ShopView?>(null)
+    val shop: StateFlow<ShopView?> = shopFlow
+    private val summaryFlow = MutableStateFlow<RunSummary?>(null)
+    val summary: StateFlow<RunSummary?> = summaryFlow
+
+    /** The run so far, refreshed each time the game pauses. */
+    private val statsFlow = MutableStateFlow<RunSummary?>(null)
+    val runStats: StateFlow<RunSummary?> = statsFlow
+
+    /** Co-op names by player number, for the statistics. Set by the lobby before a run. */
+    @Volatile var names: List<String> = emptyList()
+
+    /**
+     * Host of a co-op run: called on the game thread with each fresh
+     * [Checkpoint] (when the shop opens, when it closes, when a run starts),
+     * or with null when the run is over and there is nothing left to keep.
+     */
+    var onCheckpoint: ((Checkpoint?) -> Unit)? = null
+
+    /** Host: the run was saved for later at [Checkpoint]. Everyone stops here. Game thread. */
+    var onSaved: ((Checkpoint) -> Unit)? = null
+
+    /** Where runs are written down and enemies logged. Set before the first run. */
+    @Volatile var ledger: LedgerStore? = null
+
+    fun cardUnlockMask(): Int = ledger?.state?.value?.totals?.let(CardMission::mask) ?: 0
+
+    /** Solo runs kept for later. Set before the first run. */
+    @Volatile var saves: SoloSaves? = null
+    private val roleFlow = MutableStateFlow(Role.SOLO)
+    private val duelFlow = MutableStateFlow(false)
+
+    /** True while the game on screen is a duel: no saving, no enemies. */
+    val duel: StateFlow<Boolean> = duelFlow
+    private var duelSetup: DuelSetup? = null
+    val role: StateFlow<Role> = roleFlow
+
+    // What carries each link, from Nearby: 0 unknown, 1 Bluetooth LE, 2 Bluetooth, 3 Wi-Fi. Written on the main thread.
+    private val linkQuality = IntArray(MAX_PLAYERS)
+
+    // Links that skip Nearby and go straight over the local network. Written on the main thread.
+    private val direct = BooleanArray(MAX_PLAYERS)
+
+    /** True while the host holds the game for a phone that dropped out. */
+    private val heldFlow = MutableStateFlow(false)
+    val held: StateFlow<Boolean> = heldFlow
+
+    private val rematchFlow = MutableStateFlow(RematchView())
+    val rematch: StateFlow<RematchView> = rematchFlow
+
+    /** A break reminder is the reason for the pause: the card asks to keep playing or to save. */
+    private val breakFlow = MutableStateFlow(false)
+    val breakDue: StateFlow<Boolean> = breakFlow
+
+    /** The guided practice, while one is on. */
+    private val tutorialFlow = MutableStateFlow<TutorialView?>(null)
+    val tutorial: StateFlow<TutorialView?> = tutorialFlow
+
+    private val thread = HandlerThread("game").apply { start() }
+    private val handler = Handler(thread.looper)
+    private lateinit var choreographer: Choreographer
+
+    // Guards the surface and everything draw() reads that the main thread can change.
+    private val surfaceLock = Any()
+    private var surfaceLive = false
+    private var resumed = false
+    @Volatile private var running = false
+
+    // Game thread only.
+    private var current = Mode.HOME
+    private var playingAs = Role.SOLO
+    private var host: HostSession? = null
+    private var client: ClientSession? = null
+    private var loopback: LoopbackHost? = null
+    private var me = HOST_PLAYER
+    private var checkpoint: Checkpoint? = null
+
+    // Break reminders: minutes between them (0 for off), and how long this phone has played since the last one.
+    @Volatile private var breakEvery = 0
+    private var playedNanos = 0L
+    private var lastPlayAt = 0L
+    private var breaking = false
+
+    private var practice: Tutorial? = null
+    private var tutorialKey = -1
+
+    // Developer options for solo runs, and whether this run used any, which keeps it out of the records.
+    @Volatile private var dev = Dev()
+    private var cheating = false
+
+    /** The run in progress was started from the developer page; only then do the options reach it. */
+    private var devRun = false
+    private var gameSpeed = 1f
+
+    // Solo: the slot this run keeps itself in (-1 for none), and what this phone has met and beaten since the last flush.
+    private var soloSlot = -1
+    private val tally = Tally()
+
+    /** This run is in the ledger already; it must not be written twice. */
+    private var recorded = false
+    private var scanFrames = 0
+
+    /** Host: bit p set while player p's phone is out of reach. Client: bit 0 while the host is. */
+    private var unreachable = 0
+    private var publishedReady = 0
+    private var clientShopKey = 0
+    private var lastFrameNanos = 0L
+    private var pendingNanos = 0L
+    private var statWindows = 0
+    private var nextNetLog = 0L
+    @Volatile private var cutout = Insets.NONE
+
+    init {
+        holder.addCallback(this)
+        keepScreenOn = true
+        // Choreographer is per thread; asking for it here would hand back the main one.
+        handler.post { choreographer = Choreographer.getInstance() }
+        ViewCompat.setOnApplyWindowInsetsListener(this) { _, insets ->
+            cutout = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout())
+            fit()
+            insets
+        }
+    }
+
+    // Commands from the menus and the lobby. Each one runs on the game thread, in order.
+
+    /** A normal run: developer options stay out of it. */
+    fun startRun(difficulty: Difficulty, character: dev.david.tessel.core.content.CharacterDef = dev.david.tessel.core.content.CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
+
+    /** A trial run from the developer page, with its options on. */
+    fun startDevRun(difficulty: Difficulty) = onGameThread { beginSolo(difficulty, withDev = true) }
+
+    /** A new solo run in a free slot. With every slot taken it does not start; the menus ask for one to be freed first. */
+    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: dev.david.tessel.core.content.CharacterDef = dev.david.tessel.core.content.CharacterDef.BALANCED) {
+        // A run that uses developer options goes into no save slot and no record.
+        val cheat = withDev && dev.active
+        val slot = if (cheat) -1 else saves?.free() ?: 0
+        if (!cheat && slot < 0) return
+        dropCoop()
+        devRun = withDev
+        applyDev()
+        world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
+        world.players.chooseCharacter(0, character, difficulty.bonusHp)
+        world.players.missionMask[0] = cardUnlockMask()
+        if (cheat) {
+            if (dev.startStage > 1) world.skipTo(dev.startStage)
+            world.players.coins[0] = dev.startCoins
+            world.bringDevBoss()
+            world.devUpgrades(dev.upgrades)
+            world.devPerks(dev.perks)
+        }
+        soloSlot = slot
+        markCheating(cheat)
+        freshRun()
+        if (!cheat) keep()
+    }
+
+    private fun markCheating(on: Boolean) {
+        cheating = on
+        hud.tag = if (on) "Developer run, not counted" else null
+    }
+
+    /** Practice for a new player: walking, then shooting, then dodging. Counts for nothing. */
+    fun startTutorial() = onGameThread {
+        dropCoop()
+        world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = Difficulty.EASY)
+        world.practice = true
+        world.spawning = false
+        practice = Tutorial().also { it.begin(world) }
+        hud.practice = true
+        soloSlot = -1
+        markCheating(false)
+        freshRun()
+        recorded = true
+        tutorialKey = -1
+        publishTutorial()
+        Trace.log("tutorial started")
+    }
+
+    private fun publishTutorial() {
+        val t = practice ?: return
+        val q = (t.progress * 20f).toInt()
+        val key = (t.step.ordinal * 100 + q) * 4 + (if (t.hit) 2 else 0) + (if (t.passed) 1 else 0)
+        if (key == tutorialKey) return
+        tutorialKey = key
+        tutorialFlow.value = TutorialView(t.step, q, t.hit, t.passed)
+    }
+
+    /** Developer page: the break reminder, now. */
+    fun breakNow() = onGameThread {
+        // From the developer page the run is paused already; the card replaces the pause menu.
+        if (current == Mode.PLAYING || (current == Mode.PAUSED && playingAs != Role.CLIENT)) callBreak()
+    }
+
+    private fun callBreak() {
+        playedNanos = 0L
+        Trace.log("break reminder, role=$playingAs")
+        if (playingAs == Role.CLIENT) {
+            // The host pauses everyone, this phone too, and says why.
+            client?.action(Wire.BREAK)
+        } else {
+            breaking = true
+            enter(Mode.PAUSED)
+        }
+    }
+
+    /** Counts the time spent playing. Time in the shop counts; five minutes away from the game counts as a break. */
+    private fun trackUsage(usable: Long) {
+        if (practice != null) return
+        if (current != Mode.PLAYING && current != Mode.SHOP) return
+        val t = SystemClock.elapsedRealtime()
+        if (t - lastPlayAt > BREAK_RESET_MS) playedNanos = 0L
+        lastPlayAt = t
+        playedNanos += usable
+        val every = breakEvery
+        if (current == Mode.PLAYING && every > 0 && playedNanos >= every * 60_000_000_000L) callBreak()
+    }
+
+    /**
+     * Puts the developer options on the world. A team never gets any: the
+     * options only reach a solo run, and a run they touched is marked.
+     */
+    private fun applyDev(live: Boolean = false) {
+        val solo = playingAs == Role.SOLO && practice == null && devRun
+        val d = if (solo) dev else Dev()
+        world.invincible = d.invincible
+        if (practice == null) world.spawning = !d.noSpawns
+        gameSpeed = d.speed
+        for (k in 0 until Bestiary.size) {
+            val t = d.tweak(k)
+            world.devSpeed[k] = t.speed
+            world.devHealth[k] = t.health
+            world.devDamage[k] = t.damage
+        }
+        world.devBoss = d.boss
+        world.devElites = d.elites
+        world.devAllow(if (d.off.isEmpty()) null else BooleanArray(Bestiary.size) { it !in d.off })
+        if (!solo) return
+        if (live && current != Mode.HOME && d.changesTheRun && !cheating) markCheating(true)
+    }
+
+    /** Carries on the solo run kept in [slot]: in the shop it stopped at, or from the start. */
+    fun continueRun(slot: Int) = onGameThread {
+        val saved = saves?.get(slot) ?: return@onGameThread
+        dropCoop()
+        world.restore(saved.checkpoint, SystemClock.elapsedRealtimeNanos()) { it == HOST_PLAYER }
+        soloSlot = slot
+        applyDev()
+        freshRun()
+        if (world.phase == Phase.SHOP) {
+            publishShop()
+            enter(Mode.SHOP)
+        }
+    }
+
+    /** Throws away the solo run kept in [slot], from the menu. */
+    fun discardSave(slot: Int) {
+        saves?.delete(slot)
+    }
+
+    fun startCoopHost(link: HostLink, difficulty: Difficulty, players: Int, duel: DuelSetup? = null, choices: List<LobbyChoice> = emptyList()) = onGameThread {
+        dropCoop()
+        becomeRole(Role.HOST)
+        duelSetup = duel
+        duelFlow.value = duel != null
+        if (duel != null) {
+            world.startDuel(players, SystemClock.elapsedRealtimeNanos(), duel)
+        } else {
+            world.reset(players = players, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
+            for (p in 0 until players) {
+                val choice = choices.getOrNull(p) ?: continue
+                world.players.chooseCharacter(p, choice.character, difficulty.bonusHp)
+                world.players.missionMask[p] = choice.missionMask and CardMission.allMask
+            }
+        }
+        for (p in 1 until players) world.remote[p] = true
+        host = HostSession(world, link::send).also {
+            for (p in 1 until players) it.connect(p)
+            it.onRequest = ::onPartnerAsk
+            it.onShopChanged = { publishShop(); keep() }
+            it.announceStart()
+        }
+        if (duel == null) keep()
+        freshRun()
+    }
+
+    /** Host: carries on a saved co-op run. [seated] marks the seats with a phone in them this time. */
+    fun continueCoopHost(link: HostLink, saved: Checkpoint, seated: BooleanArray) = onGameThread {
+        dropCoop()
+        becomeRole(Role.HOST)
+        world.restore(saved, SystemClock.elapsedRealtimeNanos()) { it == HOST_PLAYER || seated.getOrElse(it) { false } }
+        for (p in 1 until world.playerCount) world.remote[p] = true
+        host = HostSession(world, link::send).also {
+            for (p in 1 until world.playerCount) if (world.players.present[p]) it.connect(p)
+            it.onRequest = ::onPartnerAsk
+            it.onShopChanged = { publishShop(); keep() }
+            it.announceStart()
+        }
+        keep()
+        freshRun()
+        if (world.phase == Phase.SHOP) {
+            publishShop()
+            enter(Mode.SHOP)
+        }
+    }
+
+    /**
+     * Co-op: saves the run for later and ends it for everyone. A joining
+     * phone asks the host, who does the saving.
+     */
+    fun saveForLater() = onGameThread {
+        // A duel has nothing to keep.
+        if (duelFlow.value) return@onGameThread
+        when (playingAs) {
+            Role.CLIENT -> client?.action(Wire.SAVE)
+            Role.HOST -> saveAndStop()
+            Role.SOLO -> saveSolo()
+        }
+    }
+
+    fun startCoopClient(link: Link, you: Int, players: Int) = onGameThread {
+        dropCoop()
+        becomeRole(Role.CLIENT)
+        me = you
+        client = ClientSession(you, players, link::send).also { it.reset() }
+        freshRun()
+    }
+
+    /** Debug builds: plays the joining side against a bot host inside this phone. */
+    fun startLoopback() = onGameThread {
+        if (!debuggable) return@onGameThread
+        dropCoop()
+        becomeRole(Role.CLIENT)
+        val fake = LoopbackHost(handler, LOOPBACK_DELAY_MS) { bytes -> fromHost(bytes, System.nanoTime()) }
+        me = LoopbackHost.YOU
+        client = ClientSession(LoopbackHost.YOU, LoopbackHost.PLAYERS, fake.clientLink::send).also { it.reset() }
+        loopback = fake
+        fake.begin()
+        freshRun()
+    }
+
+    /** A message from another phone, from any thread. [from] is its player number; the host is 0. */
+    fun deliver(from: Int, bytes: ByteArray) {
+        val arrived = System.nanoTime()
+        handler.post {
+            when (playingAs) {
+                Role.HOST -> host?.receive(from, bytes, arrived)
+                Role.CLIENT -> fromHost(bytes, arrived)
+                Role.SOLO -> Unit
+            }
+        }
+    }
+
+    fun pause() = onGameThread {
+        when (playingAs) {
+            Role.CLIENT -> if (current == Mode.PLAYING) client?.action(Wire.PAUSE)
+            else -> if (current == Mode.PLAYING) enter(Mode.PAUSED)
+        }
+    }
+
+    fun resume() = onGameThread {
+        when (playingAs) {
+            Role.CLIENT -> client?.action(Wire.RESUME)
+            else -> if (current == Mode.PAUSED && unreachable == 0) {
+                restartClock()
+                enter(Mode.PLAYING)
+            }
+        }
+    }
+
+    fun playAgain(difficulty: Difficulty) = onGameThread {
+        when (playingAs) {
+            Role.SOLO -> beginSolo(difficulty, character = world.players.character[0])
+            Role.HOST -> if (current == Mode.OVER) host?.markRematchReady(0, cardUnlockMask())
+            Role.CLIENT -> if (current == Mode.OVER) client?.action(Wire.RESTART, cardUnlockMask())
+        }
+    }
+
+    fun leaveRun() = onGameThread {
+        dropCoop()
+        shards.clear()
+        shopFlow.value = null
+        enter(Mode.HOME)
+    }
+
+    /** Solo: leaves the run on purpose. It goes in the history as left, and its save is thrown away. */
+    fun abandonRun() = onGameThread {
+        if (playingAs == Role.SOLO && !recorded && !cheating && practice == null) {
+            val run = summarize()
+            if (run != null && run.seconds >= MIN_RECORDED_SECONDS) {
+                recorded = true
+                ledger?.record(entryOf(run, left = true))
+            }
+            if (soloSlot > 0) saves?.delete(soloSlot)
+            soloSlot = -1
+        }
+        dropCoop()
+        shards.clear()
+        shopFlow.value = null
+        enter(Mode.HOME)
+    }
+
+    fun buy(slot: Int) = onGameThread {
+        if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
+        if (playingAs == Role.CLIENT) client?.action(Wire.BUY, slot)
+        else if (world.shop.buy(world, HOST_PLAYER, slot)) { publishShop(); keep() }
+    }
+
+    fun setCardLocked(slot: Int, locked: Boolean) = onGameThread {
+        if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
+        if (playingAs == Role.CLIENT) client?.action(if (locked) Wire.LOCK_CARD else Wire.UNLOCK_CARD, slot)
+        else if (world.shop.setLocked(world, HOST_PLAYER, slot, locked)) { publishShop(); keep() }
+    }
+
+    fun pickPerk(slot: Int) = onGameThread {
+        if (current != Mode.SHOP) return@onGameThread
+        if (playingAs == Role.CLIENT) client?.action(Wire.PERK, slot)
+        else if (world.shop.pickPerk(world, HOST_PLAYER, slot)) { publishShop(); keep() }
+    }
+
+    fun heal() = onGameThread {
+        if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
+        if (playingAs == Role.CLIENT) client?.action(Wire.HEAL)
+        else if (world.shop.heal(world, HOST_PLAYER)) { publishShop(); keep() }
+    }
+
+    fun reroll() = onGameThread {
+        if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
+        if (playingAs == Role.CLIENT) client?.action(Wire.REROLL)
+        else if (world.shop.reroll(world, HOST_PLAYER)) { publishShop(); keep() }
+    }
+
+    /** Alone this starts the next stage; in co-op it marks this player ready. */
+    fun nextStage() = onGameThread {
+        if (current != Mode.SHOP) return@onGameThread
+        when (playingAs) {
+            Role.SOLO -> {
+                if (world.shop.perkPending(HOST_PLAYER)) return@onGameThread
+                world.nextStage()
+                restartClock()
+                enter(Mode.PLAYING)
+            }
+            Role.HOST -> {
+                host?.markReady(HOST_PLAYER)
+                publishShop()
+            }
+            Role.CLIENT -> client?.action(Wire.READY)
+        }
+    }
+
+    /** A phone dropped out mid-game ([player] 0 on a joining phone means the host). */
+    fun linkLost(player: Int) = onGameThread {
+        unreachable = unreachable or (1 shl player)
+        host?.disconnect(player)
+        if (playingAs == Role.HOST && current == Mode.PLAYING) enter(Mode.PAUSED)
+        heldFlow.value = playingAs == Role.HOST
+    }
+
+    fun linkRestored(player: Int) = onGameThread {
+        unreachable = unreachable and (1 shl player).inv()
+        host?.connect(player)
+        if (playingAs == Role.HOST) heldFlow.value = unreachable != 0
+    }
+
+    /** Host: a phone that is not coming back. Its player leaves the run; the rest go on. */
+    fun dropPlayer(player: Int) = onGameThread {
+        unreachable = unreachable and (1 shl player).inv()
+        host?.disconnect(player)
+        world.removePlayer(player)
+        heldFlow.value = unreachable != 0
+        if (current == Mode.SHOP) publishShop()
+    }
+
+    /** The host left, or this phone is the last one in the game. */
+    fun partnerGone() = onGameThread {
+        if (playingAs == Role.SOLO) return@onGameThread
+        dropCoop()
+        shards.clear()
+        shopFlow.value = null
+        enter(Mode.HOME)
+    }
+
+    /** The link to [player] (0 on a joining phone means the host) got faster or was just made. */
+    fun setLinkQuality(player: Int, quality: Int) {
+        if (player in 0 until MAX_PLAYERS) linkQuality[player] = quality
+    }
+
+    /** The link to [player] now goes straight over the local network, or no longer does. */
+    fun setDirect(player: Int, on: Boolean) {
+        if (player in 0 until MAX_PLAYERS) direct[player] = on
+    }
+
+    /** For the readout: 4 for a direct link, otherwise what Nearby reported. */
+    private fun qualityOf(player: Int) = if (direct[player]) 4 else linkQuality[player]
+
+    fun applySettings(s: Settings) {
+        controller.leftHanded = s.leftHanded
+        controller.stickRadiusDp = s.stickSize.radiusDp
+        haptics.enabled = s.vibration
+        haptics.shots = s.shotVibration
+        sfx.enabled = s.sound
+        handler.post {
+            renderer.stickRadius = controller.stickRadius
+            renderer.showStats = s.showStats
+            hud.showLink = s.showLink
+            breakEvery = s.breakEvery
+            dev = s.dev
+            applyDev(live = true)
+        }
+    }
+
+    fun setResumed(value: Boolean) {
+        resumed = value
+        if (!value) handler.post { flushLog() }
+        updateRunning()
+    }
+
+    override fun surfaceCreated(holder: SurfaceHolder) {
+        synchronized(surfaceLock) { surfaceLive = true }
+        updateRunning()
+    }
+
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        fit()
+        // A new surface needs its blank home frame drawn again.
+        handler.post { wake(redraw = true) }
+    }
+
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        // Taking the lock waits out a frame that is still drawing.
+        synchronized(surfaceLock) { surfaceLive = false }
+        updateRunning()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        running = false
+        thread.quitSafely()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        synchronized(surfaceLock) { renderer.palette = paletteFor(newConfig) }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (Build.VERSION.SDK_INT >= 29) {
+            // Keeps a thumb that starts at the screen edge from triggering Back.
+            // The system honours at most 200 dp of height per edge.
+            val strip = (EDGE_STRIP_DP * density).toInt()
+            val tall = (200 * density).toInt()
+            systemGestureExclusionRects = listOf(
+                Rect(0, height - tall, strip, height),
+                Rect(width - strip, height - tall, width, height),
+            )
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        controller.onTouch(event)
+        return true
+    }
+
+    override fun doFrame(frameTimeNanos: Long) {
+        if (!running) return
+        // At home nothing moves: draw the blank ground once and stop asking for frames until a run starts.
+        if (current == Mode.HOME && homeDrawn) {
+            idle = true
+            return
+        }
+        choreographer.postFrameCallback(this)
+        val now = SystemClock.uptimeMillis()
+        val nowNanos = System.nanoTime()
+
+        val elapsed = if (lastFrameNanos == 0L) STEP_NANOS else frameTimeNanos - lastFrameNanos
+        lastFrameNanos = frameTimeNanos
+        // After a stall, catching up on every missed step would only stall again.
+        val usable = elapsed.coerceAtMost(MAX_CATCH_UP_NANOS)
+        trackUsage(usable)
+
+        controller.read(inputs[0], moveView, aimView, now)
+        gamepad.apply(inputs[0])
+        val c = client
+        autopilot?.drive(if (playingAs == Role.CLIENT && c != null) c.view else world, me, inputs[0])
+        val simStart = System.nanoTime()
+        val shown: World
+        if (playingAs == Role.CLIENT && c != null) {
+            loopback?.frame(usable, nowNanos)
+            followHost(c)
+            if (current == Mode.PLAYING) {
+                pendingNanos += usable
+                while (pendingNanos >= STEP_NANOS) {
+                    c.tick(inputs[0], nowNanos)
+                    pendingNanos -= STEP_NANOS
+                }
+            } else {
+                pendingNanos = 0
+            }
+            c.frame(nowNanos)
+            react(c.view.events, now)
+            hud.link(c.roundTripMillis, qualityOf(0))
+            hud.score(c.latest?.let { clientScore(it, me) } ?: 0)
+            hud.surge(c.latest?.surge?.get(me) ?: 0)
+            shown = c.view
+        } else {
+            val h = host
+            if (current == Mode.PLAYING) {
+                stress?.apply(world, inputs[0])
+                pendingNanos += if (gameSpeed == 1f) usable else (usable * gameSpeed).toLong()
+                while (pendingNanos >= STEP_NANOS) {
+                    if (h != null) for (p in 1 until world.playerCount) inputs[p].copyFrom(h.remoteInput(p, nowNanos))
+                    world.step(inputs)
+                    practice?.update(world, inputs[0])
+                    pendingNanos -= STEP_NANOS
+                }
+                if (practice != null) publishTutorial()
+            }
+            if (h != null) {
+                if (current == Mode.SHOP && h.allReady()) {
+                    h.clearReady()
+                    // What everyone bought is in now; this is where a saved run picks up.
+                    keep()
+                    world.nextStage()
+                    restartClock()
+                    enter(Mode.PLAYING)
+                } else if (current == Mode.SHOP && h.ready != publishedReady) {
+                    publishShop()
+                } else if (current == Mode.OVER) {
+                    if (unreachable == 0 && h.allRematchReady()) restartHost()
+                    else {
+                        var present = 0
+                        for (p in 0 until world.playerCount) if (world.players.present[p]) present = present or (1 shl p)
+                        publishRematch(h.ready, present)
+                    }
+                }
+                h.collect(world.events)
+            }
+            react(world.events, now)
+            h?.pump(nowNanos, current == Mode.PAUSED, unreachable != 0, breaking)
+            if (h == null) hud.link(-1, -1) else showWorstLink(h)
+            hud.score(world.score(me))
+            hud.surge((world.players.surge[me] + TICK_HZ - 1) / TICK_HZ)
+            shown = world
+        }
+        // A few times a second is plenty to notice what has come into the arena.
+        if (current == Mode.PLAYING && practice == null && !cheating && ++scanFrames % SCAN_EVERY_FRAMES == 0) {
+            val en = shown.enemies
+            for (i in 0 until en.count) tally.see(en.type[i], shown.stage)
+        }
+        shards.update(usable / 1e9f)
+        val blend = if (playingAs != Role.CLIENT && current == Mode.PLAYING) pendingNanos.toFloat() / STEP_NANOS else 1f
+        val drawStart = System.nanoTime()
+
+        synchronized(surfaceLock) {
+            if (!surfaceLive) return
+            val canvas = holder.lockHardwareCanvas() ?: return
+            try {
+                if (current == Mode.HOME) {
+                    canvas.drawColor(renderer.palette.ground)
+                    homeDrawn = true
+                } else {
+                    homeDrawn = false
+                    renderer.draw(canvas, shown, blend, viewport, shards, moveView, aimView, me)
+                    val inset = cutout
+                    hud.names = names
+                    hud.draw(canvas, shown, renderer.palette, inset.left, inset.top, inset.right, me, now)
+                }
+            } finally {
+                holder.unlockCanvasAndPost(canvas)
+            }
+        }
+
+        if (playingAs != Role.SOLO && nowNanos >= nextNetLog) {
+            nextNetLog = nowNanos + NET_LOG_NANOS
+            logNet()
+        }
+
+        if (stats.record(elapsed, drawStart - simStart, System.nanoTime() - drawStart)) {
+            renderer.setStats(stats, shown.enemies.count, shown.bullets.count)
+            if (debuggable && ++statWindows % LOG_EVERY_WINDOWS == 0) {
+                Log.d(TAG, "fps=${stats.fps} frame=${stats.frameMs} worst=${stats.worstMs} sim=${stats.simMs} draw=${stats.drawMs} enemies=${shown.enemies.count} stage=${shown.stage} mode=$current role=$playingAs")
+            }
+        }
+    }
+
+    /** Host: takes a checkpoint of the run as it is now and hands it on to be stored. */
+    private fun keep() {
+        when (playingAs) {
+            Role.HOST -> {
+                val cp = world.capture()
+                checkpoint = cp
+                onCheckpoint?.invoke(cp)
+            }
+            // Alone the run keeps itself in its slot, so it outlives the app being closed.
+            Role.SOLO -> if (soloSlot > 0) saves?.write(soloSlot, world.capture())
+            Role.CLIENT -> Unit
+        }
+    }
+
+    /** Solo: stops here and goes home; the run waits in its slot at the shop it last passed. */
+    private fun saveSolo() {
+        if (world.phase == Phase.SHOP) keep()
+        soloSlot = -1
+        shards.clear()
+        shopFlow.value = null
+        statsFlow.value = null
+        enter(Mode.HOME)
+    }
+
+    private fun flushLog() {
+        // Practice and developer runs leave no trace in the logbook.
+        if (practice != null || cheating) tally.clear() else ledger?.merge(tally)
+    }
+
+    /** Writes a finished run into the ledger once, and hands the end screen its summary. */
+    private fun finishRun(run: RunSummary) {
+        val duel = run.duel
+        if (duel != null) {
+            // A duel is a match, not a run: it counts for the achievements and nothing else.
+            if (!recorded) {
+                recorded = true
+                ledger?.recordDuel(duel.won)
+            }
+            summaryFlow.value = run
+            return
+        }
+        if (recorded || cheating) {
+            summaryFlow.value = run
+            return
+        }
+        recorded = true
+        val by = Cause.type(run.killedBy)
+        if (by >= 0) tally.slain(by, run.stage)
+        val best = ledger?.record(entryOf(run, left = false)) ?: false
+        flushLog()
+        summaryFlow.value = run.withBest(best)
+    }
+
+    private fun entryOf(run: RunSummary, left: Boolean): RunEntry {
+        val you = run.you
+        return RunEntry(
+            endedAt = System.currentTimeMillis(),
+            difficulty = run.difficulty,
+            stage = run.stage,
+            seconds = run.seconds,
+            score = run.score,
+            kills = run.kills,
+            coins = run.coins,
+            bosses = run.bosses,
+            players = run.players,
+            killedBy = run.killedBy,
+            left = left,
+            damage = you?.damage ?: 0,
+            shots = you?.shots ?: 0,
+            hitsTaken = you?.hitsTaken ?: 0,
+            downed = you?.downed ?: 0,
+            revives = you?.revives ?: 0,
+            upgrades = you?.upgrades ?: 0,
+            won = run.won,
+        )
+    }
+
+    private val stageNow get() = if (playingAs == Role.CLIENT) client?.view?.stage ?: 1 else world.stage
+
+    /** Host: in the shop the run is kept as it is; mid-stage, as it was when that stage's shop closed. */
+    private fun saveAndStop() {
+        if (playingAs != Role.HOST) return
+        if (world.phase == Phase.SHOP) keep()
+        val cp = checkpoint ?: world.capture().also { onCheckpoint?.invoke(it) }
+        onSaved?.invoke(cp)
+        dropCoop()
+        shards.clear()
+        shopFlow.value = null
+        statsFlow.value = null
+        enter(Mode.HOME)
+    }
+
+    /** Everyone's statistics so far, from the host's world or, on a joining phone, its newest snapshot. */
+    private fun summarize(): RunSummary? {
+        val c = client
+        val known = names
+        if (playingAs == Role.CLIENT) {
+            val s = c?.latest ?: return null
+            if (s.duel) {
+                val rows = (0 until s.playerCount).filter { s.present and (1 shl it) != 0 }
+                return duelSummary(s.duelChampion, s.duelRound, rows, { s.duelWins[it] }, known, s.tick / TICK_HZ)
+            }
+            val team = (0 until s.playerCount).map { p ->
+                PlayerStats(
+                    score = clientScore(s, p),
+                    name = known.getOrNull(p) ?: "Player ${p + 1}",
+                    you = p == me,
+                    present = s.present and (1 shl p) != 0,
+                    kills = s.kills[p],
+                    damage = s.dealt[p],
+                    shots = s.fired[p],
+                    coins = s.earned[p],
+                    hitsTaken = s.taken[p],
+                    downed = s.downs[p],
+                    revives = s.revived[p],
+                    upgrades = s.bought[p],
+                )
+            }
+            val cleared = if (s.phase == Phase.SHOP) s.stage else s.stage - 1
+            val breakdown = Scoring.breakdown(s.difficulty, s.tick / TICK_HZ, cleared, s.bossesDown, s.points[me], s.bought[me], s.revived[me])
+            return RunSummary(
+                s.tick / TICK_HZ, s.stage, s.kills[me], s.earned[me], s.difficulty, Integer.bitCount(s.present), s.bossesDown, team,
+                score = breakdown.total, breakdown = breakdown, killedBy = s.killedBy[me],
+                perks = perkNames(s.perks[me]), won = s.victory,
+            )
+        }
+        val pl = world.players
+        if (world.duel.on) {
+            val rows = (0 until world.playerCount).filter { pl.present[it] }
+            return duelSummary(world.duel.champion, world.duel.round, rows, { world.duel.wins[it] }, known, world.tick / TICK_HZ)
+        }
+        val team = (0 until world.playerCount).map { p ->
+            PlayerStats(
+                score = world.score(p),
+                name = if (world.playerCount == 1) "You" else known.getOrNull(p) ?: "Player ${p + 1}",
+                you = p == me,
+                present = pl.present[p],
+                kills = pl.kills[p],
+                damage = pl.dealt[p].toInt(),
+                shots = pl.fired[p],
+                coins = pl.earned[p],
+                hitsTaken = pl.taken[p],
+                downed = pl.downs[p],
+                revives = pl.revived[p],
+                upgrades = pl.bought(p),
+            )
+        }
+        val breakdown = Scoring.breakdown(
+            world.difficulty, world.tick / TICK_HZ, world.stagesCleared, world.bossesDown, pl.points[me], pl.bought(me), pl.revived[me],
+        )
+        return RunSummary(
+            world.tick / TICK_HZ, world.stage, pl.kills[me], pl.earned[me], world.difficulty, world.presentCount(), world.bossesDown, team,
+            score = breakdown.total, breakdown = breakdown, killedBy = pl.killedBy[me],
+            perks = perkNames(pl.perks[me]), won = world.victory,
+        )
+    }
+
+    /** The end card for a duel: who took it and the rounds each player won. */
+    private fun duelSummary(champion: Int, rounds: Int, rows: List<Int>, winsOf: (Int) -> Int, known: List<String>, seconds: Int): RunSummary {
+        val nameOf = { p: Int -> if (p == me) "You" else known.getOrNull(p) ?: "Player ${p + 1}" }
+        val duel = DuelResult(
+            won = champion == me,
+            champion = if (champion < 0) "" else nameOf(champion),
+            rounds = rounds,
+            wins = rows.map { nameOf(it) to winsOf(it) },
+        )
+        return RunSummary(seconds, 1, 0, 0, Difficulty.NORMAL, rows.size, duel = duel)
+    }
+
+    private fun perkNames(mask: Int) = (0 until Perks.count).filter { mask shr it and 1 != 0 }.map { Perks.of(it).name }
+
+    /** Player [p]'s score from the newest snapshot; the host works it out from its own world. */
+    private fun clientScore(s: Snapshot, p: Int): Int {
+        val cleared = if (s.phase == Phase.SHOP) s.stage else s.stage - 1
+        return Scoring.total(s.difficulty, s.tick / TICK_HZ, cleared, s.bossesDown, s.points[p], s.bought[p], s.revived[p])
+    }
+
+    /** Turns what happened this frame into shards, haptics and menu changes, then forgets it. */
+    private fun react(ev: Events, now: Long) {
+        for (i in 0 until ev.count) {
+            when (ev.kind[i]) {
+                Events.SHOT -> if (ev.who[i] == me) {
+                    haptics.shot(now)
+                    sfx.play(Sound.SHOT, now, 60L, 0.7f)
+                }
+                Events.ENEMY_HIT -> sfx.play(Sound.HIT, now, 45L, 0.6f)
+                Events.COIN -> if (ev.who[i] == me) sfx.play(Sound.COIN, now, 35L, 0.8f)
+                Events.STAGE_CLEAR -> sfx.play(Sound.CLEAR, now)
+                Events.ENEMY_KILLED, Events.ENEMY_GONE -> {
+                    val type = ev.who[i]
+                    if (type !in 0 until Bestiary.size) continue
+                    val def = Bestiary.of(type)
+                    sfx.play(Sound.KILL, now, 30L, if (def.boss) 1f else 0.8f)
+                    tally.defeat(type, stageNow)
+                    shards.burst(
+                        def.shape, ev.x[i], ev.y[i], def.radius, ev.angle[i], ev.dx[i], ev.dy[i],
+                        renderer.bodyOf(type), renderer.facetOf(type),
+                    )
+                }
+                Events.BOSS_IN -> {
+                    sfx.play(Sound.BOSS, now)
+                    tally.see(ev.who[i], stageNow)
+                    hud.announce(ev.who[i], now)
+                    haptics.down()
+                }
+                Events.BOSS_DOWN -> haptics.down()
+                Events.PERK_STOLEN -> if (ev.who[i] == me) {
+                    hud.notice("Core stole ${Perks.of(ev.ref[i].coerceIn(0, Perks.count - 1)).name}", now)
+                    haptics.hurt()
+                }
+                Events.PERK_BACK -> if (ev.who[i] == me) {
+                    hud.notice("Got back ${Perks.of(ev.ref[i].coerceIn(0, Perks.count - 1)).name}", now)
+                }
+                Events.CORE_CHANGE -> {
+                    hud.notice("The Core calls the other bosses", now)
+                    sfx.play(Sound.BOSS, now)
+                    haptics.down()
+                }
+                Events.PLAYER_HIT -> if (ev.who[i] == me) {
+                    haptics.hurt()
+                    sfx.play(Sound.HURT, now, 80L)
+                }
+                Events.PLAYER_DOWN -> if (ev.who[i] == me) {
+                    haptics.down()
+                    sfx.play(Sound.DOWN, now)
+                }
+                Events.REVIVED -> if (ev.who[i] == me) haptics.hurt()
+                Events.SHOP_OPEN -> if (playingAs != Role.CLIENT) {
+                    host?.clearReady()
+                    keep()
+                    publishShop()
+                    enter(Mode.SHOP)
+                }
+                Events.RUN_OVER -> {
+                    haptics.down()
+                    if (playingAs != Role.CLIENT) {
+                        summarize()?.let(::finishRun)
+                        if (playingAs == Role.SOLO && soloSlot > 0) {
+                            // Over; nothing left to carry on.
+                            saves?.delete(soloSlot)
+                            soloSlot = -1
+                        }
+                        if (playingAs == Role.HOST && !world.duel.on) {
+                            // Nothing left to carry on.
+                            checkpoint = null
+                            onCheckpoint?.invoke(null)
+                        }
+                        host?.clearReady()
+                        enter(Mode.OVER)
+                    }
+                }
+            }
+        }
+        ev.clear()
+    }
+
+    private fun fromHost(bytes: ByteArray, arrived: Long) {
+        val c = client ?: return
+        if (Wire.typeOf(bytes) == Wire.START) {
+            // The host began a fresh run (Play Again). Same session, new game.
+            c.reset()
+            freshRun()
+            return
+        }
+        c.receive(bytes, arrived)
+        val s = c.latest ?: return
+        heldFlow.value = s.waiting
+    }
+
+    /** On the joining phone the menus follow the host: its pause, its shop, its end of run. */
+    private fun followHost(c: ClientSession) {
+        val s = c.latest ?: return
+        breakFlow.value = s.paused && s.breaking
+        duelFlow.value = s.duel
+        val wanted = when {
+            s.paused -> Mode.PAUSED
+            s.phase == Phase.SHOP -> Mode.SHOP
+            s.phase == Phase.OVER -> Mode.OVER
+            else -> Mode.PLAYING
+        }
+        if (wanted == Mode.SHOP) publishClientShop(s)
+        if (wanted == Mode.OVER) {
+            if (current != Mode.OVER) summarize()?.let(::finishRun)
+            publishRematch(s.ready, s.present)
+        }
+        if (wanted != current) {
+            if (wanted == Mode.PLAYING) restartClock()
+            enter(wanted)
+        }
+    }
+
+    /**
+     * Every two seconds in co-op, one line on how the link is doing, so a
+     * slow game can be looked into afterwards with logcat.
+     */
+    private fun logNet() {
+        val c = client
+        val h = host
+        if (playingAs == Role.CLIENT && c != null) {
+            Log.d(TAG, "net client via=${if (direct[0]) "direct" else "nearby"} rtt=${c.roundTripMillis} spread=${c.spreadMillis} " +
+                "delay=${c.delayNanos / 1_000_000} target=${c.targetDelayNanos / 1_000_000} starved=${c.starvedFrames} mode=$current")
+        } else if (h != null) {
+            for (p in 1 until world.playerCount) {
+                if (h.linked and (1 shl p) == 0) continue
+                Log.d(TAG, "net host p=$p via=${if (direct[p]) "direct" else "nearby"} rtt=${h.roundTripMillis(p)} " +
+                    "spread=${h.spreadMillis(p)} playback=${h.playbackMillis(p)} mode=$current")
+            }
+        }
+    }
+
+    /** The host shows its slowest link: that is the player who will feel it. */
+    private fun showWorstLink(h: HostSession) {
+        var trip = -1
+        var quality = 0
+        for (p in 1 until world.playerCount) {
+            if (h.linked and (1 shl p) == 0) continue
+            trip = maxOf(trip, h.roundTripMillis(p))
+            val q = qualityOf(p)
+            if (q != 0 && (quality == 0 || q < quality)) quality = q
+        }
+        hud.link(trip, quality)
+    }
+
+    private fun onPartnerAsk(kind: Int) {
+        when (kind) {
+            Wire.PAUSE -> if (current == Mode.PLAYING) enter(Mode.PAUSED)
+            Wire.BREAK -> if (current == Mode.PLAYING) {
+                Trace.log("break reminder from a joined phone")
+                breaking = true
+                enter(Mode.PAUSED)
+            }
+            Wire.SAVE -> saveAndStop()
+            Wire.RESUME -> if (current == Mode.PAUSED && unreachable == 0) {
+                restartClock()
+                enter(Mode.PLAYING)
+            }
+            Wire.RESTART -> Unit // A peer cannot restart the party unilaterally.
+        }
+    }
+
+    private fun publishRematch(mask: Int, present: Int) {
+        rematchFlow.value = RematchView(Integer.bitCount(mask and present), Integer.bitCount(present), mask and (1 shl me) != 0)
+    }
+
+    private fun restartHost() {
+        val h = host ?: return
+        if (!h.allRematchReady() || unreachable != 0) return
+        val characters = world.players.character.copyOf()
+        val masks = h.rematchMasks.copyOf()
+        // Players who left stay out of the new run too.
+        val gone = BooleanArray(world.playerCount) { !world.players.present[it] }
+        val setup = duelSetup
+        if (setup != null) {
+            world.startDuel(world.playerCount, SystemClock.elapsedRealtimeNanos(), setup)
+        } else {
+            world.reset(players = world.playerCount, seed = SystemClock.elapsedRealtimeNanos(), difficulty = world.difficulty)
+            for (p in 0 until world.playerCount) {
+                world.players.chooseCharacter(p, characters[p], world.difficulty.bonusHp)
+                world.players.missionMask[p] = masks[p]
+            }
+        }
+        for (p in 1 until world.playerCount) world.remote[p] = true
+        for (p in gone.indices) if (gone[p]) world.removePlayer(p)
+        host?.announceStart()
+        if (setup == null) keep()
+        freshRun()
+    }
+
+    private fun freshRun() {
+        flushLog()
+        recorded = false
+        rematchFlow.value = RematchView()
+        shards.clear()
+        shopFlow.value = null
+        summaryFlow.value = null
+        clientShopKey = 0
+        restartClock()
+        enter(Mode.PLAYING)
+    }
+
+    private fun becomeRole(role: Role) {
+        playingAs = role
+        roleFlow.value = role
+        applyDev()
+    }
+
+    private fun dropCoop() {
+        checkpoint = null
+        duelSetup = null
+        duelFlow.value = false
+        host = null
+        client = null
+        loopback = null
+        unreachable = 0
+        me = HOST_PLAYER
+        heldFlow.value = false
+        if (practice != null) {
+            practice = null
+            tutorialFlow.value = null
+            hud.practice = false
+            world.practice = false
+            world.spawning = true
+        }
+        markCheating(false)
+        devRun = false
+        becomeRole(Role.SOLO)
+    }
+
+    private fun publishShop() {
+        val s = world.shop
+        val pl = world.players
+        val me = HOST_PLAYER
+        val offers = ArrayList<ShopOffer>(SHOP_SLOTS)
+        for (slot in 0 until SHOP_SLOTS) {
+            val u = s.item(me, slot)
+            if (u < 0) { offers += ShopOffer(slot, "Empty", "Refresh or continue", 0, 0, 0, true, false, empty = true); continue }
+            val def = Upgrades.of(u)
+            offers += ShopOffer(
+                slot = slot,
+                name = def.name,
+                blurb = Upgrades.blurb(u, s.levelsBought(world, me, slot)),
+                level = pl.levels[me][u],
+                maxLevel = def.maxLevel,
+                price = s.price(world, me, slot),
+                maxed = s.maxed(world, me, slot),
+                affordable = s.canBuy(world, me, slot),
+                rare = s.isRare(me, slot),
+                levels = s.levelsBought(world, me, slot),
+                rarity = s.rarity(me, slot),
+                locked = s.locked(me, slot),
+            )
+        }
+        val perkOffers = (0 until Perks.OFFERED).mapNotNull { k ->
+            s.perkOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, Perks.of(it).name, Perks.of(it).blurb) }
+        }
+        val ready = host?.ready ?: 0
+        publishedReady = ready
+        shopFlow.value = ShopView(
+            stage = world.stage,
+            coins = pl.coins[me],
+            hp = pl.hp[me],
+            maxHp = pl.maxHp[me],
+            offers = offers,
+            healPrice = s.healPrice(world),
+            healAmount = s.healAmount(world, me),
+            healsLeft = s.healsLeft(me),
+            canHeal = s.canHeal(world, me),
+            rerollPrice = s.rerollPrice(world, me),
+            canReroll = s.canReroll(world, me),
+            coop = playingAs == Role.HOST,
+            selfReady = ready and (1 shl HOST_PLAYER) != 0,
+            readyCount = Integer.bitCount(ready),
+            teamSize = world.presentCount(),
+            perkOffers = perkOffers,
+        )
+    }
+
+    /** Rebuilds the joining phone's shop view, but only when something in it changed. */
+    private fun publishClientShop(s: Snapshot) {
+        if (!s.hasShop) return
+        var key = s.coins[me] * 31 + s.hp[me]
+        key = key * 31 + s.ready
+        key = key * 31 + s.healsLeft
+        key = key * 31 + s.healAmount
+        key = key * 31 + s.rerollPrice
+        key = key * 31 + s.stage
+        for (slot in 0 until SHOP_SLOTS) {
+            key = key * 31 + s.shopItem[slot]
+            key = key * 31 + s.shopLevel[slot]
+            key = key * 31 + s.shopPrice[slot]
+            key = key * 31 + s.shopRarity[slot].ordinal
+            key = key * 31 + s.shopLevels[slot]
+            key = key * 31 + (if (s.shopLocked[slot]) 1 else 0)
+        }
+        for (k in 0 until Perks.OFFERED) key = key * 31 + s.perkOffer[k]
+        if (key == clientShopKey && shopFlow.value != null) return
+        clientShopKey = key
+
+        val offers = ArrayList<ShopOffer>(SHOP_SLOTS)
+        for (slot in 0 until SHOP_SLOTS) {
+            val u = s.shopItem[slot]
+            if (u < 0) { offers += ShopOffer(slot, "Empty", "Refresh or continue", 0, 0, 0, true, false, empty = true); continue }
+            val def = Upgrades.of(u)
+            offers += ShopOffer(
+                slot = slot,
+                name = def.name,
+                blurb = Upgrades.blurb(u, s.shopLevels[slot]),
+                level = s.shopLevel[slot],
+                maxLevel = def.maxLevel,
+                price = s.shopPrice[slot],
+                maxed = s.shopMaxed[slot],
+                affordable = s.shopAffordable[slot],
+                rarity = s.shopRarity[slot],
+                locked = s.shopLocked[slot],
+                levels = s.shopLevels[slot],
+            )
+        }
+        val perkOffers = (0 until Perks.OFFERED).mapNotNull { k ->
+            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, Perks.of(it).name, Perks.of(it).blurb) }
+        }
+        shopFlow.value = ShopView(
+            stage = s.stage,
+            coins = s.coins[me],
+            hp = s.hp[me],
+            maxHp = s.maxHp[me],
+            offers = offers,
+            healPrice = s.healPrice,
+            healAmount = s.healAmount,
+            healsLeft = s.healsLeft,
+            canHeal = s.canHeal,
+            rerollPrice = s.rerollPrice,
+            canReroll = s.canReroll,
+            coop = true,
+            selfReady = s.ready and (1 shl me) != 0,
+            readyCount = Integer.bitCount(s.ready),
+            teamSize = Integer.bitCount(s.present),
+            perkOffers = perkOffers,
+        )
+    }
+
+    private fun onGameThread(block: () -> Unit) {
+        handler.post(block)
+    }
+
+    private fun enter(mode: Mode) {
+        if (mode == Mode.PAUSED) statsFlow.value = summarize()
+        // Anything but playing is a safe moment to put what was met and beaten on record.
+        if (mode != Mode.PLAYING) flushLog()
+        if (mode != Mode.PAUSED) breaking = false
+        if (mode != current) Trace.log("mode $current to $mode, role=$playingAs")
+        current = mode
+        if (mode != Mode.HOME) wake()
+        // Before the mode, so a menu that sees the pause also sees why.
+        if (playingAs != Role.CLIENT || mode != Mode.PAUSED) breakFlow.value = breaking && mode == Mode.PAUSED
+        modeFlow.value = mode
+    }
+
+    private fun restartClock() {
+        lastFrameNanos = 0L
+        pendingNanos = 0L
+    }
+
+    /** The blank home frame is on the screen, so no more frames are needed there. */
+    private var homeDrawn = false
+    private var idle = false
+
+    /** Starts the frame loop again after it stopped at home, or after the surface changed. */
+    private fun wake(redraw: Boolean = false) {
+        if (redraw) homeDrawn = false
+        if (!running || !idle && !redraw) return
+        idle = false
+        restartClock()
+        choreographer.removeFrameCallback(this)
+        choreographer.postFrameCallback(this)
+    }
+
+    private fun updateRunning() {
+        val shouldRun = resumed && synchronized(surfaceLock) { surfaceLive }
+        if (shouldRun == running) return
+        running = shouldRun
+        if (shouldRun) {
+            handler.post {
+                homeDrawn = false
+                idle = false
+                restartClock()
+                // A quick pause and resume can leave the old callback queued; two would double the game speed.
+                choreographer.removeFrameCallback(this)
+                choreographer.postFrameCallback(this)
+            }
+        }
+    }
+
+    private fun fit() {
+        if (width == 0 || height == 0) return
+        synchronized(surfaceLock) { viewport.fit(width, height) }
+        val c = cutout
+        controller.layout(width, height, c.left, c.top, c.right, c.bottom)
+    }
+
+    private fun paletteFor(config: Configuration): Palette {
+        val night = config.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        return if (night) Palette.Dark else Palette.Light
+    }
+
+    private companion object {
+        const val TAG = "Tessel"
+        const val STEP_NANOS = 1_000_000_000L / TICK_HZ
+        const val MAX_CATCH_UP_NANOS = 100_000_000L
+        const val EDGE_STRIP_DP = 48f
+        const val LOG_EVERY_WINDOWS = 10
+        const val NET_LOG_NANOS = 2_000_000_000L
+        const val LOOPBACK_DELAY_MS = 35L
+
+        /** A run left this soon after it began is not worth a line in the history. */
+        const val MIN_RECORDED_SECONDS = 20
+        const val SCAN_EVERY_FRAMES = 15
+
+        /** Time away from play, in milliseconds, that counts as a break for the reminder. */
+        const val BREAK_RESET_MS = 5 * 60 * 1000L
+    }
+}

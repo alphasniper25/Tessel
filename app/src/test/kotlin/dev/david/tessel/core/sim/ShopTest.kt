@@ -1,0 +1,150 @@
+package dev.david.tessel.core.sim
+
+import dev.david.tessel.core.content.Balance
+import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.Upgrades
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ShopTest {
+    private val idle = Array(MAX_PLAYERS) { PlayerInput() }
+    private val world = World(seed = 8).apply { spawning = false }
+    private val shop get() = world.shop
+
+    private fun openShop(coins: Int) {
+        while (world.phase != Phase.SHOP) world.step(idle)
+        world.players.coins[0] = coins
+    }
+
+    private fun slotOf(upgrade: Int): Int {
+        for (s in 0 until SHOP_SLOTS) if (shop.item(0, s) == upgrade) return s
+        return -1
+    }
+
+    @Test
+    fun stockHoldsDifferentUpgrades() {
+        openShop(0)
+        val items = (0 until SHOP_SLOTS).map { shop.item(0, it) }
+        assertEquals(SHOP_SLOTS, items.toSet().size)
+        assertTrue(items.all { it in 0 until Upgrades.count })
+    }
+
+    @Test
+    fun buyingSpendsCoinsAndRaisesTheLevel() {
+        openShop(500)
+        val u = shop.item(0, 0)
+        val price = shop.price(world, 0, 0)
+        val levels = shop.levelsBought(world, 0, 0)
+        assertTrue(price >= Upgrades.price(u, 0, world.stage))
+        assertTrue(shop.buy(world, 0, 0))
+        assertEquals(500 - price, world.players.coins[0])
+        assertEquals(levels, world.players.levels[0][u])
+    }
+
+    @Test
+    fun buyingConsumesTheCardAndPreventsRepeatedPurchase() {
+        openShop(100_000)
+        val u = shop.item(0, 0)
+        val amount = shop.levelsBought(world, 0, 0)
+        assertTrue(shop.buy(world, 0, 0))
+        val coins = world.players.coins[0]
+        assertFalse(shop.buy(world, 0, 0))
+        assertEquals(-1, shop.item(0, 0))
+        assertEquals(amount, world.players.levels[0][u])
+        assertEquals(coins, world.players.coins[0])
+    }
+
+    @Test
+    fun lockingUnaffordableCardKeepsQuoteAndRerollKeepsSlot() {
+        openShop(0)
+        val raw = shop.raw(0, 2)
+        val quote = shop.price(world, 0, 2)
+        assertTrue(shop.setLocked(world, 0, 2, true))
+        assertFalse(shop.buy(world, 0, 2))
+        world.players.coins[0] = 100_000
+        assertTrue(shop.reroll(world, 0))
+        assertEquals(raw, shop.raw(0, 2))
+        assertEquals(quote, shop.price(world, 0, 2))
+        assertEquals(SHOP_SLOTS, (0 until SHOP_SLOTS).map { shop.item(0, it) }.toSet().size)
+    }
+
+    @Test
+    fun cannotBuyWithoutTheCoins() {
+        openShop(0)
+        assertFalse(shop.buy(world, 0, 0))
+        assertEquals(0, world.players.coins[0])
+    }
+
+    @Test
+    fun pricesClimbWithLevelAndWithStage() {
+        assertTrue(Upgrades.price(Upgrades.DAMAGE, 3, 1) > Upgrades.price(Upgrades.DAMAGE, 2, 1))
+        assertEquals(Upgrades.of(Upgrades.DAMAGE).basePrice, Upgrades.price(Upgrades.DAMAGE, 0, 1))
+        assertTrue(Upgrades.price(Upgrades.DAMAGE, 0, 8) > 2 * Upgrades.price(Upgrades.DAMAGE, 0, 1))
+        assertTrue(Upgrades.healPrice(10) > 3 * Upgrades.healPrice(1))
+    }
+
+    @Test
+    fun rerollCostsMoreEachTimeAndRestocks() {
+        openShop(1000)
+        val first = shop.rerollPrice(world, 0)
+        assertTrue(shop.buy(world, 0, 0))
+        val afterBuy = world.players.coins[0]
+        assertTrue(shop.reroll(world, 0))
+        assertEquals(afterBuy - first, world.players.coins[0])
+        assertTrue(shop.rerollPrice(world, 0) > first)
+    }
+
+    @Test
+    fun healIsCappedPerShopAndAtFullHealth() {
+        openShop(1000)
+        assertFalse(shop.canHeal(world, 0))
+        world.players.hp[0] = 1
+        assertTrue(shop.heal(world, 0))
+        assertEquals(1 + Upgrades.HEAL_AMOUNT, world.players.hp[0])
+        assertTrue(shop.heal(world, 0))
+        assertFalse(shop.heal(world, 0))
+        assertEquals(0, shop.healsLeft(0))
+    }
+
+    @Test
+    fun maxedUpgradesLeaveTheStock() {
+        openShop(0)
+        for (u in 0 until Upgrades.count) world.players.levels[0][u] = Upgrades.of(u).maxLevel
+        world.players.levels[0][Upgrades.RANGE] = 0
+        world.players.coins[0] = 1000
+        shop.reroll(world, 0)
+        assertEquals(Upgrades.RANGE, shop.item(0, 0))
+        for (s in 1 until SHOP_SLOTS) assertEquals(-1, shop.item(0, s))
+    }
+
+    @Test
+    fun maxHealthAddsAFilledPip() {
+        openShop(0)
+        for (u in 0 until Upgrades.count) world.players.levels[0][u] = Upgrades.of(u).maxLevel
+        world.players.levels[0][Upgrades.MAX_HEALTH] = 0
+        world.players.coins[0] = 1000
+        shop.reroll(world, 0)
+        val slot = slotOf(Upgrades.MAX_HEALTH)
+        world.players.hp[0] = 3
+        val amount = shop.levelsBought(world, 0, slot)
+        assertTrue(shop.buy(world, 0, slot))
+        assertEquals(START_HP + amount, world.players.maxHp[0])
+        assertEquals(3 + amount, world.players.hp[0])
+    }
+
+    @Test
+    fun aNewShopResetsTheRerollPrice() {
+        openShop(1000)
+        val fresh = shop.rerollPrice(world, 0)
+        shop.reroll(world, 0)
+        assertTrue(shop.rerollPrice(world, 0) > fresh)
+        world.nextStage()
+        while (world.phase != Phase.SHOP) world.step(idle)
+        assertEquals(Upgrades.rerollPrice(world.stage, 0), shop.rerollPrice(world, 0))
+    }
+}
+
+/** What a player starts with on Normal, which these worlds use. */
+private val START_HP = Balance.PLAYER_HP + Difficulty.NORMAL.bonusHp

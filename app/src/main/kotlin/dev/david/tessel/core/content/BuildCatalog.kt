@@ -1,0 +1,49 @@
+package dev.david.tessel.core.content
+
+import dev.david.tessel.core.rng.Rng
+
+/** Stable IDs: append new entries; never reorder the serialized ones. */
+enum class CardFamily { GUN, HEALTH, RAM, MOBILITY, ECONOMY }
+
+enum class CharacterDef(
+    val label: String, val description: String, val extraHp: Int,
+    val damageScale: Float, val speedScale: Float, val ramBase: Float,
+    private val weights: List<Int>,
+) {
+    BALANCED("Balanced", "Original starting stats; even card weights.", 0, 1f, 1f, 0f, listOf(10,10,10,10,10)),
+    VANGUARD("Vanguard", "+2 HP; -10% damage and speed; contact retaliation.", 2, 0.9f, 0.9f, 1f, listOf(8,28,18,8,10)),
+    STRIKER("Striker", "-1 HP; +25% bullet damage.", -1, 1.25f, 1f, 0f, listOf(24,8,8,10,10)),
+    RAM("Ram", "-1 HP; -15% bullet damage; +20% speed; stronger contact retaliation.", -1, 0.85f, 1.2f, 2.5f, listOf(7,14,30,24,10));
+
+    fun weight(family: CardFamily) = weights[family.ordinal]
+    companion object { fun fromId(id: Int) = entries.getOrElse(id) { BALANCED } }
+}
+
+/** Rarity is sampled independently of family and character; levels are capped by remaining room. */
+enum class CardRarity(val label: String, val weight: Int, val levels: Int, val premium: Double) {
+    COMMON("Common",50,1,1.0), UNCOMMON("Uncommon",27,2,1.03),
+    RARE("Rare",15,3,1.10), EPIC("Epic",7,4,1.15), LEGENDARY("Legendary",1,5,1.20);
+    companion object {
+        fun fromId(id: Int) = entries.getOrElse(id) { COMMON }
+        fun roll(rng: Rng): CardRarity {
+            var ticket = rng.int(1, entries.sumOf { it.weight })
+            for (tier in entries) { ticket -= tier.weight; if (ticket <= 0) return tier }
+            error("Invalid rarity weights")
+        }
+    }
+}
+
+/** A compact 16-bit encoding used in checkpoints and shop snapshots. */
+object CardCode {
+    fun pack(id: Int, rarity: CardRarity): Int {
+        require(id in 0 until Upgrades.count && id < 256)
+        return id or (rarity.ordinal shl 8)
+    }
+    fun valid(raw: Int) = raw in 0..32767 && (raw and 255) < Upgrades.count && (raw shr 8) < CardRarity.entries.size
+    fun item(raw: Int) = if (valid(raw)) raw and 255 else -1
+    fun tier(raw: Int) = if (valid(raw)) CardRarity.fromId(raw shr 8) else CardRarity.COMMON
+    fun migrateLegacy(raw: Int): Int {
+        if (raw < 0 || (raw and 0x40.inv()) !in 0..10) return -1
+        return pack(raw and 0x40.inv(), if (raw and 0x40 != 0) CardRarity.RARE else CardRarity.COMMON)
+    }
+}
