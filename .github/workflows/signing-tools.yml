@@ -1,0 +1,22 @@
+name: Android APK signing tools
+on:
+  push:
+    branches: [tools/apk-signing]
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'build-tools;37.0.0'
+      - run: |
+          mkdir -p output
+          cp "$ANDROID_HOME/build-tools/37.0.0/lib/apksigner.jar" output/
+          cp "$ANDROID_HOME/build-tools/37.0.0/zipalign" output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-signing-tools
+          path: output/
+          retention-days: 1
