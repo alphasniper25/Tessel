@@ -43,23 +43,23 @@ object Upgrades {
     const val CORE_BREAKER = 16
 
     private val defs = arrayOf(
-        UpgradeDef("Damage", "+15% damage per bullet", basePrice = 15, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
-        UpgradeDef("Fire Rate", "+10% shots per second", basePrice = 18, maxLevel = 20, step = 0.10f, stat = UpgradeStat.FIRE_RATE),
-        UpgradeDef("Multishot", "One more bullet per shot", basePrice = 45, maxLevel = 8, step = 1f, stat = UpgradeStat.VOLLEY),
-        UpgradeDef("Velocity", "+10% bullet speed", basePrice = 10, maxLevel = 10, step = 0.10f, stat = UpgradeStat.VELOCITY),
-        UpgradeDef("Pierce", "Bullets go through one more enemy", basePrice = 40, maxLevel = 5, step = 1f, stat = UpgradeStat.PIERCE),
-        UpgradeDef("Range", "+12% bullet range", basePrice = 10, maxLevel = 10, step = 0.12f, stat = UpgradeStat.RANGE),
-        UpgradeDef("Speed", "+6% move speed", basePrice = 15, maxLevel = 10, step = 0.06f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED),
-        UpgradeDef("Max Health", "One more health pip, filled", basePrice = 30, maxLevel = 10, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.MAX_HP),
-        UpgradeDef("Wealth", "+15% coin value", basePrice = 25, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY, stat = UpgradeStat.WEALTH),
-        UpgradeDef("Magnet", "+25% coin pickup reach", basePrice = 8, maxLevel = 8, step = 0.25f, family = CardFamily.ECONOMY, stat = UpgradeStat.MAGNET),
-        UpgradeDef("Caliber", "+15% bullet size", basePrice = 12, maxLevel = 8, step = 0.15f, stat = UpgradeStat.CALIBER),
-        UpgradeDef("Ram Damage", "+1 contact retaliation damage", basePrice = 22, maxLevel = 15, step = 1f, family = CardFamily.RAM, stat = UpgradeStat.RAM),
-        UpgradeDef("Heal Power", "Shop healing restores one more pip", basePrice = 24, maxLevel = 5, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
-        UpgradeDef("Field Medic", "Shop healing restores two extra pips", basePrice = 32, maxLevel = 1, step = 2f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
-        UpgradeDef("Afterburner", "+18% movement speed", basePrice = 65, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED_BONUS),
-        UpgradeDef("Titan Plating", "+4 max HP, filled; +3 retaliation damage", basePrice = 160, maxLevel = 1, step = 4f, family = CardFamily.RAM, secondaryStep = 3f, stat = UpgradeStat.MAX_HP, secondaryStat = UpgradeStat.RAM),
-        UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 240, maxLevel = 1, step = 0.8f, family = CardFamily.GUN, stat = UpgradeStat.DAMAGE_BONUS),
+        UpgradeDef("Damage", "+15% damage per bullet", basePrice = 10, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
+        UpgradeDef("Fire Rate", "+10% shots per second", basePrice = 13, maxLevel = 20, step = 0.10f, stat = UpgradeStat.FIRE_RATE),
+        UpgradeDef("Multishot", "One more bullet per shot", basePrice = 31, maxLevel = 8, step = 1f, stat = UpgradeStat.VOLLEY),
+        UpgradeDef("Velocity", "+10% bullet speed", basePrice = 7, maxLevel = 10, step = 0.10f, stat = UpgradeStat.VELOCITY),
+        UpgradeDef("Pierce", "Bullets go through one more enemy", basePrice = 28, maxLevel = 5, step = 1f, stat = UpgradeStat.PIERCE),
+        UpgradeDef("Range", "+12% bullet range", basePrice = 7, maxLevel = 10, step = 0.12f, stat = UpgradeStat.RANGE),
+        UpgradeDef("Speed", "+6% move speed", basePrice = 10, maxLevel = 10, step = 0.06f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED),
+        UpgradeDef("Max Health", "One more health pip, filled", basePrice = 21, maxLevel = 10, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.MAX_HP),
+        UpgradeDef("Wealth", "+15% coin value", basePrice = 18, maxLevel = 10, step = 0.15f, family = CardFamily.ECONOMY, stat = UpgradeStat.WEALTH),
+        UpgradeDef("Magnet", "+25% coin pickup reach", basePrice = 6, maxLevel = 8, step = 0.25f, family = CardFamily.ECONOMY, stat = UpgradeStat.MAGNET),
+        UpgradeDef("Caliber", "+15% bullet size", basePrice = 8, maxLevel = 8, step = 0.15f, stat = UpgradeStat.CALIBER),
+        UpgradeDef("Ram Damage", "+1 contact retaliation damage", basePrice = 15, maxLevel = 15, step = 1f, family = CardFamily.RAM, stat = UpgradeStat.RAM),
+        UpgradeDef("Heal Power", "Shop healing restores one more pip", basePrice = 17, maxLevel = 5, step = 1f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
+        UpgradeDef("Field Medic", "Shop healing restores two extra pips", basePrice = 22, maxLevel = 1, step = 2f, family = CardFamily.HEALTH, stat = UpgradeStat.HEAL),
+        UpgradeDef("Afterburner", "+18% movement speed", basePrice = 46, maxLevel = 1, step = 0.18f, family = CardFamily.MOBILITY, stat = UpgradeStat.SPEED_BONUS),
+        UpgradeDef("Titan Plating", "+4 max HP, filled; +3 retaliation damage", basePrice = 112, maxLevel = 1, step = 4f, family = CardFamily.RAM, secondaryStep = 3f, stat = UpgradeStat.MAX_HP, secondaryStat = UpgradeStat.RAM),
+        UpgradeDef("Core Breaker", "+80% bullet damage", basePrice = 168, maxLevel = 1, step = 0.8f, family = CardFamily.GUN, stat = UpgradeStat.DAMAGE_BONUS),
     )
 
     val count get() = defs.size
@@ -112,7 +112,7 @@ object Upgrades {
     fun of(id: Int) = defs[id]
 
     /**
-     * Each level costs 30% more than the one before, and everything costs
+     * Each level costs 23% more than the one before, and everything costs
      * more each stage, because coins are worth more each stage too. Buying the
      * same upgrade later costs more; a locked card retains its quoted price.
      */
@@ -121,17 +121,17 @@ object Upgrades {
 
     fun inflation(stage: Int) = STAGE_GROWTH.pow(stage - 1)
 
-    private const val LEVEL_GROWTH = 1.3
-    private const val STAGE_GROWTH = 1.17
+    private const val LEVEL_GROWTH = 1.23
+    private const val STAGE_GROWTH = 1.12
 
     const val HEAL_AMOUNT = 2
     const val HEALS_PER_SHOP = 2
 
-    /** Keeps pace with coin value, so a heal always costs about the same number of kills. */
-    fun healPrice(stage: Int) = (14 * Balance.COIN_GROWTH.pow(stage - 1)).roundToInt()
+    /** Keeps pace with shop inflation, so a heal always costs about the same number of kills. */
+    fun healPrice(stage: Int) = (8 * inflation(stage)).roundToInt()
 
     fun rerollPrice(stage: Int, rerolls: Int) = ((REROLL_BASE + REROLL_STEP * rerolls) * inflation(stage)).roundToInt()
 
-    private const val REROLL_BASE = 5
-    private const val REROLL_STEP = 3
+    private const val REROLL_BASE = 3
+    private const val REROLL_STEP = 2
 }

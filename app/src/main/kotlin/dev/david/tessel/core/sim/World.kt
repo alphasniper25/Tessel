@@ -21,8 +21,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-const val ARENA_W = 1600f
-const val ARENA_H = 720f
+const val ARENA_W = 1920f
+const val ARENA_H = 864f
 const val TICK_HZ = 60
 const val TICK_SECONDS = 1f / TICK_HZ
 const val MAX_PLAYERS = 8
@@ -193,6 +193,8 @@ class World(seed: Long = 1L) {
 
     val over get() = phase == Phase.OVER
 
+    private val stageEarned = IntArray(MAX_PLAYERS)
+    private val stageKills = IntArray(MAX_PLAYERS)
     private var clearTicks = 0
     private var coinBase = 1
     private var nextId = 1
@@ -215,6 +217,7 @@ class World(seed: Long = 1L) {
         nextId = 1
         playerCount = players.coerceIn(1, MAX_PLAYERS)
         this.players.reset(playerCount, difficulty.bonusHp)
+        stageEarned.fill(0); stageKills.fill(0)
         shop.reset()
         bullets.clear()
         hostile.clear()
@@ -248,7 +251,11 @@ class World(seed: Long = 1L) {
         enemies.remember()
         coins.remember()
 
-        for (p in 0 until playerCount) if (players.present[p]) updatePlayer(p, inputs[p])
+        for (p in 0 until playerCount) if (players.present[p]) {
+            updatePlayer(p, inputs[p])
+            val regen = players.character[p].regenSeconds * TICK_HZ
+            if (!duel.on && !practice && phase == Phase.FIGHT && regen > 0 && stageTicks % regen == 0 && players.alive(p) && players.hp[p] < players.maxHp[p]) players.hp[p]++
+        }
         bumpPlayers()
         if (bossDue > 0 && --bossDue == 0) bringBoss()
         brains.think()
@@ -284,6 +291,7 @@ class World(seed: Long = 1L) {
     fun nextStage() {
         if (phase != Phase.SHOP) return
         stage++
+        players.earned.copyInto(stageEarned); players.kills.copyInto(stageKills)
         stageTicks = 0
         coinBase = coinBaseFor(stage)
         phase = Phase.FIGHT
@@ -1282,6 +1290,11 @@ class World(seed: Long = 1L) {
         bullets.clear()
         hostile.clear()
         phase = Phase.SHOP
+        if (!practice && !duel.on) for (p in 0 until playerCount) if (players.present[p]) {
+            val bonus = dev.david.tessel.core.content.StageRewards.coins(stage, players.earned[p] - stageEarned[p], players.kills[p] - stageKills[p])
+            players.coins[p] += bonus
+            players.earned[p] += bonus
+        }
         shop.open(this)
         events.add(Events.SHOP_OPEN, stage)
     }

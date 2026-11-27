@@ -78,7 +78,7 @@ class PlayDialogTest {
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Play").performClick()
         compose.mainClock.advanceTimeBy(1500)
-        compose.onNodeWithText("Ram").performClick()
+        compose.onNodeWithText("Rapid").performClick()
         val action = compose.onNodeWithText("New Run")
         action.assertIsDisplayed()
         val bounds = action.getUnclippedBoundsInRoot()

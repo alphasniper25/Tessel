@@ -34,6 +34,8 @@ class Renderer(private val density: Float, palette: Palette) {
     var showStats = false
     var zoom = 1.12f
     private val tankArt = TankArt()
+    var names: List<String> = emptyList()
+    private val teamColors = intArrayOf(0xFF49D5E7.toInt(),0xFFE9B650.toInt(),0xFFB7A0F5.toInt(),0xFF80D28A.toInt(),0xFFF19BC9.toInt(),0xFF91ADFF.toInt(),0xFFE8E8E8.toInt(),0xFFF49570.toInt())
     private val hpText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; textSize = 10f * density; typeface = Typeface.DEFAULT_BOLD }
     private val hpBuf = TextBuf()
     var stickRadius = 56f * density
@@ -364,14 +366,18 @@ class Renderer(private val density: Float, palette: Palette) {
         if (rawX !in 0f..canvas.width.toFloat() || centerY !in 0f..canvas.height.toFloat()) return
         val x = rawX.coerceIn(25f*density, max(25f*density,canvas.width-25f*density))
         val r = Balance.PLAYER_RADIUS * view.scale
+        if (w.playerCount > 1) {
+            line.color = teamColors[p % teamColors.size]; line.strokeWidth = 2f*density; line.alpha = 255
+            canvas.drawCircle(rawX, centerY, r + 3f*density, line)
+        }
         val y = (if (centerY-r-22*density < 44*density) centerY+r+14*density else centerY-r-10*density).coerceIn(14f*density, max(14f*density, canvas.height-6f*density))
         val half = max(r*1.25f, 19f*density)
         val h = if(self) 4f*density else 3f*density
         val fraction = (pl.hp[p].toFloat()/pl.maxHp[p].coerceAtLeast(1)).coerceIn(0f,1f)
         fill.color=palette.raised; canvas.drawRoundRect(x-half,y,x+half,y+h,h/2,h/2,fill)
-        fill.color=if(fraction <= .25f) palette.danger else palette.ink
+        fill.color=if(fraction <= .25f) palette.danger else if(w.playerCount > 1) teamColors[p % teamColors.size] else palette.ink
         if(fraction>0f) canvas.drawRoundRect(x-half,y,x-half+2*half*fraction,y+h,h/2,h/2,fill)
-        hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(self && w.playerCount > 1) "YOU " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
+        hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(w.playerCount > 1) (names.getOrNull(p) ?: "P${p+1}") else "").put(if(w.playerCount > 1) "  " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
     }
 
     /**

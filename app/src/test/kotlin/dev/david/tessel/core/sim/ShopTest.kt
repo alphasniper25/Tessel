@@ -81,8 +81,8 @@ class ShopTest {
     fun pricesClimbWithLevelAndWithStage() {
         assertTrue(Upgrades.price(Upgrades.DAMAGE, 3, 1) > Upgrades.price(Upgrades.DAMAGE, 2, 1))
         assertEquals(Upgrades.of(Upgrades.DAMAGE).basePrice, Upgrades.price(Upgrades.DAMAGE, 0, 1))
-        assertTrue(Upgrades.price(Upgrades.DAMAGE, 0, 8) > 2 * Upgrades.price(Upgrades.DAMAGE, 0, 1))
-        assertTrue(Upgrades.healPrice(10) > 3 * Upgrades.healPrice(1))
+        assertTrue(Upgrades.price(Upgrades.DAMAGE, 0, 8) > Upgrades.price(Upgrades.DAMAGE, 0, 1))
+        assertTrue(Upgrades.healPrice(10) > Upgrades.healPrice(1))
     }
 
     @Test

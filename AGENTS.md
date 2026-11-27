@@ -32,3 +32,6 @@
 - For every explicitly requested APK, build using Gradle, then sign the test APK with this same private key using official Android apksigner. Verify signature, match the pinned certificate fingerprint, confirm the package ID is unchanged and versionCode increases relative to the distributed predecessor, record the APK SHA-256, and only then hand it to the owner. If any gate fails, report the failure instead of distributing. CI's ordinary debug APK is an intermediate artifact only, not the signed handoff. Signing occurs locally with private key access, not in the current GitHub workflow.
 - Users who installed an older ephemeral-key build need a one-time migration: back up and verify private app data with ADB run-as before any uninstall; restore it after installing the stable-key APK. Never claim an in-place update from a mismatched signer. Maintain backward-readable save formats. Actual phone migration has not yet been verified.
 - Use a separate production signing identity for any future public release.
+
+## Alpha.6 balance
+- Preserve serialized RAM ordinal (displayed as Rapid); no innate retaliation. Stage reward uses only per-stage deltas, credited once at shop entry. No extra reward when restoring a checkpoint. Arena 1920 × 864; Wire.VERSION=18, checkpoint remains 6. Preserve permanent test signing.

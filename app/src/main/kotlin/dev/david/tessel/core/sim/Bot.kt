@@ -47,7 +47,7 @@ class Bot(private var heading: Float = 0f) {
                 val uy = (e.y[nearest] - py) / d
                 out.aimX = ux
                 out.aimY = uy
-                out.fire = d < Balance.BULLET_RANGE
+                out.fire = d < pl.range(p)
                 if (d < BACK_OFF) {
                     mx = -ux
                     my = -uy

@@ -9,11 +9,13 @@ enum class CharacterDef(
     val label: String, val description: String, val extraHp: Int,
     val damageScale: Float, val speedScale: Float, val ramBase: Float,
     private val weights: List<Int>,
+    val fireScale: Float = 1f, val regenSeconds: Int = 0,
 ) {
-    BALANCED("Balanced", "Original starting stats; even card weights.", 0, 1f, 1f, 0f, listOf(10,10,10,10,10)),
-    VANGUARD("Vanguard", "+2 HP; -10% damage and speed; contact retaliation.", 2, 0.9f, 0.9f, 1f, listOf(8,28,18,8,10)),
-    STRIKER("Striker", "-1 HP; +25% bullet damage.", -1, 1.25f, 1f, 0f, listOf(24,8,8,10,10)),
-    RAM("Ram", "-1 HP; -15% bullet damage; +20% speed; stronger contact retaliation.", -1, 0.85f, 1.2f, 2.5f, listOf(7,14,30,24,10));
+    BALANCED("Balanced", "All-rounder with even card weights.", 0, 1f, 1f, 0f, listOf(10,10,10,10,10)),
+    VANGUARD("Vanguard", "+3 HP; regenerates 1 HP every 20 seconds of combat; slower fire and movement.", 3, 0.95f, 0.92f, 0f, listOf(12,30,8,10,10), fireScale = 0.95f, regenSeconds = 20),
+    STRIKER("Striker", "-1 HP; +35% bullet damage; slightly slower fire.", -1, 1.35f, 1f, 0f, listOf(28,8,8,10,10), fireScale = 0.95f),
+    // Keep the old serialized RAM ID so existing profiles and saves remain readable.
+    RAM("Rapid", "-1 HP; +50% fire rate; +10% movement speed; lighter shots.", -1, 0.85f, 1.1f, 0f, listOf(28,8,8,18,10), fireScale = 1.5f);
 
     fun weight(family: CardFamily) = weights[family.ordinal]
     companion object { fun fromId(id: Int) = entries.getOrElse(id) { BALANCED } }

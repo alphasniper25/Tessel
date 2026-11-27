@@ -33,6 +33,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -193,6 +196,14 @@ private fun Stage(lobby: CoopLobby, state: LobbyState, saved: Checkpoint?, setti
     }
     when (state) {
         LobbyState.Idle, is LobbyState.Reconnecting, is LobbyState.Playing -> {
+            if (state == LobbyState.Idle) {
+                var username by remember { mutableStateOf(lobby.myName) }
+                Text("Your player name", Type.footnote, c.ink2)
+                BasicTextField(value = username, onValueChange = { username = it.take(18); lobby.setUsername(username) },
+                    singleLine = true, textStyle = Type.subhead.copy(color = c.ink), cursorBrush = SolidColor(c.ink),
+                    modifier = Modifier.fillMaxWidth().background(c.raised, RoundedCornerShape(8.dp)).padding(12.dp))
+                Spacer(Modifier.height(Space.x3))
+            }
             if (saved != null) {
                 SavedGame(saved, onContinue = { lobby.host(saved) }, onDiscard = lobby::discardSave)
                 Spacer(Modifier.height(Space.x6))

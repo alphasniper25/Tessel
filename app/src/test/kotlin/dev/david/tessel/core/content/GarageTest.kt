@@ -41,7 +41,7 @@ class GarageTest {
         val v=Viewport(); v.follow(1600,720,1.25f,800f,360f)
         assertEquals(800f,v.screenX(800f),.001f); assertEquals(360f,v.screenY(360f),.001f)
         v.follow(1600,720,1.25f,0f,0f); assertEquals(0f,v.left,.001f); assertEquals(0f,v.top,.001f)
-        v.follow(1600,720,1.25f,1600f,720f);assertEquals(1600f,v.right,.001f);assertEquals(720f,v.bottom,.001f)
-        v.follow(1600,720,1f,400f,300f); assertEquals(1f,v.scale,.001f);assertEquals(0f,v.left,.001f)
+        v.follow(1600,720,1.25f,dev.david.tessel.core.sim.ARENA_W,dev.david.tessel.core.sim.ARENA_H);assertEquals(1600f,v.right,.001f);assertEquals(720f,v.bottom,.001f)
+        v.follow(1600,720,1f,400f,300f); assertEquals(1600f/dev.david.tessel.core.sim.ARENA_W,v.scale,.001f);assertEquals(0f,v.left,.001f)
     }
 }

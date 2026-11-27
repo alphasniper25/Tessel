@@ -56,7 +56,7 @@ fun main() {
     pass("typed effects preserve character stats, compound boosts, healing and health") {
         val p=w.players;p.chooseCharacter(0,CharacterDef.RAM,w.difficulty.bonusHp);val lv=p.levels[0]
         lv[Upgrades.DAMAGE]=4;lv[Upgrades.CORE_BREAKER]=1;lv[Upgrades.SPEED]=5;lv[Upgrades.AFTERBURNER]=1;lv[Upgrades.TITAN_PLATING]=1;lv[Upgrades.RAM_DAMAGE]=2;lv[Upgrades.FIELD_MEDIC]=1;lv[Upgrades.HEAL_POWER]=3
-        check(abs(p.damage(0)-1.6f*0.85f*1.8f)<0.0001f);check(abs(p.moveSpeed(0)-Balance.PLAYER_SPEED*1.3f*1.2f*1.18f)<0.001f);check(p.ramDamage(0)==7.5f);check(w.shop.healAmount(w,0)==7);check(Upgrades.amount(Upgrades.TITAN_PLATING,UpgradeStat.MAX_HP)==4f)
+        check(abs(p.damage(0)-Balance.BULLET_DAMAGE*1.6f*0.85f*1.8f)<0.0001f);check(abs(p.moveSpeed(0)-Balance.PLAYER_SPEED*1.3f*1.1f*1.18f)<0.001f);check(p.ramDamage(0)==5f);check(w.shop.healAmount(w,0)==7);check(Upgrades.amount(Upgrades.TITAN_PLATING,UpgradeStat.MAX_HP)==4f)
     }
     encoder.close();decoder.close();println("$checks performance checks passed")
 }

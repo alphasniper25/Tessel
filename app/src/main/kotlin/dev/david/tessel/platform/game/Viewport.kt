@@ -35,6 +35,15 @@ class Viewport {
         top = if (spanY <= height) (height - spanY) / 2f else (height / 2f - y * scale).coerceIn(height - spanY, 0f)
     }
 
+    /** Zoom out just enough to include the active team, with a margin. */
+    fun followTeam(width: Int, height: Int, zoom: Float, minX: Float, maxX: Float, minY: Float, maxY: Float) {
+        fit(width, height)
+        val base = scale
+        if (base <= 0f) return
+        val target = min(width / (maxX - minX + 200f), height / (maxY - minY + 160f))
+        follow(width, height, min(zoom, (target / base).coerceAtLeast(1f)), (minX + maxX) / 2f, (minY + maxY) / 2f)
+    }
+
     fun screenX(worldX: Float) = left + worldX * scale
     fun screenY(worldY: Float) = top + worldY * scale
 }

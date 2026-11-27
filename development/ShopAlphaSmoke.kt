@@ -72,11 +72,11 @@ fun main() {
     }
     pass("old format-3 save migrates rare card, coins, levels, and balanced default") { val old=checkNotNull(Checkpoint.read(oldSave())); check(old.coins[0]==123);check(old.levels[0][Upgrades.DAMAGE]==2); check(CardCode.item(old.stock[0][0])==Upgrades.SPEED);check(CardCode.tier(old.stock[0][0])==CardRarity.RARE);check(old.character[0]==CharacterDef.BALANCED);check(old.locked[0].none{it}) }
     pass("character stats and checkpoint identity") {
-        val c=World(seed=21); c.players.chooseCharacter(0,CharacterDef.RAM,c.difficulty.bonusHp);check(abs(c.players.moveSpeed(0)-Balance.PLAYER_SPEED*1.2f)<0.001f);check(abs(c.players.damage(0)-0.85f)<0.001f);check(c.players.ramDamage(0)==2.5f);check(Checkpoint.read(c.capture().write())!!.character[0]==CharacterDef.RAM)
+        val c=World(seed=21); c.players.chooseCharacter(0,CharacterDef.RAM,c.difficulty.bonusHp);check(abs(c.players.moveSpeed(0)-Balance.PLAYER_SPEED*1.1f)<0.001f);check(abs(c.players.damage(0)-Balance.BULLET_DAMAGE*0.85f)<0.001f);check(c.players.ramDamage(0)==0f);check(Checkpoint.read(c.capture().write())!!.character[0]==CharacterDef.RAM)
     }
     pass("Ram contact hits enemy and still costs the player health") {
         val r=World(seed=33);r.spawning=false;r.players.chooseCharacter(0,CharacterDef.RAM,r.difficulty.bonusHp)
-        val hp=r.players.hp[0]; val j=r.spawnEnemy(Bestiary.DOT,r.players.x[0]+1f,r.players.y[0]);check(j>=0)
+        r.players.levels[0][Upgrades.RAM_DAMAGE]=2; val hp=r.players.hp[0]; val j=r.spawnEnemy(Bestiary.DOT,r.players.x[0]+1f,r.players.y[0]);check(j>=0)
         val before=r.enemies.hp[j];repeat(5){r.step(Array(MAX_PLAYERS){PlayerInput()})}
         check(r.players.hp[0]<hp);check(r.enemies.count==0 || r.enemies.hp[j]<before)
     }
@@ -94,7 +94,7 @@ fun main() {
             println("  ${c.label}: families="+fam.joinToString { "%.1f%%".format(it/200.0) }+"; rarity="+rar.joinToString { "%.1f%%".format(it/200.0) })
         }
         val baseline=counts.getValue(CharacterDef.BALANCED)
-        for((c,f) in listOf(CharacterDef.VANGUARD to CardFamily.HEALTH,CharacterDef.VANGUARD to CardFamily.RAM,CharacterDef.RAM to CardFamily.RAM,CharacterDef.RAM to CardFamily.MOBILITY,CharacterDef.STRIKER to CardFamily.GUN)) check(counts.getValue(c)[f.ordinal]>baseline[f.ordinal]*1.1)
+        for((c,f) in listOf(CharacterDef.VANGUARD to CardFamily.HEALTH,CharacterDef.RAM to CardFamily.GUN,CharacterDef.RAM to CardFamily.MOBILITY,CharacterDef.STRIKER to CardFamily.GUN)) check(counts.getValue(c)[f.ordinal]>baseline[f.ordinal]*1.1)
     }
     println("$checks targeted checks passed")
 }

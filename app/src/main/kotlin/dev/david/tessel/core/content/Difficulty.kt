@@ -30,7 +30,7 @@ enum class Difficulty(
     ),
     NORMAL(
         "Normal", "A fair fight.",
-        spawn = 0.85f, speed = 0.92f, toughness = 0.85f, bossToughness = 0.75f,
+        spawn = 0.78f, speed = 0.87f, toughness = 0.80f, bossToughness = 0.65f,
         shotSpeed = 0.9f, attackRate = 0.85f, bonusHp = 2, coinValue = 1.25f, score = 1f,
     ),
     HARD(

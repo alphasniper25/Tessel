@@ -42,7 +42,7 @@ fun CharacterPreview(character: CharacterDef, look: TankLook, difficulty: Diffic
         Column(Modifier.weight(1f)) {
             Text(character.label, Type.headline, c.ink)
             Text("HP ${(Balance.PLAYER_HP + difficulty.bonusHp + character.extraHp).coerceAtLeast(1)}  ·  Damage ${(character.damageScale*100).toInt()}%", Type.footnote, c.ink)
-            Text("Speed ${(character.speedScale*100).toInt()}%  ·  Ram ${character.ramBase}", Type.footnote, c.ink)
+            Text("Speed ${(character.speedScale*100).toInt()}%  ·  Fire ${(character.fireScale*100).toInt()}%", Type.footnote, c.ink)
             if (!compact) Text(character.description, Type.footnote, c.ink2)
         }
     }
@@ -70,7 +70,7 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
                 TankPreview(settings.tankClass, look, Modifier.width(150.dp).height(112.dp).background(c.surface, RoundedCornerShape(12.dp)))
                 Column(Modifier.weight(1f)) {
                     Text(settings.tankClass.label, Type.title3, c.ink)
-                    Text("HP ${(Balance.PLAYER_HP + settings.difficulty.bonusHp + settings.tankClass.extraHp).coerceAtLeast(1)} · Damage ${(settings.tankClass.damageScale*100).toInt()}% · Speed ${(settings.tankClass.speedScale*100).toInt()}% · Ram ${settings.tankClass.ramBase}", Type.subhead, c.ink)
+                    Text("HP ${(Balance.PLAYER_HP + settings.difficulty.bonusHp + settings.tankClass.extraHp).coerceAtLeast(1)} · Damage ${(settings.tankClass.damageScale*100).toInt()}% · Speed ${(settings.tankClass.speedScale*100).toInt()}% · Fire ${(settings.tankClass.fireScale*100).toInt()}%", Type.subhead, c.ink)
                     Text(settings.tankClass.description, Type.footnote, c.ink2)
                     Text("Cosmetics do not change stats. Credits are earned from finished runs, kills, survival and bosses.", Type.footnote, c.ink3)
                 }

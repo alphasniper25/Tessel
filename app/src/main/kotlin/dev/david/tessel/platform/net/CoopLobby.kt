@@ -109,7 +109,16 @@ class CoopLobby(private val activity: ComponentActivity, private val game: GameS
     private val stateFlow = MutableStateFlow<LobbyState>(LobbyState.Idle)
     val state: StateFlow<LobbyState> = stateFlow
 
-    val myName: String = deviceName()
+    private val namePrefs = activity.getSharedPreferences("tessel_identity", android.content.Context.MODE_PRIVATE)
+    var myName: String = namePrefs.getString("username", null) ?: deviceName()
+        private set
+
+    fun setUsername(value: String) {
+        if (stateFlow.value != LobbyState.Idle) return
+        myName = value.replace('|', ' ').filterNot { it.isISOControl() }.trim().take(18).ifBlank { deviceName() }
+        namePrefs.edit().putString("username", myName).apply()
+        TapInbox.name = myName
+    }
 
     private class Seat(var endpoint: String?, val name: String, val id: Long = 0L) {
         var connected = true

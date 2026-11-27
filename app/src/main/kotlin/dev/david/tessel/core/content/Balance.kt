@@ -10,14 +10,14 @@ object Balance {
     /** Cut from 220 after user test #2 ("too overpowered at the start"); Speed upgrades buy it back. */
     const val PLAYER_SPEED = 195f
     const val PLAYER_HP = 6
-    const val INVULN_SECONDS = 0.6f
+    const val INVULN_SECONDS = 0.85f
 
     /** Cut from 3.5 after user test #2; Fire Rate upgrades buy it back. */
-    const val FIRE_RATE = 2.8f
+    const val FIRE_RATE = 3.2f
     const val BULLET_SPEED = 700f
-    const val BULLET_RANGE = 520f
+    const val BULLET_RANGE = 600f
     const val BULLET_RADIUS = 4f
-    const val BULLET_DAMAGE = 1f
+    const val BULLET_DAMAGE = 1.65f
 
     /** Radians between neighbouring bullets of one multishot volley, about 7 degrees. */
     const val MULTISHOT_SPREAD = 0.12f
@@ -30,7 +30,7 @@ object Balance {
     const val HIT_SHOVE_RADIUS = 110f
 
     const val COIN_RADIUS = 5f
-    const val MAGNET_RADIUS = 70f
+    const val MAGNET_RADIUS = 90f
 
     // Co-op: a player at 0 health is down, not out. They crawl at a fraction
     // of their speed and come back if their partner stands close for a while.
@@ -58,7 +58,7 @@ object Balance {
     const val ENEMY_HP_FROM_STAGE = 4
 
     /** Coin value multiplies by this each stage. */
-    const val COIN_GROWTH = 1.22
+    const val COIN_GROWTH = 1.14
 
     // Enemy shots: hollow, slow enough to read, a little faster and more frequent each stage.
     const val HOSTILE_RADIUS = 5.5f

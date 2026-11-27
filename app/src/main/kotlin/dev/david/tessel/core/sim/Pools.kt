@@ -96,7 +96,7 @@ class PlayerState {
     }
 
     fun fireRate(p: Int): Float {
-        var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE)
+        var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE) * character[p].fireScale
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
         if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
