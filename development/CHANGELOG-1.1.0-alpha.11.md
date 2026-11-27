@@ -1,0 +1,10 @@
+# Alpha.11 candidate (versionCode 32)
+- World-anchored low-contrast arena floor grid; screen-space render culling of coins, enemies, projectiles and drones with conservative margins.
+- Separate local cameras for each co-op player, overriding full-arena zoom only in co-op. Host authoritative world, spawn and network snapshot behavior unchanged. No bandwidth or device FPS claims.
+- Seven run-local skill points at stages 7/13/19/26/32/38/44; three prerequisite chains, refreshes (1–3 free per shop), fortune (+2/4/6 percentage points each to epic and legendary from common), trade (5/10/15% discounts). Existing boss rewards remain. Stored in existing 32-bit perk mask; Core cannot steal skill ranks. Free refreshes do not advance paid price ladder, and locks keep their quotes.
+- Three reserve cards unlock at stage 15 with bounded ranks and weaker incremental effects; modest stage reward reduction from stage 10. These are experimental balance values, not yet validated against campaign runs.
+- Final Core: persistent objectives, remaining summoned boss count, one recall per summoned boss, slower mending, longer grid warning and shorter hidden phase. Retains eight summons, original boss architecture, and player difficulty.
+- App version alpha.11/32; wire 25 intentionally rejects mixed alpha.10 peers. Save layout remains FORMAT=7, with existing stored upgrade count and appended stable IDs.
+- Original drone caps and other combat families unchanged.
+- Tests added: skill prerequisites, refresh pricing, reserve eligibility and separate cameras. Full Android CI and device tests pending.
+- Debug APK assembly explicitly requested; CI APK is intermediate only. Stable private test signing key and fingerprint verification required before distribution; no private credentials in repository.

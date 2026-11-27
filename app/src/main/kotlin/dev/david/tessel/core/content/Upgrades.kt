@@ -44,6 +44,9 @@ object Upgrades {
     const val REGEN = 17
     const val SHIELD_RECHARGE = 18
     const val DRONE_POWER = 19
+    const val RESERVE_POWER = 20
+    const val RESERVE_HULL = 21
+    const val RESERVE_DRIVE = 22
 
     private val defs = arrayOf(
         UpgradeDef("Damage", "+15% damage per bullet", basePrice = 10, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
@@ -66,9 +69,13 @@ object Upgrades {
         UpgradeDef("Regeneration", "Recover health during combat; each level shortens the interval", basePrice=20, maxLevel=3, step=1f, family=CardFamily.HEALTH, stat=UpgradeStat.REGEN),
         UpgradeDef("Shield Recharge", "12% faster impact shield recovery", basePrice=23, maxLevel=4, step=.12f, family=CardFamily.RAM, stat=UpgradeStat.SHIELD_RECHARGE),
         UpgradeDef("Drone Power", "+10% drone impact damage", basePrice=18, maxLevel=5, step=.10f, stat=UpgradeStat.DRONE_POWER),
+        UpgradeDef("Reserve Power", "+3% base damage / Rammer impact", basePrice=30, maxLevel=40, step=.03f, stat=UpgradeStat.DAMAGE),
+        UpgradeDef("Reserve Hull", "+1 filled health pip", basePrice=52, maxLevel=12, step=1f, family=CardFamily.HEALTH, stat=UpgradeStat.MAX_HP),
+        UpgradeDef("Reserve Drive", "+1.5% movement speed", basePrice=28, maxLevel=30, step=.015f, family=CardFamily.MOBILITY, stat=UpgradeStat.SPEED),
     )
 
     val count get() = defs.size
+    fun availableAt(id: Int, stage: Int) = id in 0 until count && (id < RESERVE_POWER || stage >= 15)
     fun offered(id: Int, frame: TankEvolution): Boolean {
         if(id==MULTISHOT || id==VELOCITY) return false
         if(id==SHIELD_RECHARGE) return frame.melee
@@ -125,6 +132,9 @@ object Upgrades {
             CALIBER -> "${pct(defs[id].step)} bullet size"
             RAM_DAMAGE -> "+$levels retaliation; +${(7.5f*levels).roundToInt()}% Rammer base impact"
             HEAL_POWER -> "Shop healing restores $levels more pips"
+            RESERVE_POWER -> "${3*levels}% more base damage / impact"
+            RESERVE_HULL -> "+$levels filled health pips"
+            RESERVE_DRIVE -> "+${1.5f*levels}% movement speed"
             else -> defs[id].blurb
         }
     }
@@ -137,7 +147,7 @@ object Upgrades {
      * same upgrade later costs more; a locked card retains its quoted price.
      */
     fun price(id: Int, level: Int, stage: Int) =
-        (defs[id].basePrice * LEVEL_GROWTH.pow(level) * inflation(stage)).roundToInt()
+        (defs[id].basePrice * (if (id >= RESERVE_POWER) 1.16 else LEVEL_GROWTH).pow(level) * inflation(stage)).roundToInt()
 
     fun inflation(stage: Int) = STAGE_GROWTH.pow(stage - 1)
 

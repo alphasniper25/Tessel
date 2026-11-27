@@ -39,7 +39,7 @@ class ShopOffer(
 )
 
 /** One perk on offer after a boss. */
-class PerkOffer(val slot: Int, val name: String, val blurb: String, val evolution: dev.david.tessel.core.content.TankEvolution? = null)
+class PerkOffer(val slot: Int, val name: String, val blurb: String, val evolution: dev.david.tessel.core.content.TankEvolution? = null, val skill: Boolean = false)
 
 class ShopView(
     val stage: Int,
@@ -60,6 +60,7 @@ class ShopView(
     /** Perks to choose from; the shop cannot be left until one is taken. */
     val perkOffers: List<PerkOffer> = emptyList(),
     val healAmount: Int = 2,
+    val perkMask: Int = 0,
 )
 
 /** One player's column in the run's statistics. */

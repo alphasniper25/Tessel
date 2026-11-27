@@ -20,7 +20,7 @@ object CoreRules {
 
     // Grid strikes.
     const val CELL = 112f
-    const val WARN_SECONDS = 1.9f
+    const val WARN_SECONDS = 2.2f
     const val HIT_SECONDS = 0.4f
     const val STUN_SECONDS = 1.5f
 
@@ -54,7 +54,7 @@ object CoreRules {
     const val RECALL_BELOW = 0.3f
 
     /** Share of its health a boss in its bubble regains each second, and the share at which it goes out again. */
-    const val MEND_PER_SECOND = 0.1f
+    const val MEND_PER_SECOND = 0.08f
     const val READY_AT = 0.9f
     const val RECALL_SPEED = 260f
 

@@ -96,6 +96,7 @@ class Renderer(private val density: Float, palette: Palette) {
         canvas.drawColor(palette.surface)
         fill.color = palette.ground
         canvas.drawRect(view.left, view.top, view.right, view.bottom, fill)
+        drawFloor(canvas, view)
 
         drawStrike(canvas, w, view)
         drawCoreTrail(canvas,w,view)
@@ -123,6 +124,39 @@ class Renderer(private val density: Float, palette: Palette) {
         if (showStats) {
             statsPaint.color = palette.ink3
             canvas.drawText(readout.chars, 0, readout.length, canvas.width / 2f, canvas.height - 10f * density, statsPaint)
+        }
+    }
+
+    private val floorPaint = Paint()
+    private fun visible(canvas: Canvas, x: Float, y: Float, margin: Float): Boolean =
+        x + margin >= 0f && x - margin <= canvas.width && y + margin >= 0f && y - margin <= canvas.height
+
+    /** World-anchored, low-contrast grid; only visible lines are drawn. */
+    private fun drawFloor(canvas: Canvas, view: Viewport) {
+        if (view.scale <= 0f) return
+        val step = 72f
+        val x0 = maxOf(0f, view.left)
+        val y0 = maxOf(0f, view.top)
+        val x1 = minOf(canvas.width.toFloat(), view.right)
+        val y1 = minOf(canvas.height.toFloat(), view.bottom)
+        if (x1 <= x0 || y1 <= y0) return
+        floorPaint.color = palette.ink
+        floorPaint.strokeWidth = 1f
+        var gx = kotlin.math.ceil((x0 - view.left) / view.scale / step).toInt()
+        while (gx * step <= ARENA_W) {
+            val x = view.screenX(gx * step)
+            if (x > x1) break
+            floorPaint.alpha = if (gx % 4 == 0) 30 else 14
+            canvas.drawLine(x, y0, x, y1, floorPaint)
+            gx++
+        }
+        var gy = kotlin.math.ceil((y0 - view.top) / view.scale / step).toInt()
+        while (gy * step <= ARENA_H) {
+            val y = view.screenY(gy * step)
+            if (y > y1) break
+            floorPaint.alpha = if (gy % 4 == 0) 30 else 14
+            canvas.drawLine(x0, y, x1, y, floorPaint)
+            gy++
         }
     }
 
@@ -243,6 +277,7 @@ class Renderer(private val density: Float, palette: Palette) {
         for (i in 0 until c.count) {
             val x = view.screenX(lerp(c.prevX[i], c.x[i], blend))
             val y = view.screenY(lerp(c.prevY[i], c.y[i], blend))
+            if (!visible(canvas,x,y,r+2f)) continue
             fill.color = palette.coin
             canvas.drawCircle(x, y, r, fill)
             fill.color = coinFacet
@@ -261,6 +296,7 @@ class Renderer(private val density: Float, palette: Palette) {
             val x = view.screenX(lerp(e.prevX[i], e.x[i], blend))
             val y = view.screenY(lerp(e.prevY[i], e.y[i], blend))
             val r = def.radius * view.scale
+            if (!visible(canvas,x,y,r*1.5f+10f*density)) continue
             if(type==Bestiary.CORE && w.core.hazards.hidden>0){line.color=palette.ink3;line.strokeWidth=2f*density;line.alpha=100;canvas.drawCircle(x,y,r,line);line.alpha=255;continue}
             val flashing = e.flash[i] > 0
             val body = if (flashing) palette.ink else enemyBody[type]
@@ -346,6 +382,7 @@ class Renderer(private val density: Float, palette: Palette) {
             val y = view.screenY(lerp(h.prevY[i], h.y[i], blend))
             val stationary = h.vx[i]==0f && h.vy[i]==0f
             val r = h.radius[i] * view.scale * if(stationary) 1.5f else 1f
+            if (!visible(canvas,x,y,r*1.5f+2f)) continue
             line.color=palette.danger
             line.strokeWidth = r * 0.5f
             canvas.drawCircle(x, y, r * 0.75f, line)
@@ -366,7 +403,9 @@ class Renderer(private val density: Float, palette: Palette) {
             // A short streak behind each shot reads as speed without any blur.
             val laser = b.owner[i] in 0 until w.playerCount && w.players.evolution[b.owner[i]].laser
             line.color=if(laser) palette.zone(4) else palette.ink
-            val tail = (if(laser) 440f else STREAK) * view.scale / speed
+            val length = (if(laser) 440f else STREAK) * view.scale
+            if (!visible(canvas,x,y,length+b.radius[i]*view.scale)) continue
+            val tail = length / speed.coerceAtLeast(.01f)
             line.strokeWidth = b.radius[i] * 2f * view.scale
             canvas.drawLine(x - b.vx[i] * tail, y - b.vy[i] * tail, x, y, line)
         }
@@ -377,6 +416,7 @@ class Renderer(private val density: Float, palette: Palette) {
         val d=w.droneWing;val pl=w.players;val r=dev.david.tessel.core.sim.DroneWing.RADIUS*view.scale
         for(i in d.hp.indices){if(d.hp[i]<=0)continue;val p=i/dev.david.tessel.core.sim.DroneWing.LIMIT
             val x=view.screenX(lerp(d.prevX[i],d.x[i],blend));val y=view.screenY(lerp(d.prevY[i],d.y[i],blend));val a=d.angle[i];val dx=cos(a);val dy=sin(a)
+            if (!visible(canvas,x,y,r*2f)) continue
             val paint=dev.david.tessel.core.content.GarageCatalog.items[pl.appearance[p].paint].color
             fill.color=if(paint==0)playerBody else paint;fill.alpha=255
             dronePath.reset();dronePath.moveTo(x+dx*r,y+dy*r);dronePath.lineTo(x-dx*r*.72f-dy*r*.72f,y-dy*r*.72f+dx*r*.72f);dronePath.lineTo(x-dx*r*.72f+dy*r*.72f,y-dy*r*.72f-dx*r*.72f);dronePath.close();canvas.drawPath(dronePath,fill)

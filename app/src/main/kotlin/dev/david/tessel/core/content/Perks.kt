@@ -14,6 +14,15 @@ object Perks {
     const val LAST_STAND = 7
     const val SHOCKWAVE = 8
     const val HAGGLER = 9
+    const val REFRESH_I = 10
+    const val REFRESH_II = 11
+    const val REFRESH_III = 12
+    const val FORTUNE_I = 13
+    const val FORTUNE_II = 14
+    const val FORTUNE_III = 15
+    const val TRADE_I = 16
+    const val TRADE_II = 17
+    const val TRADE_III = 18
 
     private val defs = arrayOf(
         PerkDef("Second Wind", "Once a stage, a hit that would down you leaves you on one health."),
@@ -26,6 +35,15 @@ object Perks {
         PerkDef("Last Stand", "+50% damage while you have two health or fewer."),
         PerkDef("Shockwave", "A hit on you damages and shoves the enemies close by."),
         PerkDef("Haggler", "Shop upgrades cost 10% less."),
+        PerkDef("Refresh I", "One free shop refresh each stage."),
+        PerkDef("Refresh II", "Two free shop refreshes each stage in total."),
+        PerkDef("Refresh III", "Three free shop refreshes each stage in total."),
+        PerkDef("Fortune I", "Epic and legendary odds each gain 2 percentage points on new cards."),
+        PerkDef("Fortune II", "Epic and legendary odds each gain 4 points in total."),
+        PerkDef("Fortune III", "Epic and legendary odds each gain 6 points in total."),
+        PerkDef("Trade I", "5% discount on newly priced upgrade cards."),
+        PerkDef("Trade II", "10% discount on newly priced upgrade cards."),
+        PerkDef("Trade III", "15% discount on newly priced upgrade cards."),
     )
 
     val count get() = defs.size
@@ -34,6 +52,30 @@ object Perks {
 
     /** How many perks a boss offers at once. */
     const val OFFERED = 3
+}
+
+/** Run-local, three independent prerequisite chains. The existing saved perk mask
+ * carries them for each seat, without adding a new currency or checkpoint field. */
+object SkillTree {
+    const val ORIGINAL_PERKS = 10
+    const val MASK = (1 shl 19) - (1 shl ORIGINAL_PERKS)
+    private val milestones = intArrayOf(7, 13, 19, 26, 32, 38, 44)
+    private val roots = intArrayOf(Perks.REFRESH_I, Perks.FORTUNE_I, Perks.TRADE_I)
+    fun milestone(stage: Int) = stage in milestones
+    fun isNode(id: Int) = id in Perks.REFRESH_I..Perks.TRADE_III
+    fun rank(mask: Int, branch: Int): Int {
+        val root = roots[branch]
+        var n = 0
+        while (n < 3 && mask and (1 shl (root + n)) != 0) n++
+        return n
+    }
+    fun next(mask: Int, branch: Int): Int {
+        val n = rank(mask, branch)
+        return if (n == 3) -1 else roots[branch] + n
+    }
+    fun freeRefreshes(mask: Int) = rank(mask, 0)
+    fun luck(mask: Int) = 2 * rank(mask, 1)
+    fun priceFactor(mask: Int) = 1.0 - .05 * rank(mask, 2)
 }
 
 /** Extra traits an enemy can carry, shown by a bright outline. */

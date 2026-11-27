@@ -786,8 +786,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 } else {
                     homeDrawn = false
                     val pl = shown.players
-                    viewport.follow(canvas.width, canvas.height, if (practice != null) 1f else renderer.zoom,
-                        pl.prevX[me] + (pl.x[me]-pl.prevX[me])*blend, pl.prevY[me] + (pl.y[me]-pl.prevY[me])*blend)
+                    viewport.followLocal(canvas.width, canvas.height, if (practice != null) 1f else renderer.zoom,
+                        pl.prevX[me] + (pl.x[me]-pl.prevX[me])*blend, pl.prevY[me] + (pl.y[me]-pl.prevY[me])*blend, shown.playerCount > 1)
                     // A player's chosen zoom is stable even when the team separates.
                     // Off-screen teammates get colored edge markers in Renderer.
                     renderer.names = names
@@ -1252,7 +1252,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it)) }
+            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), dev.david.tessel.core.content.SkillTree.isNode(it)) }
         }
         val ready = host?.ready ?: 0
         publishedReady = ready
@@ -1273,6 +1273,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             readyCount = Integer.bitCount(ready),
             teamSize = world.presentCount(),
             perkOffers = perkOffers,
+            perkMask = pl.perks[me],
         )
     }
 
@@ -1285,6 +1286,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         key = key * 31 + s.healAmount
         key = key * 31 + s.rerollPrice
         key = key * 31 + s.stage
+        key = key * 31 + s.perks[me]
         for (slot in 0 until SHOP_SLOTS) {
             key = key * 31 + s.shopItem[slot]
             key = key * 31 + s.shopLevel[slot]
@@ -1317,7 +1319,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it)) }
+            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), dev.david.tessel.core.content.SkillTree.isNode(it)) }
         }
         shopFlow.value = ShopView(
             stage = s.stage,
@@ -1336,6 +1338,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             readyCount = Integer.bitCount(s.ready),
             teamSize = Integer.bitCount(s.present),
             perkOffers = perkOffers,
+            perkMask = s.perks[me],
         )
     }
 

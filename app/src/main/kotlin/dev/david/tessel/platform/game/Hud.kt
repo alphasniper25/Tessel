@@ -309,6 +309,29 @@ class Hud(private val density: Float, fontScale: Float) {
         }
         val filled = width * share
         if (filled > height) canvas.drawRoundRect(left, top, left + filled, top + height, round, round, fill)
+        if (w.stage == dev.david.tessel.core.content.CoreRules.STAGE && w.phase == Phase.FIGHT) {
+            var corePresent = false
+            var escorts = 0
+            for (i in 0 until w.enemies.count) {
+                if (w.enemies.type[i] == Bestiary.CORE) corePresent = true
+                if (w.enemies.elite[i] == dev.david.tessel.core.content.Elite.TETHERED) escorts++
+            }
+            val objective = when {
+                w.core.strike == dev.david.tessel.core.sim.CoreFight.STRIKE_WARN -> "Move off the marked squares!"
+                w.core.form == 2 -> "Phase 2: the Core summons eight bosses"
+                w.core.hazards.hidden > 0 -> "Core hidden: dodge and clear enemies"
+                corePresent && w.core.form == 3 -> "Destroy the Core first, then its bosses"
+                corePresent -> "Break the shield and defeat the Core"
+                escorts > 0 -> "Core destroyed: defeat remaining bosses"
+                else -> "Prepare for the Core"
+            }
+            note.color = palette.ink2
+            canvas.drawText(objective, cx, insetTop + 51f * density, note)
+            if (escorts > 0) {
+                buf.clear().put("Summoned bosses left: ").put(escorts)
+                canvas.drawText(buf.chars,0,buf.length,cx,insetTop+76f*density,note)
+            }
+        }
 
         if (w.playerCount > 1 && !w.duel.on) {
             val pl = w.players

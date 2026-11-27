@@ -57,6 +57,7 @@ class CoreFight(private val w: World) {
     /** Enemy id in each bubble and what it is doing; 0 for none. */
     private val slotId = IntArray(SLOTS)
     private val slotState = IntArray(SLOTS) { DEAD }
+    private val recalled = BooleanArray(SLOTS)
 
     /** False once the core itself has fallen. */
     var coreAlive = false
@@ -80,6 +81,7 @@ class CoreFight(private val w: World) {
         stolen.fill(0)
         slotId.fill(0)
         slotState.fill(DEAD)
+        recalled.fill(false)
         coreAlive = false
         active = false
         form = 0
@@ -233,7 +235,7 @@ class CoreFight(private val w: World) {
         val pl = w.players
         for (p in 0 until w.playerCount) {
             if (!pl.alive(p)) continue
-            val mask = pl.perks[p] and (1 shl Perks.SIPHON).inv()
+            val mask = pl.perks[p] and (1 shl Perks.SIPHON).inv() and dev.david.tessel.core.content.SkillTree.MASK.inv()
             if (mask == 0) continue
             var pick = w.rng.int(0, Integer.bitCount(mask) - 1)
             var perk = 0
@@ -354,7 +356,10 @@ class CoreFight(private val w: World) {
             alive++
             if (slotState[k] == OUT) {
                 out++
-                if (coreAlive && e.hp[i] / e.maxHp[i] < CoreRules.RECALL_BELOW) slotState[k] = RETURN
+                if (coreAlive && !recalled[k] && e.hp[i] / e.maxHp[i] < CoreRules.RECALL_BELOW) {
+                    recalled[k] = true
+                    slotState[k] = RETURN
+                }
             } else if (slotState[k] == RETURN) {
                 out++
             }

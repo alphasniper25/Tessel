@@ -7,7 +7,7 @@ import kotlin.math.min
 /**
  * Fits the fixed-size arena to the screen, centred, never stretched. On a
  * 20:9 phone it fills the screen exactly; on other shapes thin bars remain,
- * so both players in co-op always see the same arena.
+ * while each player in co-op uses a separate local camera.
  */
 class Viewport {
     var scale = 1f
@@ -35,7 +35,11 @@ class Viewport {
         top = if (spanY <= height) (height - spanY) / 2f else (height / 2f - y * scale).coerceIn(height - spanY, 0f)
     }
 
-    /** Zoom out just enough to include the active team, with a margin. */
+    /** A co-op player never switches to a shared team framing or the full-arena overview. */
+    fun followLocal(width: Int, height: Int, zoom: Float, x: Float, y: Float, coop: Boolean) =
+        follow(width, height, if (coop && zoom < 1.35f) 1.60f else zoom, x, y)
+
+    /** Legacy helper for an optional overview; never used by the live player camera. */
     fun followTeam(width: Int, height: Int, zoom: Float, minX: Float, maxX: Float, minY: Float, maxY: Float) {
         fit(width, height)
         val base = scale

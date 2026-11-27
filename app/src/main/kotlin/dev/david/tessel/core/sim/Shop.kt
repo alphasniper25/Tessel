@@ -6,6 +6,7 @@ import dev.david.tessel.core.content.CardFamily
 import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
@@ -44,10 +45,14 @@ class Shop {
     private fun offerPerks(w: World, p: Int) {
         offers[p].fill(-1)
         if (offerEvolution(w,p)) return
+        if (w.devBoss < 0 && SkillTree.milestone(w.stage)) {
+            for (branch in 0 until Perks.OFFERED) offers[p][branch] = SkillTree.next(w.players.perks[p], branch)
+            return
+        }
         if (w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
         var n = 0
         val free = IntArray(Perks.count)
-        for (k in 0 until Perks.count) if (!w.players.has(p, k)) free[n++] = k
+        for (k in 0 until SkillTree.ORIGINAL_PERKS) if (!w.players.has(p, k)) free[n++] = k
         for (slot in 0 until minOf(Perks.OFFERED, n)) {
             val pick = w.rng.int(slot, n - 1)
             val held = free[slot]
@@ -99,8 +104,9 @@ class Shop {
             return true
         }
         val k = offers.getOrNull(p)?.getOrNull(slot) ?: return false
-        if (k < 0) return false
+        if (k < 0 || w.players.has(p,k)) return false
         val pl = w.players
+        if (SkillTree.isNode(k) && (0..2).none { SkillTree.next(pl.perks[p], it) == k }) return false
         pl.perks[p] = pl.perks[p] or (1 shl k)
         if (k == Perks.THICK_SKIN) {
             pl.maxHp[p] += 2
@@ -132,6 +138,7 @@ class Shop {
         total *= rarity(p, slot).premium
         if (w.players.has(p, Perks.HAGGLER)) total *= 0.9
         if(w.players.character[p] == dev.david.tessel.core.content.CharacterDef.BALANCED) total *= 0.9
+        total *= SkillTree.priceFactor(w.players.perks[p])
         return total.roundToInt().coerceAtLeast(1)
     }
 
@@ -147,7 +154,7 @@ class Shop {
     }
 
     fun canBuy(w: World, p: Int, slot: Int) = p in 0 until w.playerCount && slot in 0 until SHOP_SLOTS &&
-        !perkPending(p) && Upgrades.offered(item(p,slot),w.players.evolution[p]) && !maxed(w, p, slot) && CardMission.eligible(item(p, slot), w.players.missionMask[p], rarity(p, slot)) && w.players.coins[p] >= price(w, p, slot)
+        !perkPending(p) && Upgrades.availableAt(item(p,slot),w.stage) && Upgrades.offered(item(p,slot),w.players.evolution[p]) && !maxed(w, p, slot) && CardMission.eligible(item(p, slot), w.players.missionMask[p], rarity(p, slot)) && w.players.coins[p] >= price(w, p, slot)
 
     fun buy(w: World, p: Int, slot: Int): Boolean {
         if (!canBuy(w, p, slot)) return false
@@ -187,11 +194,14 @@ class Shop {
         return true
     }
 
-    fun rerollPrice(w: World, p: Int) = Upgrades.rerollPrice(w.stage, rerolls[p])
+    fun rerollPrice(w: World, p: Int): Int {
+        val free = SkillTree.freeRefreshes(w.players.perks[p])
+        return if (rerolls[p] < free) 0 else Upgrades.rerollPrice(w.stage, rerolls[p] - free)
+    }
 
     fun canReroll(w: World, p: Int) = p in 0 until w.playerCount &&
         !perkPending(p) && locks[p].any { !it } && w.players.coins[p] >= rerollPrice(w, p) &&
-        (0 until Upgrades.count).any { u -> CardMission.eligible(u, w.players.missionMask[p]) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u] < Upgrades.runCap(u) &&
+        (0 until Upgrades.count).any { u -> Upgrades.availableAt(u,w.stage) && CardMission.eligible(u, w.players.missionMask[p]) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u] < Upgrades.runCap(u) &&
             (0 until SHOP_SLOTS).none { slot -> locked(p, slot) && item(p, slot) == u } }
 
     fun reroll(w: World, p: Int): Boolean {
@@ -226,8 +236,8 @@ class Shop {
             cp.perkOffer[p].copyInto(offers[p])
             if(offerEvolution(w,p)) offers[p].fill(-1)
             // Old saved offers may contain retired cards.
-            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && !Upgrades.offered(item(p,slot),w.players.evolution[p])) {
-                val available=(0 until Upgrades.count).filter { u -> Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }
+            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && (!Upgrades.availableAt(item(p,slot),w.stage) || !Upgrades.offered(item(p,slot),w.players.evolution[p]))) {
+                val available=(0 until Upgrades.count).filter { u -> Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }
                 stock[p][slot]=if(available.isEmpty()) -1 else CardCode.pack(available[w.rng.int(0,available.lastIndex)],CardRarity.COMMON)
                 locks[p][slot]=false;quotes[p][slot]=0
             }
@@ -239,15 +249,15 @@ class Shop {
         // Reserve every retained offer before drawing anything, even a lock in the last slot.
         for (slot in 0 until SHOP_SLOTS) {
             val u = item(p, slot)
-            if (locked(p, slot) && u >= 0 && Upgrades.offered(u,w.players.evolution[p]) && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) used[u] = true
+            if (locked(p, slot) && u >= 0 && Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) used[u] = true
             else { locks[p][slot] = false; stock[p][slot] = -1; quotes[p][slot] = 0 }
         }
         val character = w.players.character[p]
         for (slot in 0 until SHOP_SLOTS) {
             if (locked(p, slot)) continue
-            val available = (0 until Upgrades.count).filter { !used[it] && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
+            val available = (0 until Upgrades.count).filter { !used[it] && Upgrades.availableAt(it,w.stage) && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
             if (available.isEmpty()) continue
-            var tier = CardRarity.roll(w.rng)
+            var tier = CardRarity.roll(w.rng, SkillTree.luck(w.players.perks[p]))
             var pool = available.filter { CardMission.eligible(it, w.players.missionMask[p], tier) }
             // Only if every starter is capped/retained: still offer an eligible mission card.
             if (pool.isEmpty()) {

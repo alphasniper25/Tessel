@@ -25,10 +25,10 @@ class CoreHazards(private val w: World) {
         val e=w.enemies;val p=w.players
         if(phase!=form){reset();form=phase;shieldMax=e.maxHp[i]*.10f;shield=shieldMax}
         elapsed++
-        if(++quiet>3*TICK_HZ) shield=min(shieldMax,shield+shieldMax/(12*TICK_HZ))
+        if(++quiet>5*TICK_HZ) shield=min(shieldMax,shield+shieldMax/(12*TICK_HZ))
         if(hidden>0)hidden--
         if(!waved && e.hp[i]<e.maxHp[i]*.50f){
-            waved=true;hidden=4*TICK_HZ;warning=0;firing=0;count=0
+            waved=true;hidden=3*TICK_HZ;warning=0;firing=0;count=0
             repeat(10){k->val a=k*2f*PI.toFloat()/10;val sx=(ARENA_W/2+cos(a)*(ARENA_W*.43f));val sy=(ARENA_H/2+sin(a)*(ARENA_H*.40f));w.spawnEnemy(if(k%3==0)Bestiary.SLAB else Bestiary.PIP,sx,sy)}
         }
         if(nextBeam>0)nextBeam--

@@ -27,9 +27,14 @@ enum class CardRarity(val label: String, val weight: Int, val levels: Int, val p
     RARE("Rare",15,3,1.10), EPIC("Epic",7,4,1.15), LEGENDARY("Legendary",1,5,1.20);
     companion object {
         fun fromId(id: Int) = entries.getOrElse(id) { COMMON }
-        fun roll(rng: Rng): CardRarity {
-            var ticket = rng.int(1, entries.sumOf { it.weight })
-            for (tier in entries) { ticket -= tier.weight; if (ticket <= 0) return tier }
+        fun roll(rng: Rng, luck: Int = 0): CardRarity {
+            val shift = luck.coerceIn(0, 6)
+            var ticket = rng.int(1, 100)
+            for (tier in entries) {
+                val weight = tier.weight + when (tier) { COMMON -> -2 * shift; EPIC, LEGENDARY -> shift; else -> 0 }
+                ticket -= weight
+                if (ticket <= 0) return tier
+            }
             error("Invalid rarity weights")
         }
     }
