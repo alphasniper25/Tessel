@@ -53,6 +53,7 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
     val c = Theme.colors
     var tab by remember { mutableIntStateOf(0) }
     var previewId by remember { mutableIntStateOf(-1) }
+    var filter by remember { mutableIntStateOf(0) }
     val slot = CosmeticSlot.entries[tab]
     val selected = GarageCatalog.items.getOrNull(previewId)?.takeIf { it.slot == slot }
     val balance = GarageCatalog.balance(ledger.totals, settings.cosmeticOwned)
@@ -76,8 +77,11 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
                 }
             }
             Segmented(listOf("Body", "Turret", "Paint", "Skin"), tab, { tab=it; previewId=-1 })
+            Segmented(listOf("All","Owned","Unowned"),filter,{ filter=it;previewId=-1 })
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (item in GarageCatalog.bySlot[slot.ordinal]) {
+                val visible=GarageCatalog.bySlot[slot.ordinal].filter { filter==0 || GarageCatalog.owned(settings.cosmeticOwned,it.id)==(filter==1) }
+                if(visible.isEmpty()) Text("No matching cosmetics",Type.footnote,c.ink2)
+                for (item in visible) {
                     val isOwned=GarageCatalog.owned(settings.cosmeticOwned,item.id)
                     val equipped=settings.tankLook.get(slot)==item.id
                     val isSelected=selected?.id==item.id

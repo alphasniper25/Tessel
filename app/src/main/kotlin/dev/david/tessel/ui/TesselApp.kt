@@ -110,6 +110,7 @@ fun TesselApp(
     var statsOpen by rememberSaveable { mutableStateOf(false) }
     var cardsOpen by rememberSaveable { mutableStateOf(false) }
     var garageOpen by rememberSaveable { mutableStateOf(false) }
+    var treeOpen by rememberSaveable { mutableStateOf(false) }
     var playOpen by remember { mutableStateOf(false) }
     var devOpen by rememberSaveable { mutableStateOf(false) }
     var codeOpen by remember { mutableStateOf(false) }
@@ -135,6 +136,11 @@ fun TesselApp(
 
     LaunchedEffect(settings) { game.applySettings(settings) }
     LaunchedEffect(shop) { shop?.let { lastShop = it } }
+    val skillDue=shop?.perkOffers?.any { it.skill }==true
+    LaunchedEffect(mode,shop?.stage,skillDue) {
+        if(mode==Mode.SHOP && skillDue) treeOpen=true
+        if(mode==Mode.PLAYING || mode==Mode.OVER) treeOpen=false
+    }
     LaunchedEffect(summary) { summary?.let { lastSummary = it } }
     LaunchedEffect(Unit) { onStart?.invoke() }
     // Once the host presses Start, every phone leaves the lobby for the arena.
@@ -146,6 +152,7 @@ fun TesselApp(
             settingsOpen = false
             cardsOpen = false
             garageOpen = false
+            treeOpen = false
             statsOpen = false
             lobbyOpen = true
         }
@@ -197,6 +204,7 @@ fun TesselApp(
                 onSave = game::saveForLater,
                 onLeave = { if (tutorial != null) game.leaveRun() else if (coop) abandonCoop() else game.abandonRun() },
                 practice = tutorial != null,
+                onTree = if(!duel && tutorial==null) ({ treeOpen=true;game.menuSound() }) else null,
             )
         }
 
@@ -214,7 +222,7 @@ fun TesselApp(
 
         Sheet(visible = mode == Mode.SHOP, onDismiss = null) {
             (shop ?: lastShop)?.let {
-                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked)
+                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
             }
         }
 
@@ -261,12 +269,13 @@ fun TesselApp(
             HomeScreen(
                 settings = settings,
                 ledger = ledger,
-                onPlay = { playOpen = true },
-                onTogether = { lobbyOpen = true },
-                onStats = { statsOpen = true },
-                onCards = { cardsOpen = true },
-                onGarage = { garageOpen = true },
-                onSettings = { settingsOpen = true },
+                onPlay = { game.menuSound();playOpen = true },
+                onTogether = { game.menuSound();lobbyOpen = true },
+                onStats = { game.menuSound();statsOpen = true },
+                onCards = { game.menuSound();cardsOpen = true },
+                onGarage = { game.menuSound();garageOpen = true },
+                onTree = { game.menuSound();treeOpen=true },
+                onSettings = { game.menuSound();settingsOpen = true },
                 onLogo = if (settings.devUnlocked) {
                     {
                         settingsOpen = true
@@ -295,6 +304,7 @@ fun TesselApp(
                 onDelete = game::discardSave,
                 initialCharacter = settings.tankClass,
                 look = settings.tankLook,
+                onBack = { playOpen=false;game.menuSound() },
                 onNewCharacter = { character ->
                     store.update { it.copy(tankClass = character) }
                     playOpen = false
@@ -449,6 +459,24 @@ fun TesselApp(
             )
         }
 
+        if(treeOpen && !waitingOnSomeone && (mode==Mode.HOME || mode==Mode.SHOP || mode==Mode.PAUSED)) {
+            val currentShop=shop.takeIf { mode==Mode.SHOP }
+            val run=runStats.takeIf { mode==Mode.PAUSED }
+            val mask=currentShop?.perkMask ?: run?.let { summary ->
+                (0 until dev.david.tessel.core.content.Perks.count).fold(0){acc,id ->
+                    if(dev.david.tessel.core.content.Perks.of(id).name in summary.perks) acc or (1 shl id) else acc
+                }
+            } ?: 0
+            dev.david.tessel.ui.screens.SkillTreeScreen(
+                clearedStage=currentShop?.stage ?: ((run?.stage ?: 1)-1).coerceAtLeast(0),
+                mask=mask,
+                available=currentShop?.perkOffers?.filter { it.skill }.orEmpty(),
+                canSpend=currentShop!=null && !currentShop.selfReady,
+                onSpend=game::pickPerk,
+                onBack={treeOpen=false;game.menuSound()},
+                backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home"
+            )
+        }
         // The partner left, or the link never came back, while the lobby screen was closed.
         val ended = lobbyState as? LobbyState.Ended
         if (ended != null && !lobbyOpen) {
@@ -456,8 +484,9 @@ fun TesselApp(
         }
     }
 
-    BackHandler(enabled = settingsOpen || lobbyOpen || statsOpen || cardsOpen || garageOpen || playOpen || mode != Mode.HOME) {
+    BackHandler(enabled = treeOpen || settingsOpen || lobbyOpen || statsOpen || cardsOpen || garageOpen || playOpen || mode != Mode.HOME) {
         when {
+            treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false
             minutesOpen -> minutesOpen = false
             enemiesOpen && devOpen && settingsOpen -> enemiesOpen = false

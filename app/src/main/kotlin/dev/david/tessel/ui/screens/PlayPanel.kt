@@ -52,6 +52,7 @@ fun PlayPanel(
     onNewCharacter: ((CharacterDef) -> Unit)? = null,
     initialCharacter: CharacterDef = CharacterDef.BALANCED,
     look: dev.david.tessel.core.content.TankLook = dev.david.tessel.core.content.TankLook(),
+    onBack: (() -> Unit)? = null,
 ) {
     val c = Theme.colors
     val full = saves.size >= SoloSaves.SLOTS
@@ -64,7 +65,10 @@ fun PlayPanel(
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.x4)) {
                 Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Space.x1)) {
-                    Text("Start a run", Type.title2, c.ink)
+                    Row(verticalAlignment=Alignment.CenterVertically) {
+                        Text("Start a run", Type.title2, c.ink,Modifier.weight(1f))
+                        if(onBack!=null) dev.david.tessel.ui.components.BackButton("Home",onBack)
+                    }
                     Text("Difficulty", Type.footnote, c.ink2)
                     Segmented(Difficulty.entries.map { it.label }, difficulty.ordinal, { onDifficulty(Difficulty.entries[it]) })
                     if (onNewCharacter != null) {

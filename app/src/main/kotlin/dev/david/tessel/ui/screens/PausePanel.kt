@@ -45,6 +45,7 @@ fun PausePanel(
     onLeave: () -> Unit,
     practice: Boolean = false,
     duel: Boolean = false,
+    onTree: (() -> Unit)? = null,
 ) {
     val c = Theme.colors
     var asking by remember { mutableStateOf(Asking.NOTHING) }
@@ -104,6 +105,7 @@ fun PausePanel(
         if (stats != null && !practice) {
             Column(Modifier.weight(1f).padding(top = Space.x1).verticalScroll(rememberScrollState())) {
                 RunStats(stats)
+                if(onTree!=null) SecondaryButton("Skill Tree",onTree,Modifier.fillMaxWidth())
                 if (stats.perks.isNotEmpty()) {
                     Spacer(Modifier.height(Space.x3))
                     Text("Perks: " + stats.perks.joinToString(", "), Type.footnote, c.ink2)

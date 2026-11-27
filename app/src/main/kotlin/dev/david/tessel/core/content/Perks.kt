@@ -59,9 +59,14 @@ object Perks {
 object SkillTree {
     const val ORIGINAL_PERKS = 10
     const val MASK = (1 shl 19) - (1 shl ORIGINAL_PERKS)
-    private val milestones = intArrayOf(7, 13, 19, 26, 32, 38, 44)
+    private val milestones = intArrayOf(3, 13, 19, 26, 32, 38, 44)
     private val roots = intArrayOf(Perks.REFRESH_I, Perks.FORTUNE_I, Perks.TRADE_I)
     fun milestone(stage: Int) = stage in milestones
+    fun earned(stage: Int) = milestones.count { it <= stage }
+    fun nextMilestone(stage: Int) = milestones.firstOrNull { it > stage }
+    fun schedule() = milestones.toList()
+    fun node(branch: Int, rank: Int) = roots[branch] + rank - 1
+    fun name(branch: Int) = listOf("Refresh","Fortune","Trade")[branch]
     fun unspent(stage: Int, mask: Int) = (milestones.count { it <= stage } - Integer.bitCount(mask and MASK)).coerceAtLeast(0)
     fun isNode(id: Int) = id in Perks.REFRESH_I..Perks.TRADE_III
     fun rank(mask: Int, branch: Int): Int {

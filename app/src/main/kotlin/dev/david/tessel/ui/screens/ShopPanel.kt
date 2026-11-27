@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,10 +55,13 @@ fun ShopPanel(
     onNext: () -> Unit,
     onPerk: (Int) -> Unit = {},
     onLock: (Int, Boolean) -> Unit = { _, _ -> },
+    onTree: (() -> Unit)? = null,
+    onSave: (() -> Unit)? = null,
 ) {
     val c = Theme.colors
     val view = LocalView.current
     val tap = { if (vibrate) view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
+    var confirmExit by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Column(
         Modifier
@@ -69,27 +74,33 @@ fun ShopPanel(
                 Text("Health ${shop.hp} of ${shop.maxHp}$team", Type.footnote.merge(Type.numbers), c.ink2)
             }
             CoinAmount(shop.coins, style = Type.title3)
+            if(onSave!=null) dev.david.tessel.ui.components.BackButton("Exit", { confirmExit=true })
         }
         Spacer(Modifier.height(Space.x2))
+        if(confirmExit) {
+            Text(if(shop.coop) "Save and stop for everyone?" else "Save this shop and return home?",Type.subhead,c.ink)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                dev.david.tessel.ui.components.SecondaryButton("Cancel",{confirmExit=false},Modifier.weight(1f))
+                PrimaryButton("Save & Exit",{confirmExit=false;onSave?.invoke()},Modifier.weight(1f))
+            }
+            return@Column
+        }
 
         Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
-        // Run skill tree: ranks are visible even between skill milestones.
         val skills = shop.perkOffers.any { it.skill }
-        if (shop.stage >= 7) {
-            Text("Run skill tree", Type.headline, c.ink)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val labels = listOf("Refresh", "Fortune", "Trade")
-                for (branch in 0..2) {
-                    Column(Modifier.weight(1f)) {
-                        Text(labels[branch], Type.footnote, c.ink2)
-                        LevelPips(SkillTree.rank(shop.perkMask, branch), 3)
-                    }
+        val points=SkillTree.unspent(shop.stage,shop.perkMask)
+        if(onTree!=null) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text("Run skill tree",Type.headline,c.ink)
+                    Text(if(points>0) "$points point(s) available" else SkillTree.nextMilestone(shop.stage)?.let{"Next point: stage $it"} ?: "All milestones reached",Type.footnote,c.ink2)
                 }
+                dev.david.tessel.ui.components.SecondaryButton(if(points>0)"Spend Points" else "View Tree",onTree,Modifier.weight(1f),tint=c.accent)
             }
             Spacer(Modifier.height(Space.x2))
         }
         // A milestone or boss reward must be chosen before shopping.
-        if (shop.perkOffers.isNotEmpty()) {
+        if (shop.perkOffers.isNotEmpty() && (!skills || onTree==null)) {
             Text(if(shop.perkOffers.any { it.evolution!=null }) "Choose a Tank Evolution" else if(skills) "Spend 1 skill point" else "Choose a Perk", Type.headline, c.ink)
             Text(if(skills) "Choose the next rank in one branch. Resets on a new run." else "It stays for the rest of the run.", Type.footnote, c.ink3)
             Spacer(Modifier.height(Space.x2))
@@ -99,7 +110,7 @@ fun ShopPanel(
                         name = offer.name,
                         blurb = offer.blurb,
                         tint = c.perk,
-                        enabled = true,
+                        enabled = !shop.selfReady,
                         faded = false,
                         onClick = {
                             tap()
@@ -117,6 +128,7 @@ fun ShopPanel(
             Spacer(Modifier.height(Space.x4))
         }
 
+        if (skills && onTree!=null) Text("Unlock a skill to continue to the shop.",Type.subhead,c.ink2)
         if (shop.perkOffers.isEmpty()) {
             if (shop.offers.all { it.empty || it.maxed } && !shop.canReroll)
                 Text("No cards available right now. Heal, refresh when affordable, or continue.", Type.footnote, c.ink3)

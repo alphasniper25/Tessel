@@ -421,6 +421,8 @@ class Renderer(private val density: Float, palette: Palette) {
             fill.color=if(paint==0)playerBody else paint;fill.alpha=255
             dronePath.reset();dronePath.moveTo(x+dx*r,y+dy*r);dronePath.lineTo(x-dx*r*.72f-dy*r*.72f,y-dy*r*.72f+dx*r*.72f);dronePath.lineTo(x-dx*r*.72f+dy*r*.72f,y-dy*r*.72f-dx*r*.72f);dronePath.close();canvas.drawPath(dronePath,fill)
             if(w.playerCount>1){line.color=teamColors[p%teamColors.size];line.strokeWidth=1.2f*density;line.alpha=255;canvas.drawPath(dronePath,line)}
+            val spec=pl.evolution[p].droneSpec
+            if(spec!=null && d.hp[i]<spec.hp){fill.color=palette.raised;canvas.drawRect(x-r,y+r+2f,x+r,y+r+4f,fill);fill.color=palette.ink;canvas.drawRect(x-r,y+r+2f,x-r+2*r*d.hp[i]/spec.hp,y+r+4f,fill)}
         }
     }
     private fun drawTeammateMarkers(canvas:Canvas,w:World,view:Viewport,me:Int){
@@ -460,7 +462,7 @@ class Renderer(private val density: Float, palette: Palette) {
         fill.color=if(fraction <= .25f) palette.danger else if(w.playerCount > 1) teamColors[p % teamColors.size] else palette.ink
         if(fraction>0f) canvas.drawRoundRect(x-half,y,x-half+2*half*fraction,y+h,h/2,h/2,fill)
         hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(w.playerCount > 1) (names.getOrNull(p) ?: "P${p+1}") else "").put(if(w.playerCount > 1) "  " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
-        pl.evolution[p].droneSpec?.let { spec -> hpBuf.clear().put(w.droneWing.count(p)).put("/").put(spec.cap);canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y+h+11*density,hpText) }
+        pl.evolution[p].droneSpec?.let { spec -> hpBuf.clear().put("Drones ").put(w.droneWing.count(p)).put("/").put(spec.cap);canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y+h+11*density,hpText) }
     }
 
     /**

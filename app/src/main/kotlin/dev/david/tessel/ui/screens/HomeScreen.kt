@@ -45,6 +45,7 @@ fun HomeScreen(
     onLogo: (() -> Unit)? = null,
     onCards: () -> Unit = {},
     onGarage: () -> Unit = {},
+    onTree: () -> Unit = {},
 ) {
     val c = Theme.colors
     Row(
@@ -65,7 +66,8 @@ fun HomeScreen(
                     .then(if (onLogo == null) Modifier else Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onLogo() }),
             )
             Spacer(Modifier.height(Space.x2))
-            Text("Tessel", Type.largeTitle, c.ink)
+            Text("TESSEL", Type.largeTitle, c.ink)
+            Text("ARENA SURVIVAL  /  ALPHA 12",Type.caption,c.accent)
             Spacer(Modifier.height(Space.x2))
             val best = ledger.bestOverall()
             val line = if (best == null) {
@@ -87,8 +89,9 @@ fun HomeScreen(
                 SecondaryButton("Play Together", onTogether, Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
                     SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
-                    SecondaryButton("Cards & Missions", onCards, Modifier.weight(1f))
+                    SecondaryButton("Tank & Card Codex", onCards, Modifier.weight(1f))
                 }
+                SecondaryButton("Skill Tree",onTree,Modifier.fillMaxWidth(),tint=c.accent)
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
                     SecondaryButton("Statistics", onStats, Modifier.weight(1f))
                     SecondaryButton("Settings", onSettings, Modifier.weight(1f))

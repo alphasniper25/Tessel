@@ -39,7 +39,7 @@ class ShopOffer(
 )
 
 /** One perk on offer after a boss. */
-class PerkOffer(val slot: Int, val name: String, val blurb: String, val evolution: dev.david.tessel.core.content.TankEvolution? = null, val skill: Boolean = false)
+class PerkOffer(val slot: Int, val name: String, val blurb: String, val evolution: dev.david.tessel.core.content.TankEvolution? = null, val skill: Boolean = false, val id: Int = -1)
 
 class ShopView(
     val stage: Int,

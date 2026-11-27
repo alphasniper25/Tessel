@@ -48,7 +48,9 @@ import dev.david.tessel.core.stats.RunEntry
 import dev.david.tessel.core.stats.Tally
 import dev.david.tessel.core.tutorial.Tutorial
 import dev.david.tessel.design.Palette
+import dev.david.tessel.core.audio.Synth
 import dev.david.tessel.core.audio.Synth.Sound
+import dev.david.tessel.core.sim.CoreFight
 import dev.david.tessel.platform.audio.Haptics
 import dev.david.tessel.platform.audio.Sfx
 import dev.david.tessel.platform.dev.Trace
@@ -94,6 +96,13 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private val shards = Shards()
     private val haptics = Haptics(context)
     private val sfx = Sfx(context)
+    private var lastSurgeSound = 0
+    private var lastWarning = false
+    private var lastDroneCount = 0
+    private var lastDroneHits = 0
+    private var lastRamDamage = 0f
+    private var shopSoundPending: Sound? = null
+    private var shopSoundAt = 0L
     private val stats = FrameStats()
     private val inputs = Array(MAX_PLAYERS) { PlayerInput() }
     private val moveView = StickView()
@@ -523,32 +532,34 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     fun buy(slot: Int) = onGameThread {
         if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
-        if (playingAs == Role.CLIENT) client?.action(Wire.BUY, slot)
-        else if (world.shop.buy(world, HOST_PLAYER, slot)) { publishShop(); keep() }
+        if (playingAs == Role.CLIENT) { pendingShopSound(Sound.BUY);client?.action(Wire.BUY, slot) }
+        else if (world.shop.buy(world, HOST_PLAYER, slot)) { shopSound(Sound.BUY);publishShop(); keep() }
     }
 
     fun setCardLocked(slot: Int, locked: Boolean) = onGameThread {
         if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
-        if (playingAs == Role.CLIENT) client?.action(if (locked) Wire.LOCK_CARD else Wire.UNLOCK_CARD, slot)
-        else if (world.shop.setLocked(world, HOST_PLAYER, slot, locked)) { publishShop(); keep() }
+        if (playingAs == Role.CLIENT) { pendingShopSound(if(locked)Sound.LOCK else Sound.UNLOCK);client?.action(if (locked) Wire.LOCK_CARD else Wire.UNLOCK_CARD, slot) }
+        else if (world.shop.setLocked(world, HOST_PLAYER, slot, locked)) { shopSound(if(locked)Sound.LOCK else Sound.UNLOCK);publishShop(); keep() }
     }
 
     fun pickPerk(slot: Int) = onGameThread {
         if (current != Mode.SHOP) return@onGameThread
-        if (playingAs == Role.CLIENT) client?.action(Wire.PERK, slot)
-        else if (world.shop.pickPerk(world, HOST_PLAYER, slot)) { publishShop(); keep() }
+        val offer=shopFlow.value?.perkOffers?.firstOrNull { it.slot==slot }
+        val sound=if(offer?.evolution!=null)Sound.EVOLVE else Sound.SKILL
+        if (playingAs == Role.CLIENT) { pendingShopSound(sound);client?.action(Wire.PERK, slot) }
+        else if (world.shop.pickPerk(world, HOST_PLAYER, slot)) { shopSound(sound);publishShop(); keep() }
     }
 
     fun heal() = onGameThread {
         if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
-        if (playingAs == Role.CLIENT) client?.action(Wire.HEAL)
-        else if (world.shop.heal(world, HOST_PLAYER)) { publishShop(); keep() }
+        if (playingAs == Role.CLIENT) { pendingShopSound(Sound.HEAL);client?.action(Wire.HEAL) }
+        else if (world.shop.heal(world, HOST_PLAYER)) { shopSound(Sound.HEAL);publishShop(); keep() }
     }
 
     fun reroll() = onGameThread {
         if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
-        if (playingAs == Role.CLIENT) client?.action(Wire.REROLL)
-        else if (world.shop.reroll(world, HOST_PLAYER)) { publishShop(); keep() }
+        if (playingAs == Role.CLIENT) { pendingShopSound(Sound.REROLL);client?.action(Wire.REROLL) }
+        else if (world.shop.reroll(world, HOST_PLAYER)) { shopSound(Sound.REROLL);publishShop(); keep() }
     }
 
     /** Alone this starts the next stage; in co-op it marks this player ready. */
@@ -614,6 +625,11 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     /** For the readout: 4 for a direct link, otherwise what Nearby reported. */
     private fun qualityOf(player: Int) = if (direct[player]) 4 else linkQuality[player]
 
+    fun menuSound() = onGameThread { if(sfx.uiEnabled) sfx.play(Sound.MENU,SystemClock.uptimeMillis(),55L,.75f) }
+
+    private fun shopSound(sound: Sound) { if(sfx.uiEnabled) sfx.play(sound,SystemClock.uptimeMillis(),60L,.9f) }
+    private fun pendingShopSound(sound: Sound) { shopSoundPending=sound;shopSoundAt=SystemClock.uptimeMillis();shopSound(Sound.MENU) }
+
     fun applySettings(s: Settings) {
         preferredCharacter = s.tankClass
         preferredLook = s.tankLook
@@ -622,6 +638,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         haptics.enabled = s.vibration
         haptics.shots = s.shotVibration
         sfx.enabled = s.sound
+        sfx.master = s.soundVolume / 100f
+        sfx.uiEnabled = s.menuSounds
         handler.post {
             renderer.stickRadius = controller.stickRadius
             renderer.showStats = s.showStats
@@ -773,6 +791,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             val en = shown.enemies
             for (i in 0 until en.count) tally.see(en.type[i], shown.stage)
         }
+        if(current==Mode.PLAYING) combatAudio(shown,now)
         shards.update(usable / 1e9f)
         val blend = if (playingAs != Role.CLIENT && current == Mode.PLAYING) pendingNanos.toFloat() / STEP_NANOS else 1f
         val drawStart = System.nanoTime()
@@ -992,22 +1011,41 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         return Scoring.total(s.difficulty, s.tick / TICK_HZ, cleared, s.bossesDown, s.points[p], s.bought[p], s.revived[p])
     }
 
+    private fun combatAudio(shown: World,now: Long) {
+        val snap=if(playingAs==Role.CLIENT) client?.latest else null
+        val surge=snap?.surge?.get(me) ?: shown.players.surge[me]
+        if(surge>0 && lastSurgeSound==0) sfx.play(Sound.SURGE,now,400L,.9f)
+        lastSurgeSound=surge
+        val warn=shown.core.strike==CoreFight.STRIKE_WARN || shown.core.hazards.warning>0
+        if(warn && !lastWarning) sfx.play(Sound.WARNING,now,300L,.85f)
+        lastWarning=warn
+        val drones=shown.droneWing.count(me)
+        if(drones>lastDroneCount) sfx.play(Sound.DRONE,now,250L,.45f)
+        lastDroneCount=drones
+        val hits=snap?.fired?.get(me) ?: shown.players.fired[me]
+        val damage=snap?.dealt?.get(me) ?: shown.players.dealt[me]
+        if(shown.players.evolution[me].drones && hits>lastDroneHits) sfx.play(Sound.DRONE,now,120L,.8f)
+        if(shown.players.evolution[me].melee && damage>lastRamDamage) sfx.play(Sound.RAM,now,150L,.85f)
+        lastDroneHits=hits;lastRamDamage=damage
+    }
+
     /** Turns what happened this frame into shards, haptics and menu changes, then forgets it. */
     private fun react(ev: Events, now: Long) {
         for (i in 0 until ev.count) {
             when (ev.kind[i]) {
                 Events.SHOT -> if (ev.who[i] == me) {
                     haptics.shot(now)
-                    sfx.play(Sound.SHOT, now, 60L, 0.7f)
+                    val frame=if(playingAs==Role.CLIENT) client?.latest?.evolution?.get(me) ?: TankEvolution.BASIC else world.players.evolution[me]
+                    sfx.play(Synth.weapon(frame), now, 65L, .72f)
                 }
-                Events.ENEMY_HIT -> sfx.play(Sound.HIT, now, 45L, 0.6f)
+                Events.ENEMY_HIT -> sfx.play(Sound.HIT, now, 60L, .50f)
                 Events.COIN -> if (ev.who[i] == me) sfx.play(Sound.COIN, now, 35L, 0.8f)
                 Events.STAGE_CLEAR -> sfx.play(Sound.CLEAR, now)
                 Events.ENEMY_KILLED, Events.ENEMY_GONE -> {
                     val type = ev.who[i]
                     if (type !in 0 until Bestiary.size) continue
                     val def = Bestiary.of(type)
-                    sfx.play(Sound.KILL, now, 30L, if (def.boss) 1f else 0.8f)
+                    if(ev.kind[i]==Events.ENEMY_KILLED && !def.boss) sfx.play(Sound.KILL, now, 65L, .65f)
                     tally.defeat(type, stageNow)
                     shards.burst(
                         def.shape, ev.x[i], ev.y[i], def.radius, ev.angle[i], ev.dx[i], ev.dy[i],
@@ -1020,17 +1058,19 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                     hud.announce(ev.who[i], now)
                     haptics.down()
                 }
-                Events.BOSS_DOWN -> haptics.down()
+                Events.BOSS_DOWN -> { haptics.down();sfx.play(Sound.BOSS_DOWN,now,250L) }
                 Events.PERK_STOLEN -> if (ev.who[i] == me) {
+                    sfx.play(Sound.PERK_LOST,now,200L)
                     hud.notice("Core stole ${Perks.of(ev.ref[i].coerceIn(0, Perks.count - 1)).name}", now)
                     haptics.hurt()
                 }
                 Events.PERK_BACK -> if (ev.who[i] == me) {
+                    sfx.play(Sound.SKILL,now,200L)
                     hud.notice("Got back ${Perks.of(ev.ref[i].coerceIn(0, Perks.count - 1)).name}", now)
                 }
                 Events.CORE_CHANGE -> {
                     hud.notice("The Core calls the other bosses", now)
-                    sfx.play(Sound.BOSS, now)
+                    sfx.play(Sound.CORE_CHANGE, now)
                     haptics.down()
                 }
                 Events.PLAYER_HIT -> if (ev.who[i] == me) {
@@ -1041,7 +1081,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                     haptics.down()
                     sfx.play(Sound.DOWN, now)
                 }
-                Events.REVIVED -> if (ev.who[i] == me) haptics.hurt()
+                Events.REVIVED -> if (ev.who[i] == me) { haptics.hurt();sfx.play(Sound.REVIVE,now) }
+                Events.STAGE_START -> sfx.play(Sound.START,now,250L,.65f)
                 Events.SHOP_OPEN -> if (playingAs != Role.CLIENT) {
                     host?.clearReady()
                     keep()
@@ -1193,6 +1234,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         shopFlow.value = null
         summaryFlow.value = null
         clientShopKey = 0
+        lastSurgeSound=0;lastWarning=false;lastDroneCount=0;lastDroneHits=0;lastRamDamage=0f;shopSoundPending=null
         restartClock()
         enter(Mode.PLAYING)
     }
@@ -1253,7 +1295,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it)) }
+            s.rewardOffer(me, k).takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it), it) }
         }
         val ready = host?.ready ?: 0
         publishedReady = ready
@@ -1299,6 +1341,19 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         for (k in 0 until TankEvolution.REWARD_SLOTS) key = key * 31 + s.perkOffer[k]
         if (key == clientShopKey && shopFlow.value != null) return
         clientShopKey = key
+        val prior=shopFlow.value
+        shopSoundPending?.let { sound ->
+            val changed=prior!=null && prior.stage==s.stage && when(sound) {
+                Sound.BUY -> s.coins[me]<prior.coins && prior.offers.any{!it.empty && s.shopItem[it.slot]<0}
+                Sound.HEAL -> s.healsLeft<prior.healsLeft
+                Sound.REROLL -> s.rerollPrice!=prior.rerollPrice || prior.offers.any{ s.shopItem[it.slot]>=0 && (Upgrades.of(s.shopItem[it.slot]).name!=it.name || s.shopRarity[it.slot]!=it.rarity) }
+                Sound.LOCK,Sound.UNLOCK -> prior.offers.any{it.locked!=s.shopLocked[it.slot]}
+                Sound.SKILL,Sound.EVOLVE -> s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
+                else -> false
+            }
+            if(changed && SystemClock.uptimeMillis()-shopSoundAt<2000L) shopSound(sound)
+            if(changed || SystemClock.uptimeMillis()-shopSoundAt>=2000L) shopSoundPending=null
+        }
 
         val offers = ArrayList<ShopOffer>(SHOP_SLOTS)
         for (slot in 0 until SHOP_SLOTS) {
@@ -1320,7 +1375,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
-            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it)) }
+            s.perkOffer[k].takeIf { it >= 0 }?.let { PerkOffer(k, TankEvolution.rewardName(it), TankEvolution.rewardDetail(it), TankEvolution.fromReward(it), SkillTree.isNode(it), it) }
         }
         shopFlow.value = ShopView(
             stage = s.stage,
@@ -1352,6 +1407,14 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         // Anything but playing is a safe moment to put what was met and beaten on record.
         if (mode != Mode.PLAYING) flushLog()
         if (mode != Mode.PAUSED) breaking = false
+        if (mode != current) {
+            if(mode==Mode.SHOP) shopSound(Sound.SHOP)
+            if(mode==Mode.OVER) {
+                val won=if(playingAs==Role.CLIENT) client?.latest?.victory==true else world.victory
+                sfx.play(if(won)Sound.WIN else Sound.LOSS,SystemClock.uptimeMillis(),500L)
+            }
+            if(mode!=Mode.SHOP) shopSoundPending=null
+        }
         if (mode != current) Trace.log("mode $current to $mode, role=$playingAs")
         current = mode
         if (mode != Mode.HOME) wake()

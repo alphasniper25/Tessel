@@ -110,7 +110,7 @@ class Shop {
         val k = offers.getOrNull(p)?.getOrNull(slot) ?: return false
         if (k < 0 || w.players.has(p,k)) return false
         val pl = w.players
-        if (SkillTree.isNode(k) && (0..2).none { SkillTree.next(pl.perks[p], it) == k }) return false
+        if (SkillTree.isNode(k) && (SkillTree.unspent(w.stage,pl.perks[p]) <= 0 || (0..2).none { SkillTree.next(pl.perks[p], it) == k })) return false
         pl.perks[p] = pl.perks[p] or (1 shl k)
         if (k == Perks.THICK_SKIN) {
             pl.maxHp[p] += 2

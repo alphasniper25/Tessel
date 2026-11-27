@@ -125,7 +125,7 @@ class Hud(private val density: Float, fontScale: Float) {
         fill.color = palette.coin
         canvas.drawCircle(left + 6f * density, coinRow, 6f * density, fill)
         number.color = palette.ink
-        buf.clear().put(pl.coins[me])
+        buf.clear().putGrouped(pl.coins[me])
         canvas.drawText(buf.chars, 0, buf.length, left + 18f * density, coinRow + number.textSize * 0.35f, number)
 
         if (practice) return
@@ -282,7 +282,7 @@ class Hud(private val density: Float, fontScale: Float) {
         stageLabel.color = palette.ink
         val boss = if (w.phase == Phase.FIGHT) w.bossType() else -1
         when {
-            boss >= 0 -> canvas.drawText(Bestiary.of(boss).name, cx, baseline, stageLabel)
+            boss >= 0 -> { buf.clear().put("Stage ").put(w.stage).put(" · ").put(Bestiary.of(boss).name);canvas.drawText(buf.chars,0,buf.length,cx,baseline,stageLabel) }
             w.phase == Phase.CLEAR -> canvas.drawText("Clear the arena", cx, baseline, stageLabel)
             else -> {
                 buf.clear().put("Stage ").put(w.stage)
@@ -299,7 +299,7 @@ class Hud(private val density: Float, fontScale: Float) {
         fill.alpha = TRACK_ALPHA
         canvas.drawRoundRect(left, top, left + width, top + height, round, round, fill)
         fill.alpha = 255
-        fill.color = palette.ink
+        fill.color = if(boss>=0) palette.danger else palette.ink
         // A boss stage has no clock: the bar is the boss's health, draining.
         val share = when {
             boss >= 0 -> w.bossHealth()
@@ -344,12 +344,12 @@ class Hud(private val density: Float, fontScale: Float) {
             }
             if (message != null) {
                 note.color = palette.danger
-                canvas.drawText(message, cx, insetTop + 62f * density, note)
+                canvas.drawText(message, cx, insetTop + (if(w.stage==50) 98f else 62f) * density, note)
             }
         }
         tag?.let {
             note.color = palette.ink3
-            canvas.drawText(it, cx, insetTop + 62f * density, note)
+            canvas.drawText(it, cx, insetTop + (if(w.stage==50) 118f else 82f) * density, note)
         }
     }
 
