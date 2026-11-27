@@ -34,6 +34,7 @@ class Pipe(
     private val lock = Object()
     private val queue = ArrayDeque<ByteArray>()
     private var latestWaiting: ByteArray? = null
+    private var queuedBytes = 0L
     private val closed = AtomicBoolean(false)
 
     private val gate = Any()
@@ -53,12 +54,13 @@ class Pipe(
         synchronized(lock) {
             if (closed.get()) return false
             if (latest && latestWaiting != null) return false
-            if (queue.size >= MAX_QUEUED) {
+            if (queue.size >= MAX_QUEUED || queuedBytes + bytes.size > MAX_QUEUED_BYTES) {
                 // The other side stopped taking messages. Better to fall back than to pile up.
                 close()
                 return false
             }
             queue.addLast(bytes)
+            queuedBytes += bytes.size
             if (latest) latestWaiting = bytes
             lock.notifyAll()
         }
@@ -109,6 +111,7 @@ class Pipe(
                 synchronized(lock) {
                     if (queue.isEmpty() && !closed.get()) lock.wait(KEEPALIVE_MS)
                     while (queue.isNotEmpty()) batch += queue.removeFirst()
+                    queuedBytes = 0L
                     latest = latestWaiting
                 }
                 if (closed.get()) break
@@ -140,7 +143,9 @@ class Pipe(
         const val KEEPALIVE_MS = 400L
 
         const val MAX_FRAME = MAX_MESSAGE * 2
-        const val MAX_QUEUED = 256
+        // Allow a full reliable control-message burst while bounding stalled-link memory.
+        const val MAX_QUEUED = 512
+        const val MAX_QUEUED_BYTES = 4L * 1024 * 1024
         private const val BUFFER = 64 * 1024
     }
 }

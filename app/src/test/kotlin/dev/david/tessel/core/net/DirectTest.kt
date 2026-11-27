@@ -58,6 +58,22 @@ class DirectTest {
     }
 
     @Test
+    fun reliableQueueAcceptsBurstButRemainsBounded() {
+        val closed = CountDownLatch(1)
+        val pipe = Pipe(Socket(), {}, { closed.countDown() })
+        // Intentionally do not start a writer: exercise deterministic worst-case queue occupancy.
+        repeat(Pipe.MAX_QUEUED) { assertTrue(pipe.send(byteArrayOf(1), latest = false)) }
+        assertFalse(pipe.send(byteArrayOf(2), latest = false))
+        assertTrue(pipe.isClosed)
+        assertTrue(closed.await(1, SECONDS))
+        val large = Pipe(Socket(), {}, {})
+        val frame = ByteArray(MAX_MESSAGE)
+        repeat((Pipe.MAX_QUEUED_BYTES / MAX_MESSAGE).toInt()) { assertTrue(large.send(frame, latest = false)) }
+        assertFalse(large.send(frame, latest = false))
+        assertTrue(large.isClosed)
+    }
+
+    @Test
     fun messagesWaitUntilThePipeIsOpened() {
         val e = connect()
         e.host.open()

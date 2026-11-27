@@ -50,7 +50,9 @@ class DifficultyTest {
             val i = w.spawnEnemy(Bestiary.HEXARCH, 800f, 200f)
             return w.enemies.maxHp[i]
         }
-        assertTrue(bossHp(Difficulty.EASY) < bossHp(Difficulty.NORMAL) * 0.7f)
+        // Arsenal keeps the alpha.8 Normal boss multiplier (.59); Easy (.45) is ~24% softer.
+        assertTrue(bossHp(Difficulty.EASY) < bossHp(Difficulty.NORMAL) * 0.8f)
+        assertTrue(bossHp(Difficulty.NORMAL) < bossHp(Difficulty.HARD))
         assertTrue(bossHp(Difficulty.IMPOSSIBLE) > bossHp(Difficulty.HARD))
     }
 

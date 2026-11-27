@@ -246,7 +246,7 @@ object Bestiary {
             move=Move.ORBIT, range=180f, attack=Attack.RING, every=2.2f, shots=8, shotSpeed=170f, from=24, weight=.85f, spin=1.1f, deathRing=6, blurb="Orbits, pulses rings, and bursts on death."),
         EnemyDef("Ember", Shape.DIAMOND, radius=18f, hp=20f, speed=120f, mass=4f, cost=8f, coins=6, hue=350,
             from=16, weight=.40f, group=1, faces=true, status=StatusEffect.BURN, trailEvery=54, blurb="Leaves lingering fire rings. Contact burns."),
-        EnemyDef("Venom", Shape.PENTAGON, radius=19f, hp=24f, speed=82f, mass=4f, cost=9f, coins=7, hue=135,
+        EnemyDef("Venom", Shape.PENTAGON, radius=19f, hp=24f, speed=82f, mass=4f, cost=9f, coins=7, hue=115,
             move=Move.HOVER, range=280f, attack=Attack.AIMED, every=3.2f, shots=1, shotSpeed=180f, from=21, weight=.36f, group=1, faces=true,
             status=StatusEffect.POISON, blurb="Poison ticks three times after a hit."),
         EnemyDef("Frost", Shape.HEXAGON, radius=22f, hp=30f, speed=62f, mass=5f, cost=10f, coins=8, hue=225,

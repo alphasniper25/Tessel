@@ -1,4 +1,4 @@
-> **Fork development:** V1.1.0-alpha.8 — source-only branch refinement and cohort experiment. See [changelog](development/CHANGELOG-1.1.0-alpha.8.md), [evolution guide](development/EVOLUTION_GUIDE.md), and [headless beta harness](development/SIMULATION_GUIDE.md). No APK is authorized for this update. Historical upstream documentation below is retained for attribution and may describe older gameplay.
+> **Fork development:** V1.1.0-alpha.9 — Arsenal beta candidate. See [changelog](development/CHANGELOG-1.1.0-alpha.9.md), [evolution guide](development/EVOLUTION_GUIDE.md), and [headless beta harness](development/SIMULATION_GUIDE.md). Historical upstream documentation below is retained for attribution and may describe older gameplay.
 
 # Tessel
 
