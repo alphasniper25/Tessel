@@ -110,9 +110,9 @@ abstract class MenuGalleryBase {
             perkOffers=rewardOverride?:rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
             devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
-    @Composable fun Market(s:ShopView,onPerk:(Int)->Unit={}){
+    @Composable fun Market(s:ShopView,onReroll:()->Unit={},onPerk:(Int)->Unit={}){
         currentShop=s
-        RunShopScreen(s,false,{}, {}, {}, {}, onPerk, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
+        RunShopScreen(s,false,{}, {}, onReroll, {}, onPerk, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
     }
 }
 @RunWith(RobolectricTestRunner::class)
@@ -223,7 +223,7 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         capture("72-before-final-perk")
         compose.mainClock.autoAdvance=false
         compose.onAllNodesWithText("Take")[0].performClick()
-        capture("73-fusion-reveal-lines",240)
+        capture("73-fusion-reveal-pulse",240)
         capture("74-fusion-reveal-node",360)
         capture("75-fusion-reveal-settled",1000)
         compose.mainClock.autoAdvance=true
@@ -232,6 +232,19 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         show{Market(sampleShop(stage=17,wallet=420,repeatMagnet=true))}
         capture("76-upgrade-full-circle-mesh")
         click("+");capture("77-upgrade-full-circle-zoom")
+    }
+    @Test fun fullCatalogAndReroll(){
+        val initial=sampleShop(stage=17,wallet=420,repeatMagnet=true)
+        val new=sampleShop(stage=17,wallet=410)
+        var live by mutableStateOf(initial)
+        // The real Compose screen receives a representative post-reroll shop
+        // snapshot; engine reroll itself is verified by the Shop unit tests.
+        show{Market(live,onReroll={live=new})}
+        capture("78-full-upgrade-catalog")
+        click("Reroll · ${initial.rerollPrice}");capture("79-upgrade-rerolled")
+        tapUpgrade(Upgrades.MAGNET);capture("80-unrolled-upgrade-inspection")
+        click("×");click("Skills");capture("81-skills-no-lines")
+        click("Perks");capture("82-perks-no-lines")
     }
     @Test fun roundThreeChoices(){
         show{Market(sampleShop(stage=30,perks=PerkCombo.LAST_LIGHT.mask,reward=1))}

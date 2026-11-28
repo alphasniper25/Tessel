@@ -34,14 +34,63 @@ object UpgradeMap {
         val ids=groups.flatMap{group->(0 until Upgrades.count).filter{(includeLegacy||!legacy(it))&&Upgrades.of(it).family==group}}
         return ids.mapIndexed{i,id->val (x,y)=point(FIRST_RADIUS,-90f+360f*i/ids.size);UpgradePosition(id,x,y,Upgrades.of(id).family)}
     }
-    fun ranks(anchor:UpgradePosition,positions:List<UpgradePosition>,cap:Int=Upgrades.runCap(anchor.id)):List<RankPosition>{
-        val a=atan2(anchor.y,anchor.x)
-        return (1..cap).map{rank->val r=FIRST_RADIUS+(rank-1)*RANK_STEP;RankPosition(rank,r*cos(a),r*sin(a))}
+    /** Complete catalog, not just the owned/rolled frontier. Keep the original
+     * type ring, then pack all remaining ranks into successive concentric rings.
+     * Each ring allocates contiguous runs of equal-sized nodes to upgrade types.
+     * Allocation uses caps only, so purchases and rerolls never move a node. */
+    private fun layout(positions:List<UpgradePosition>):Map<Int,List<RankPosition>>{
+        val out=positions.associate{it.id to mutableListOf(RankPosition(1,it.x,it.y))}
+        var ring=1
+        while(true){
+            val active=positions.filter{out.getValue(it.id).size<Upgrades.runCap(it.id)}
+            if(active.isEmpty())break
+            val radius=FIRST_RADIUS+ring*RANK_STEP
+            // Chord spacing leaves at least 8 units between node borders.
+            val capacity=(PI/asin((NODE_RADIUS+4f)/radius.toDouble())).toInt()
+            val remaining=active.associate{it.id to Upgrades.runCap(it.id)-out.getValue(it.id).size}
+            val slots=active.associate{it.id to 1}.toMutableMap()
+            val count=minOf(capacity,remaining.values.sum())
+            check(count>=active.size)
+            repeat(count-active.size){
+                val next=active.filter{slots.getValue(it.id)<remaining.getValue(it.id)}
+                    .maxByOrNull{remaining.getValue(it.id).toDouble()/(slots.getValue(it.id)+1)}!!
+                slots[next.id]=slots.getValue(next.id)+1
+            }
+            // Stable ordered arcs; rotate the ring toward the original type
+            // bearings so long tracks fill outer space without enormous spokes.
+            val step=360f/count
+            var at=0;var dx=0.0;var dy=0.0
+            for(n in active){
+                val size=slots.getValue(n.id)
+                val desired=atan2(n.y,n.x)*180.0/PI
+                val delta=(desired-(-90f+(at+(size-1)*.5f)*step))*PI/180
+                dx+=size*cos(delta);dy+=size*sin(delta);at+=size
+            }
+            val rotation=(atan2(dy,dx)*180.0/PI).toFloat()
+            at=0
+            for(n in active){
+                val row=out.getValue(n.id)
+                repeat(slots.getValue(n.id)){
+                    val (x,y)=point(radius,-90f+rotation+step*at++)
+                    row.add(RankPosition(row.size+1,x,y))
+                }
+            }
+            ring++
+        }
+        return out
     }
-    fun visibleCount(cap:Int,owned:Int,offered:Int)=minOf(cap,maxOf(1,owned+maxOf(1,offered)))
+    private val regularLayout by lazy{layout(positions(false))}
+    private val developerLayout by lazy{layout(positions(true))}
+    fun ranks(anchor:UpgradePosition,positions:List<UpgradePosition>,cap:Int=Upgrades.runCap(anchor.id)):List<RankPosition>{
+        val catalog=if(positions.any{legacy(it.id)})developerLayout else regularLayout
+        return catalog.getValue(anchor.id).take(cap)
+    }
+    fun rankCount(includeLegacy:Boolean=false)=positions(includeLegacy).sumOf{Upgrades.runCap(it.id)}
+    fun visibleCount(cap:Int,owned:Int,offered:Int)=cap.coerceAtLeast(0)
     fun extent(owned:List<Int>,offers:Map<Int,Int>,includeLegacy:Boolean=false):Float{
-        val visible=positions(includeLegacy).maxOf{visibleCount(Upgrades.runCap(it.id),owned.getOrElse(it.id){0},offers[it.id]?:0)}
-        return maxOf(WIDTH,2f*(FIRST_RADIUS+(visible-1)*RANK_STEP+100f))
+        val all=if(includeLegacy)developerLayout else regularLayout
+        val radius=all.values.maxOf{nodes->nodes.maxOf{hypot(it.x,it.y)}}
+        return maxOf(WIDTH,2f*(radius+80f))
     }
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
         for(group in groups){

@@ -35,16 +35,20 @@ class RadialUpgradeMapTest {
             for(root in roots){
                 val ranks=UpgradeMap.ranks(root,roots)
                 assertEquals(Upgrades.runCap(root.id),ranks.size)
-                for((i,n) in ranks.withIndex())assertEquals(UpgradeMap.FIRST_RADIUS+i*UpgradeMap.RANK_STEP,hypot(n.x,n.y),.002f)
+                assertEquals(UpgradeMap.FIRST_RADIUS,hypot(ranks.first().x,ranks.first().y),.002f)
+                for((a,b) in ranks.zipWithNext())assertTrue(hypot(b.x,b.y)+.002f>=hypot(a.x,a.y))
             }
             for(i in all.indices)for(j in i+1 until all.size){
                 val a=all[i];val b=all[j]
                 assertTrue(hypot(a.x-b.x,a.y-b.y)>2*UpgradeMap.NODE_RADIUS)
             }
-            assertTrue(UpgradeMap.extent(List(Upgrades.count){0},emptyMap(),dev)<=1080f)
-            val expanded=UpgradeMap.extent(List(Upgrades.count){if(it==Upgrades.MAGNET)5 else 0},mapOf(Upgrades.MAGNET to 3),dev)
-            assertTrue(expanded>1080f)
-            assertEquals(8,UpgradeMap.visibleCount(8,5,3))
+            val whole=UpgradeMap.extent(List(Upgrades.count){0},emptyMap(),dev)
+            val after=UpgradeMap.extent(List(Upgrades.count){if(it==Upgrades.MAGNET)5 else 0},mapOf(Upgrades.MAGNET to 3),dev)
+            assertEquals(whole,after,0f)
+            assertTrue(whole<2200f)
+            assertEquals(UpgradeMap.rankCount(dev),all.size)
+            assertEquals(8,UpgradeMap.visibleCount(8,0,0))
+            assertTrue(all.all{hypot(it.x,it.y)+UpgradeMap.NODE_RADIUS<=whole*.5f})
         }
     }
 }

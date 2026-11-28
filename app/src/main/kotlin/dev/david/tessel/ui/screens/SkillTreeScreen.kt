@@ -1,7 +1,5 @@
 package dev.david.tessel.ui.screens
 
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -19,10 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -69,7 +64,6 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
     }}
     val count=SkillGraph.count(mask)
     val discovered=states.count{it!=SkillVisibility.HIDDEN}
-    val paint=remember{Paint(Paint.ANTI_ALIAS_FLAG).apply{textAlign=Paint.Align.CENTER;typeface=Typeface.DEFAULT_BOLD}}
     val art=remember{TankArt()}
     fun update(next:SkillMapCamera){zoom=next.zoom;px=next.x;py=next.y}
     fun resize(factor:Float){
@@ -116,27 +110,8 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                 fun point(x:Float,y:Float)=Offset(camera.sx(x,w,h),camera.sy(y,w,h))
                 fun point(id:Int):Offset=SkillGraph.nodes[id].let{point(it.x,it.y)}
                 val hub=point(0f,0f)
-                val step=(80f*scale).coerceAtLeast(12f)
-                var gx=((hub.x%step)+step)%step
-                while(gx<w){drawLine(c.ink.copy(alpha=.035f),Offset(gx,0f),Offset(gx,h));gx+=step}
-                var gy=((hub.y%step)+step)%step
-                while(gy<h){drawLine(c.ink.copy(alpha=.035f),Offset(0f,gy),Offset(w,gy));gy+=step}
-                for(r in listOf(180f,310f,450f,610f,780f))
-                    drawOval(c.ink.copy(alpha=.06f),topLeft=point(-r*1.25f,-r*.67f),size=Size(r*2.5f*scale,r*1.34f*scale),style=Stroke(1.dp.toPx()))
-                for(sector in SkillSector.entries){
-                    val root=sector.ordinal*9;val tint=sectorTint(sector,c.dark)
-                    val owned=states[root]==SkillVisibility.OWNED
-                    drawLine(tint.copy(alpha=if(owned).9f else .43f),hub,point(root),strokeWidth=if(owned)2.dp.toPx() else 1.dp.toPx())
-                }
-                for(edge in SkillGraph.edges){
-                    val a=states[edge.a];val b=states[edge.b]
-                    val both=a==SkillVisibility.OWNED&&b==SkillVisibility.OWNED
-                    val frontier=(a==SkillVisibility.OWNED||b==SkillVisibility.OWNED)&&a!=SkillVisibility.HIDDEN&&b!=SkillVisibility.HIDDEN
-                    // Faint anonymous scaffolding outlines the full map without exposing hidden skills.
-                    val n=SkillGraph.nodes[edge.a]
-                    val tint=if(both||frontier)if(n.bridge||SkillGraph.nodes[edge.b].bridge)c.coin else sectorTint(n.sector,c.dark) else c.ink
-                    drawLine(tint.copy(alpha=if(both).9f else if(frontier).58f else .085f),point(edge.a),point(edge.b),strokeWidth=if(both)2.2.dp.toPx() else 1.dp.toPx())
-                }
+                // The graph still governs purchases/discovery. The overview
+                // deliberately renders only icons, silhouettes and the tank.
                 val hr=(85f*scale).coerceIn(13.dp.toPx(),48.dp.toPx())
                 treeTank(art,hub,hr,character,look,frame,c.ink,c.ground,c.accent)
                 for(n in SkillGraph.nodes){
@@ -158,19 +133,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                     skillGlyph(n.bonus,at,radius*.57f,if(own)c.ground else tint.copy(alpha=if(buy)1f else .82f))
                     if(own)drawCircle(tint,radius*.15f,at+Offset(radius*.78f,-radius*.78f))
                 }
-                // Root sector names remain public, but deeper identities are not disclosed.
-                for(sector in SkillSector.entries){
-                    val outer=SkillGraph.nodes[sector.ordinal*9+8]
-                    val at=point(outer.x*1.055f,outer.y*1.055f)
-                    paint.color=sectorTint(sector,c.dark).copy(alpha=.85f).toArgb()
-                    paint.textSize=9.dp.toPx()
-                    val label=sector.label.uppercase()
-                    val half=paint.measureText(label)*.5f
-                    val x=at.x.coerceIn(half+3f,maxOf(half+3f,w-half-3f))
-                    val dy=if(outer.y<0)-9.dp.toPx() else 12.dp.toPx()
-                    val y=(at.y+dy).coerceIn(paint.textSize+2f,maxOf(paint.textSize+2f,h-3f))
-                    if(at.x in 0f..w&&at.y in 0f..h)drawContext.canvas.nativeCanvas.drawText(label,x,y,paint)
-                }
+
             }
             Row(Modifier.align(Alignment.TopStart).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(3.dp),verticalAlignment=Alignment.CenterVertically){
                 MapButton("−",{resize(.75f)})

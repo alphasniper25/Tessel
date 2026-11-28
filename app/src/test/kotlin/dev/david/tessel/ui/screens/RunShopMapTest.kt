@@ -30,9 +30,10 @@ class RunShopMapTest{
     private var chosen=-1
     private var granted=-1
     private var rank=-1
+    private var rerolled=0
     private fun show(dev:Boolean=false,reward:Boolean=false){
         currentShop=view(dev,reward)
-        compose.setContent{TesselTheme{RunShopScreen(currentShop,false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{id,_->rank=id},{id,_->granted=id},{_,_->})}}
+        compose.setContent{TesselTheme{RunShopScreen(currentShop,false,{bought=it},{},{rerolled++},{},{chosen=it},{_,_->},{},{},{},{id,_->rank=id},{id,_->granted=id},{_,_->})}}
         compose.waitForIdle()
     }
     private fun tap(id:Int,dev:Boolean=false){
@@ -43,12 +44,15 @@ class RunShopMapTest{
         }
         compose.waitForIdle()
     }
-    @Test fun onlyRolledUpgradesCanBeInspectedAndPurchased(){
+    @Test fun allTypesCanBeInspectedButOnlyRolledUpgradesCanBePurchased(){
         show()
         compose.onNodeWithTag("upgrade-map").assertExists()
         compose.onNodeWithText("Damage").assertDoesNotExist()
         tap(Upgrades.FIRE_RATE)
-        compose.onNodeWithText("Fire Rate").assertDoesNotExist()
+        compose.onNodeWithText("Fire Rate").assertExists()
+        compose.onNodeWithText("Not on sale · normal purchases require a rolled offer.").assertExists()
+        compose.onNodeWithText("Buy 10").assertDoesNotExist()
+        compose.onNodeWithText("×").performClick()
         tap(Upgrades.DAMAGE)
         compose.onNodeWithText("Damage").assertExists()
         compose.onNodeWithText("Buy 10").performClick()
@@ -94,5 +98,15 @@ class RunShopMapTest{
         compose.onNodeWithText("Rank 2 → 5 / 8").assertExists()
         compose.onNodeWithText("Buy 90").performClick()
         assertEquals(1,bought)
+    }
+
+    @Test fun rerollRemainsAvailableAndClosesInspection(){
+        show()
+        tap(Upgrades.DAMAGE)
+        compose.onNodeWithText("Damage").assertExists()
+        compose.onNodeWithText("Reroll · 9").assertIsEnabled().performClick()
+        compose.waitForIdle()
+        assertEquals(1,rerolled)
+        compose.onNodeWithText("Damage").assertDoesNotExist()
     }
 }

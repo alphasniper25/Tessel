@@ -107,3 +107,6 @@
 
 ## Concentric perk refinement
 - Three full concentric perk pools, six nodes each; only chosen perks filled; future rings dim. No hints, sigils, unlock banners, automatic inspection or visible unused fusion nodes. Exactly five secret recipes, 3 pair + 2 triple, real effects. New fusion lines animate to external gold node over 950ms and settle. Wire 37, FORMAT 9. Native Android screenshots, not generated art. No APK.
+
+## Icon-only map refinement
+- No visible lines or floating names/effects on any tree map. All 25 normal upgrade types and all capped rank nodes always included, stable compact circular packing with full-size equal nodes. Distinguish purchasable glow from unaffordable rolled outline and purchased fill. Inspect any type, only actual offer slots can purchase. Existing skill visibility and secret five-fusion rules preserved. Native screenshots only; no APK.
