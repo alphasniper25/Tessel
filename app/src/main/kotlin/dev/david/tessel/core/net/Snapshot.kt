@@ -93,6 +93,7 @@ class Snapshot {
 
     /** Perks taken, as a mask, and seconds left of a surge. */
     val perks = IntArray(MAX_PLAYERS)
+    val skillNodes=LongArray(MAX_PLAYERS)
     val surge = IntArray(MAX_PLAYERS)
 
     /** A [dev.david.tessel.core.sim.Cause] code, or -1 while standing. */
@@ -167,6 +168,7 @@ class Snapshot {
     var healsLeft = 0
     var canHeal = false
     var rerollPrice = 0
+    var freeRefreshesLeft=0
     var canReroll = false
 }
 

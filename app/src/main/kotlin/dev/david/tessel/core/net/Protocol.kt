@@ -138,6 +138,7 @@ object Protocol {
             buf.putInt(pl.points[p])
             buf.put(pl.killedBy[p].toByte())
             buf.putInt(pl.perks[p])
+            buf.putLong(pl.skillMask(p))
             buf.put((if (pl.surge[p] == 0) 0 else (pl.surge[p] / TICK_HZ + 1).coerceAtMost(255)).toByte())
             buf.put(d.wins[p].toByte())
             buf.put(pl.stun[p].coerceIn(0, 255).toByte())
@@ -214,11 +215,12 @@ object Protocol {
                 buf.put(s.levelsBought(w, forPlayer, slot).toByte())
                 buf.put(if (s.locked(forPlayer, slot)) 1.toByte() else 0.toByte())
             }
-            buf.putInt(s.healPrice(w))
+            buf.putInt(s.healPrice(w,forPlayer))
             buf.put(s.healAmount(w, forPlayer).toByte())
             buf.put(s.healsLeft(forPlayer).toByte())
             buf.put((if (s.canHeal(w, forPlayer)) 1 else 0).toByte())
             buf.putInt(s.rerollPrice(w, forPlayer))
+            buf.put(s.freeRefreshesLeft(w,forPlayer).toByte())
             buf.put((if (s.canReroll(w, forPlayer)) 1 else 0).toByte())
             for (k in 0 until TankEvolution.REWARD_SLOTS) buf.put(s.rewardOffer(forPlayer, k).toByte())
         }
@@ -295,6 +297,7 @@ object Protocol {
             s.points[p] = buf.int
             s.killedBy[p] = buf.get().toInt()
             s.perks[p] = buf.int
+            s.skillNodes[p]=buf.long and dev.david.tessel.core.content.SkillGraph.MASK
             s.surge[p] = buf.get().toInt() and 0xFF
             s.duelWins[p] = buf.get().toInt()
             s.stun[p] = buf.get().toInt() and 0xFF
@@ -375,6 +378,7 @@ object Protocol {
             s.healsLeft = buf.get().toInt()
             s.canHeal = buf.get().toInt() != 0
             s.rerollPrice = buf.int
+            s.freeRefreshesLeft=buf.get().toInt() and 255
             s.canReroll = buf.get().toInt() != 0
             for (k in 0 until TankEvolution.REWARD_SLOTS) {
                 val id = buf.get().toInt()

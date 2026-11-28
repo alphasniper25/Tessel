@@ -7,6 +7,8 @@ import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.SkillTree
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillBonus
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
@@ -20,7 +22,8 @@ class Shop {
     private val stock = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) { -1 } }
     private val locks = Array(MAX_PLAYERS) { BooleanArray(SHOP_SLOTS) }
     private val quotes = Array(MAX_PLAYERS) { IntArray(SHOP_SLOTS) }
-    private val rerolls = IntArray(MAX_PLAYERS)
+    private val rerolls = IntArray(MAX_PLAYERS) // paid refreshes only
+    private val freeUsed = IntArray(MAX_PLAYERS)
     private val heals = IntArray(MAX_PLAYERS)
     private val evolutions = Array(MAX_PLAYERS) { IntArray(TankEvolution.REWARD_SLOTS) { -1 } }
     private val offers = Array(MAX_PLAYERS) { IntArray(Perks.OFFERED) { -1 } }
@@ -28,13 +31,14 @@ class Shop {
     fun reset() {
         for (p in 0 until MAX_PLAYERS) {
             stock[p].fill(-1); locks[p].fill(false); quotes[p].fill(0)
-            offers[p].fill(-1); evolutions[p].fill(-1); rerolls[p] = 0; heals[p] = 0
+            offers[p].fill(-1); evolutions[p].fill(-1); rerolls[p] = 0; freeUsed[p] = 0; heals[p] = 0
         }
     }
 
     fun open(w: World) {
         for (p in 0 until w.playerCount) {
             rerolls[p] = 0
+            freeUsed[p] = 0
             heals[p] = 0
             restock(w, p)
             offerPerks(w, p)
@@ -45,7 +49,6 @@ class Shop {
     private fun offerPerks(w: World, p: Int) {
         offers[p].fill(-1)
         if (offerEvolution(w,p)) return
-        if (w.stage % Bestiary.BOSS_EVERY != 0 && offerSkills(w,p)) return
         if (w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
         var n = 0
         val free = IntArray(Perks.count)
@@ -57,13 +60,6 @@ class Shop {
             free[pick] = held
             offers[p][slot] = free[slot]
         }
-    }
-
-    /** Derive earned points from cleared stages, including migrated older runs. */
-    private fun offerSkills(w: World,p: Int): Boolean {
-        if(w.devBoss >= 0 || SkillTree.unspent(w.stage,w.players.perks[p]) == 0) return false
-        for(branch in 0 until Perks.OFFERED) offers[p][branch] = SkillTree.next(w.players.perks[p],branch)
-        return offers[p].any { it >= 0 }
     }
 
     /** Perk id offered in [slot], or -1. */
@@ -110,14 +106,30 @@ class Shop {
         val k = offers.getOrNull(p)?.getOrNull(slot) ?: return false
         if (k < 0 || w.players.has(p,k)) return false
         val pl = w.players
-        if (SkillTree.isNode(k) && (SkillTree.unspent(w.stage,pl.perks[p]) <= 0 || (0..2).none { SkillTree.next(pl.perks[p], it) == k })) return false
+        if (SkillTree.isNode(k)) return false
         pl.perks[p] = pl.perks[p] or (1 shl k)
         if (k == Perks.THICK_SKIN) {
             pl.maxHp[p] += 2
             pl.hp[p] = min(pl.hp[p] + 2, pl.maxHp[p])
         }
         offers[p].fill(-1)
-        if(SkillTree.isNode(k)) offerSkills(w,p)
+        return true
+    }
+
+    /** Separate, optional coin purchase; never consumes an upgrade card or creates a forced reward. */
+    fun canBuySkill(w:World,p:Int,id:Int):Boolean =
+        w.phase==Phase.SHOP && !w.duel.on && p in 0 until w.playerCount && w.players.present[p] &&
+        !perkPending(p) && SkillGraph.canBuy(w.players.skillMask(p),id,w.stage,w.players.coins[p])
+    fun buySkill(w:World,p:Int,id:Int):Boolean {
+        if(!canBuySkill(w,p,id))return false
+        val pl=w.players
+        val node=SkillGraph.nodes[id]
+        pl.coins[p]-=node.price
+        pl.setSkills(p,pl.skillMask(p) or SkillGraph.bit(id))
+        if(node.bonus==SkillBonus.HEALTH){
+            pl.maxHp[p]+=node.amount
+            if(pl.hp[p]>0)pl.hp[p]=min(pl.maxHp[p],pl.hp[p]+node.amount)
+        }
         return true
     }
 
@@ -143,7 +155,7 @@ class Shop {
         total *= rarity(p, slot).premium
         if (w.players.has(p, Perks.HAGGLER)) total *= 0.9
         if(w.players.character[p] == dev.david.tessel.core.content.CharacterDef.BALANCED) total *= 0.9
-        total *= SkillTree.priceFactor(w.players.perks[p])
+        total *= 1.0 - w.players.skill(p,SkillBonus.CARD_DISCOUNT)*.01
         return total.roundToInt().coerceAtLeast(1)
     }
 
@@ -181,28 +193,27 @@ class Shop {
         return true
     }
 
-    fun healPrice(w: World) = Upgrades.healPrice(w.stage)
+    fun healPrice(w: World,p:Int=0) = (Upgrades.healPrice(w.stage)*(1.0-w.players.skill(p,SkillBonus.HEAL_DISCOUNT)*.01)).roundToInt().coerceAtLeast(1)
 
-    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + Upgrades.delta(w.players.levels[p], UpgradeStat.HEAL).toInt()
+    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + Upgrades.delta(w.players.levels[p], UpgradeStat.HEAL).toInt() + w.players.skill(p,SkillBonus.HEAL_POWER)
 
     fun healsLeft(p: Int) = Upgrades.HEALS_PER_SHOP - heals[p]
 
     fun canHeal(w: World, p: Int) =
-        p in 0 until w.playerCount && healsLeft(p) > 0 && w.players.hp[p] < w.players.maxHp[p] && w.players.coins[p] >= healPrice(w)
+        p in 0 until w.playerCount && healsLeft(p) > 0 && w.players.hp[p] < w.players.maxHp[p] && w.players.coins[p] >= healPrice(w,p)
 
     fun heal(w: World, p: Int): Boolean {
         if (!canHeal(w, p)) return false
         val pl = w.players
-        pl.coins[p] -= healPrice(w)
+        pl.coins[p] -= healPrice(w,p)
         pl.hp[p] = min(pl.hp[p] + healAmount(w, p), pl.maxHp[p])
         heals[p]++
         return true
     }
 
-    fun rerollPrice(w: World, p: Int): Int {
-        val free = SkillTree.freeRefreshes(w.players.perks[p])
-        return if (rerolls[p] < free) 0 else Upgrades.rerollPrice(w.stage, rerolls[p] - free)
-    }
+    fun freeRefreshesLeft(w:World,p:Int)=(w.players.skill(p,SkillBonus.FREE_REFRESH)-freeUsed[p]).coerceAtLeast(0)
+    fun rerollPrice(w: World, p: Int): Int =
+        if(freeRefreshesLeft(w,p)>0)0 else (Upgrades.rerollPrice(w.stage,rerolls[p])*(1.0-w.players.skill(p,SkillBonus.REROLL_DISCOUNT)*.01)).roundToInt().coerceAtLeast(1)
 
     fun canReroll(w: World, p: Int) = p in 0 until w.playerCount &&
         !perkPending(p) && locks[p].any { !it } && w.players.coins[p] >= rerollPrice(w, p) &&
@@ -211,8 +222,9 @@ class Shop {
 
     fun reroll(w: World, p: Int): Boolean {
         if (!canReroll(w, p)) return false
-        w.players.coins[p] -= rerollPrice(w, p)
-        rerolls[p]++
+        val price=rerollPrice(w,p)
+        w.players.coins[p]-=price
+        if(price==0)freeUsed[p]++ else rerolls[p]++
         restock(w, p)
         return true
     }
@@ -225,6 +237,7 @@ class Shop {
             cp.stockSaved[p] = true
             offers[p].copyInto(cp.perkOffer[p])
             cp.rerolls[p] = rerolls[p]
+            cp.freeRerollsUsed[p] = freeUsed[p]
             cp.heals[p] = heals[p]
         }
     }
@@ -233,14 +246,15 @@ class Shop {
     internal fun bringBack(w: World, cp: Checkpoint) {
         for (p in 0 until cp.players) {
             rerolls[p] = cp.rerolls[p]
+            freeUsed[p] = cp.freeRerollsUsed[p]
             heals[p] = cp.heals[p]
             cp.stock[p].copyInto(stock[p])
             cp.locked[p].copyInto(locks[p])
             cp.quotes[p].copyInto(quotes[p])
             if (!cp.stockSaved[p]) restock(w, p)
             cp.perkOffer[p].copyInto(offers[p])
+            for(i in offers[p].indices)if(SkillTree.isNode(offers[p][i]))offers[p][i]=-1
             if(offerEvolution(w,p)) offers[p].fill(-1)
-            else if(w.stage % Bestiary.BOSS_EVERY != 0 && offers[p].none { it >= 0 }) offerSkills(w,p)
             // One-time migration: an alpha.10 shop with no remaining cards can
             // immediately offer new reserves instead of requiring a paid refresh.
             if(cp.loadedUpgradeCount <= Upgrades.RESERVE_POWER && w.stage >= 15 &&
@@ -267,7 +281,7 @@ class Shop {
             if (locked(p, slot)) continue
             val available = (0 until Upgrades.count).filter { !used[it] && Upgrades.availableAt(it,w.stage) && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
             if (available.isEmpty()) continue
-            var tier = CardRarity.roll(w.rng, SkillTree.luck(w.players.perks[p]))
+            var tier = CardRarity.roll(w.rng, w.players.skill(p,SkillBonus.LUCK))
             var pool = available.filter { CardMission.eligible(it, w.players.missionMask[p], tier) }
             // Only if every starter is capped/retained: still offer an eligible mission card.
             if (pool.isEmpty()) {

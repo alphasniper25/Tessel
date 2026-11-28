@@ -28,7 +28,7 @@ enum class CardRarity(val label: String, val weight: Int, val levels: Int, val p
     companion object {
         fun fromId(id: Int) = entries.getOrElse(id) { COMMON }
         fun roll(rng: Rng, luck: Int = 0): CardRarity {
-            val shift = luck.coerceIn(0, 6)
+            val shift = luck.coerceIn(0, 12)
             var ticket = rng.int(1, 100)
             for (tier in entries) {
                 val weight = tier.weight + when (tier) { COMMON -> -2 * shift; EPIC, LEGENDARY -> shift; else -> 0 }

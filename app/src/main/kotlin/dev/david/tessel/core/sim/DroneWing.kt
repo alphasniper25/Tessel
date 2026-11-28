@@ -27,7 +27,7 @@ class DroneWing {
             if(s==null||!pl.alive(p)||w.duel.on){if(frames[p]>=0)clearOwner(p);continue}
             if(frames[p]!=f.ordinal){clearOwner(p);frames[p]=f.ordinal}
             val base=p*LIMIT;val px=pl.x[p];val py=pl.y[p]
-            val reach=(s.reach*(1f+Upgrades.delta(pl.levels[p],UpgradeStat.RANGE)*.5f)).coerceAtMost(540f)
+            val reach=(s.reach*(1f+Upgrades.delta(pl.levels[p],UpgradeStat.RANGE)*.5f+pl.skill(p,SkillBonus.RANGE)*.005f)).coerceAtMost(540f)
             if(count(p)<s.cap && nextSpawn[p]>0 && pl.stun[p]==0)nextSpawn[p]--
             if(nextSpawn[p]==0&&pl.stun[p]==0){for(k in 0 until s.cap){val i=base+k;if(hp[i]>0)continue
                 val a=k*2f*PI.toFloat()/s.cap;x[i]=(px+cos(a)*25f).coerceIn(RADIUS,ARENA_W-RADIUS);y[i]=(py+sin(a)*25f).coerceIn(RADIUS,ARENA_H-RADIUS)

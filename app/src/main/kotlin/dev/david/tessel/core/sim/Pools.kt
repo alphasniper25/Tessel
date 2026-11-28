@@ -7,6 +7,8 @@ import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillBonus
 
 /** Ticks without a hit before Overclock kicks in. */
 const val OVERCLOCK_TICKS = 8 * TICK_HZ
@@ -77,6 +79,12 @@ class PlayerState {
 
     /** Perks taken, as a mask of [Perks] ids. */
     val perks = IntArray(MAX_PLAYERS)
+    private val graphMasks=LongArray(MAX_PLAYERS)
+    private val graphBonuses=Array(MAX_PLAYERS){IntArray(SkillBonus.entries.size)}
+    fun skillMask(p:Int)=graphMasks[p]
+    fun skill(p:Int,bonus:SkillBonus)=graphBonuses[p][bonus.ordinal]
+    fun setSkills(p:Int,mask:Long){graphMasks[p]=mask and SkillGraph.MASK;SkillGraph.fill(graphMasks[p],graphBonuses[p])}
+    private fun skillFactor(p:Int,bonus:SkillBonus)=1f+skill(p,bonus)*.01f
 
     /** Second Wind spent this stage. */
     val windUsed = BooleanArray(MAX_PLAYERS)
@@ -99,7 +107,7 @@ class PlayerState {
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
-        return d * evolution[p].damage * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
+        return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
     }
 
     fun fireRate(p: Int): Float {
@@ -107,14 +115,14 @@ class PlayerState {
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
         if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
-        return r * evolution[p].rate
+        return r * evolution[p].rate * skillFactor(p,SkillBonus.FIRE_RATE)
     }
     fun volley(p: Int) = if (evolution[p] == TankEvolution.BASIC) 1 + Upgrades.delta(levels[p], UpgradeStat.VOLLEY).toInt() else evolution[p].barrels
     fun bulletSpeed(p: Int) = scaled(p, UpgradeStat.VELOCITY, Balance.BULLET_SPEED) * evolution[p].velocity
     fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
-    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach
-    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))
+    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)
+    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
+    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)
@@ -123,7 +131,7 @@ class PlayerState {
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
-    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
+    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
     fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
 
     private fun scaled(p: Int, stat: UpgradeStat, base: Float) = base * (1f + Upgrades.delta(levels[p], stat))
@@ -164,6 +172,7 @@ class PlayerState {
             levels[i].fill(0)
             missionMask[i] = 0
             perks[i] = 0
+            setSkills(i,0L)
             windUsed[i] = false
             sinceHit[i] = OVERCLOCK_TICKS
             surge[i] = 0

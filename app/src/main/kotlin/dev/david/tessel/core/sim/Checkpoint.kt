@@ -5,6 +5,8 @@ import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.content.Upgrades
 import java.nio.BufferUnderflowException
@@ -52,6 +54,8 @@ class Checkpoint(
     val appearance = Array(MAX_PLAYERS) { dev.david.tessel.core.content.TankLook() }
     val missionMask = IntArray(MAX_PLAYERS)
     val rerolls = IntArray(MAX_PLAYERS)
+    val freeRerollsUsed=IntArray(MAX_PLAYERS)
+    val skillNodes=LongArray(MAX_PLAYERS)
     val heals = IntArray(MAX_PLAYERS)
     val perks = IntArray(MAX_PLAYERS)
     val perkOffer = Array(MAX_PLAYERS) { IntArray(Perks.OFFERED) { -1 } }
@@ -72,7 +76,7 @@ class Checkpoint(
     val names = Array(MAX_PLAYERS) { "" }
 
     fun write(): ByteArray {
-        val buf = ByteBuffer.allocate(64 + players * (166 + Upgrades.count * 5 + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = ByteBuffer.allocate(64 + players * (182 + Upgrades.count * 5 + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
         buf.put('T'.code.toByte())
         buf.put('C'.code.toByte())
         buf.put(FORMAT.toByte())
@@ -118,6 +122,8 @@ class Checkpoint(
                 buf.put(if (locked[p][slot]) 1.toByte() else 0.toByte())
                 buf.putInt(quotes[p][slot])
             }
+            buf.putLong(skillNodes[p] or SkillGraph.fromLegacy(perks[p]))
+            buf.put(freeRerollsUsed[p].coerceIn(0,3).toByte())
         }
         val out = ByteArray(buf.position())
         buf.flip()
@@ -127,7 +133,7 @@ class Checkpoint(
 
     companion object {
         /** Bump when the layout changes. Saves from a version before [OLDEST] are dropped rather than misread. */
-        const val FORMAT = 7
+        const val FORMAT = 8
         private const val OLDEST = 1
 
         /** Null when [bytes] are not a save this version can read. */
@@ -202,6 +208,17 @@ class Checkpoint(
                             }
                         }
                     } else cp.stockSaved[p] = cp.stock[p].any { it >= 0 }
+                    if(format>=8){
+                        cp.skillNodes[p]=(buf.long and SkillGraph.MASK) or SkillGraph.fromLegacy(cp.perks[p])
+                        cp.freeRerollsUsed[p]=(buf.get().toInt() and 255).coerceIn(0,3)
+                    }else{
+                        cp.skillNodes[p]=SkillGraph.fromLegacy(cp.perks[p])
+                        val free=minOf(cp.rerolls[p],SkillTree.freeRefreshes(cp.perks[p]))
+                        cp.freeRerollsUsed[p]=free
+                        cp.rerolls[p]-=free
+                    }
+                    // Old unclaimed milestone offers must never become mandatory on upgrade.
+                    for(k in cp.perkOffer[p].indices)if(SkillTree.isNode(cp.perkOffer[p][k]))cp.perkOffer[p][k]=-1
                 }
                 cp
             } catch (_: BufferUnderflowException) {

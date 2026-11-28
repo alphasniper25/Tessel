@@ -1,6 +1,7 @@
 package dev.david.tessel.core.sim
 
 import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.StatusEffect
 import dev.david.tessel.core.content.CampaignScaling
@@ -343,6 +344,7 @@ class World(seed: Long = 1L) {
             cp.revived[p] = pl.revived[p]
             pl.levels[p].copyInto(cp.levels[p])
             cp.perks[p] = pl.perks[p]
+            cp.skillNodes[p]=pl.skillMask(p)
             cp.character[p] = pl.character[p]
             cp.evolution[p] = pl.evolution[p]
             cp.lastEvolutionStage[p] = pl.lastEvolutionStage[p]
@@ -376,6 +378,7 @@ class World(seed: Long = 1L) {
             pl.revived[p] = cp.revived[p]
             cp.levels[p].copyInto(pl.levels[p])
             pl.perks[p] = cp.perks[p]
+            pl.setSkills(p,cp.skillNodes[p] or SkillGraph.fromLegacy(cp.perks[p]))
             pl.character[p] = cp.character[p]
             pl.evolution[p] = cp.evolution[p]
             pl.lastEvolutionStage[p] = cp.lastEvolutionStage[p]
