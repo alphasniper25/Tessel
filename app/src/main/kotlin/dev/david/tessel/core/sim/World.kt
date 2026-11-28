@@ -149,11 +149,11 @@ class World(seed: Long = 1L) {
         devHull(((next-old)*Upgrades.amount(id,UpgradeStat.MAX_HP)).toInt())
     }
     fun devSetPerk(id:Int,owned:Boolean){
-        if(id !in 0 until dev.david.tessel.core.content.SkillTree.ORIGINAL_PERKS)return
+        if(!Perks.isRunPerk(id))return
         val pl=players;val before=pl.has(0,id)
         if(before==owned)return
         pl.perks[0]=if(owned)pl.perks[0] or (1 shl id) else pl.perks[0] and (1 shl id).inv()
-        if(id==Perks.THICK_SKIN)devHull(if(owned)2 else -2)
+        devHull(Perks.hullBonus(id)*(if(owned)1 else -1))
         if(id==Perks.SECOND_WIND)pl.windUsed[0]=false
     }
     fun devSetSkillMask(mask:Long){
@@ -192,10 +192,8 @@ class World(seed: Long = 1L) {
         for (k in ids) {
             if (k !in 0 until Perks.count || players.has(0, k)) continue
             players.perks[0] = players.perks[0] or (1 shl k)
-            if (k == Perks.THICK_SKIN) {
-                players.maxHp[0] += 2
-                players.hp[0] += 2
-            }
+            val bonus=Perks.hullBonus(k)
+            if(bonus>0){players.maxHp[0]+=bonus;players.hp[0]+=bonus}
         }
     }
 
@@ -1081,7 +1079,11 @@ class World(seed: Long = 1L) {
         if (players.has(owner, Perks.SIPHON) && players.kills[owner] % 25 == 0 && players.hp[owner] in 1 until players.maxHp[owner]) {
             players.hp[owner]++
         }
-        if(!duel.on&&!practice&&players.purgeDue(owner))players.clearStatus(owner)
+        if(!duel.on&&!practice&&players.purgeDue(owner)){
+            players.clearStatus(owner)
+            if(players.combo(owner,PerkCombo.PHASE_ESCAPE))players.invuln[owner]=max(players.invuln[owner],TICK_HZ)
+        }
+        if(!duel.on&&!practice&&players.combo(owner,PerkCombo.REPRISAL)&&players.kills[owner]%10==0&&players.hp[owner] in 1..players.maxHp[owner]/2)players.hp[owner]++
         if (elite && rng.nextFloat() < Elite.SURGE_CHANCE) players.surge[owner] = Elite.SURGE_SECONDS * TICK_HZ
         val drops = (if (def.coinChance >= 1f || rng.nextFloat() < def.coinChance) def.coins else 0) * (if (elite) 2 else 1)
         val fling = if (def.boss) 260f else 150f
@@ -1217,6 +1219,7 @@ class World(seed: Long = 1L) {
             val late=CampaignScaling.damage(stage,difficulty,by in 0 until Bestiary.size && Bestiary.of(by).boss)
             val rawAmount = if(loss>0) loss else (base+late-if(Cause.isShot(cause)) pl.evolution[p].projectileArmor else 0).coerceAtLeast(1)
             val amount=(rawAmount-if(capacitor)1 else 0).coerceAtLeast(0)
+            if(capacitor&&pl.combo(p,PerkCombo.STORM_CELL))pl.surge[p]=max(pl.surge[p],3*TICK_HZ)
             if(amount>0&&by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
                 StatusEffect.BURN, StatusEffect.POISON -> if(pl.poisonTicks[p]==0) {pl.poisonTicks[p]=(if(Bestiary.of(by).status==StatusEffect.BURN)2 else 3)*TICK_HZ;pl.poisonSource[p]=by}
                 StatusEffect.FREEZE -> pl.stun[p]=max(pl.stun[p], (TICK_HZ*.45f).toInt())
@@ -1291,11 +1294,14 @@ class World(seed: Long = 1L) {
     /** A status tick is damage, not a new collision: no knockback, extra hit grace or reapplication. */
     private fun phoenixPulse(p:Int){
         players.clearStatus(p)
+        val solar=players.combo(p,PerkCombo.SOLAR_REBIRTH)
+        if(solar)players.hp[p]=minOf(3,players.maxHp[p])
+        val radius=if(solar)180f else 120f
         val px=players.x[p];val py=players.y[p]
         for(i in 0 until hostile.count){
             if(hostile.life[i]<=0)continue
             val dx=hostile.x[i]-px;val dy=hostile.y[i]-py
-            if(dx*dx+dy*dy<=120f*120f){
+            if(dx*dx+dy*dy<=radius*radius){
                 hostile.life[i]=0;droneWing.markIntercepted(hostile.id[i],tick)
                 events.add(Events.HOSTILE_GONE,hostile.id[i])
             }

@@ -23,6 +23,15 @@ object Perks {
     const val TRADE_I = 16
     const val TRADE_II = 17
     const val TRADE_III = 18
+    // IDs 10–18 are retired skill bits, kept for old saves. New perks append.
+    const val RANGEFINDER = 19
+    const val HARDPOINT = 20
+    const val AFTERBURNER = 21
+    const val LONGSHOT = 22
+    const val DEADEYE = 23
+    const val VITAL_CORE = 24
+    const val VACUUM = 25
+    const val RAPID_CYCLE = 26
 
     private val defs = arrayOf(
         PerkDef("Second Wind", "Once a stage, a hit that would down you leaves you on one health."),
@@ -44,11 +53,22 @@ object Perks {
         PerkDef("Trade I", "5% discount on newly priced upgrade cards."),
         PerkDef("Trade II", "10% discount on newly priced upgrade cards."),
         PerkDef("Trade III", "15% discount on newly priced upgrade cards."),
+        PerkDef("Rangefinder", "+10% bullet range and drone command range."),
+        PerkDef("Hardpoint", "+10% bullet, drone and ram damage."),
+        PerkDef("Afterburner", "+10% movement speed."),
+        PerkDef("Longshot", "+15% bullet range and drone command range."),
+        PerkDef("Deadeye", "+12% bullet, drone and ram damage."),
+        PerkDef("Vital Core", "Two extra max health pips, filled."),
+        PerkDef("Vacuum", "+25% coin pickup radius."),
+        PerkDef("Rapid Cycle", "+10% fire rate and drone replacement rate."),
     )
 
     val count get() = defs.size
 
     fun of(id: Int) = defs[id]
+    fun isRunPerk(id:Int)=id in defs.indices&&!SkillTree.isNode(id)
+    val runIds get()=defs.indices.filter(::isRunPerk)
+    fun hullBonus(id:Int)=if(id==THICK_SKIN||id==VITAL_CORE)2 else 0
 
     /** How many perks a boss offers at once. */
     const val OFFERED = 3

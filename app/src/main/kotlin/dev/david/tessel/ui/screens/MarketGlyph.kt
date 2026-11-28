@@ -34,7 +34,7 @@ internal enum class MarketIcon(val skill:SkillBonus?=null){
         fun perk(id:Int)=when(id){
             Perks.SECOND_WIND->REGEN;Perks.THICK_SKIN->HULL;Perks.SIPHON->HEAL
             Perks.OVERCLOCK->FIRE;Perks.HEAVY_ROUNDS->PIERCE;Perks.QUICK_FEET->MOVE
-            Perks.MAGNET_CORE->MAGNET;Perks.LAST_STAND->DAMAGE;Perks.SHOCKWAVE->WAVE;else->DEAL
+            Perks.MAGNET_CORE,Perks.VACUUM->MAGNET;Perks.LAST_STAND,Perks.HARDPOINT,Perks.DEADEYE->DAMAGE;Perks.SHOCKWAVE->WAVE;Perks.RANGEFINDER,Perks.LONGSHOT->RANGE;Perks.AFTERBURNER->MOVE;Perks.VITAL_CORE->HULL;Perks.RAPID_CYCLE->FIRE;else->DEAL
         }
     }
 }

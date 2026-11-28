@@ -7,5 +7,5 @@ object RewardRounds {
     const val UNKNOWN=-1
     fun stage(index:Int)=(index+1)*Bestiary.BOSS_EVERY
     fun index(stage:Int)=if(stage in 5..45&&stage%Bestiary.BOSS_EVERY==0)stage/Bestiary.BOSS_EVERY-1 else -1
-    fun valid(id:Int)=id in 0 until SkillTree.ORIGINAL_PERKS||id==TankEvolution.STAY_BASIC||TankEvolution.fromReward(id)!=null
+    fun valid(id:Int)=Perks.isRunPerk(id)||id==TankEvolution.STAY_BASIC||TankEvolution.fromReward(id)!=null
 }

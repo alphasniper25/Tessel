@@ -112,6 +112,7 @@ class PlayerState {
     fun damage(p: Int): Float {
         var d = scaled(p, UpgradeStat.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE_BONUS))
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
+        d*=perkDamageFactor(p)
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
         return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
@@ -122,14 +123,17 @@ class PlayerState {
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
         if (has(p, Perks.HEAVY_ROUNDS)) r *= .85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
+        if(has(p,Perks.RAPID_CYCLE))r*=1.1f
         return r * evolution[p].rate * skillFactor(p,SkillBonus.FIRE_RATE)
     }
     fun volley(p: Int) = if (evolution[p] == TankEvolution.BASIC) 1 + Upgrades.delta(levels[p], UpgradeStat.VOLLEY).toInt() else evolution[p].barrels
     fun bulletSpeed(p: Int) = scaled(p, UpgradeStat.VELOCITY, Balance.BULLET_SPEED) * evolution[p].velocity
     fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
-    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)
-    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)
+    private fun perkDamageFactor(p:Int)=(if(has(p,Perks.HARDPOINT))1.1f else 1f)*(if(has(p,Perks.DEADEYE))1.12f else 1f)
+    fun perkRangeFactor(p:Int)=(if(has(p,Perks.RANGEFINDER))1.1f else 1f)*(if(has(p,Perks.LONGSHOT))1.15f else 1f)
+    fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)*perkRangeFactor(p)
+    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * (if (has(p, Perks.QUICK_FEET)) 1.15f else 1f) * (if(has(p,Perks.AFTERBURNER))1.1f else 1f) * (if(combo(p,PerkCombo.HORIZON)&&hp[p]==maxHp[p])1.15f else 1f)
+    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)*perkDamageFactor(p)
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)
@@ -139,7 +143,7 @@ class PlayerState {
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
-    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
+    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * (if (has(p, Perks.MAGNET_CORE)) 2f else 1f) * (if(has(p,Perks.VACUUM))1.25f else 1f) * (if(combo(p,PerkCombo.SURVEYOR))1.2f else 1f)
     fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
 
     private fun scaled(p: Int, stat: UpgradeStat, base: Float) = base * (1f + Upgrades.delta(levels[p], stat))

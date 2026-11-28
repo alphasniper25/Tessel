@@ -7,6 +7,7 @@ import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.PerkCombo
+import dev.david.tessel.core.content.PerkRounds
 import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.SkillBonus
@@ -27,11 +28,12 @@ class Shop {
     private val freeUsed = IntArray(MAX_PLAYERS)
     private val heals = IntArray(MAX_PLAYERS)
     private val evolutions = Array(MAX_PLAYERS) { IntArray(TankEvolution.REWARD_SLOTS) { -1 } }
+    private val forcedPerks=BooleanArray(MAX_PLAYERS)
     private val offers = Array(MAX_PLAYERS) { IntArray(Perks.OFFERED) { -1 } }
 
     fun reset() {
         for (p in 0 until MAX_PLAYERS) {
-            stock[p].fill(-1); locks[p].fill(false); quotes[p].fill(0)
+            stock[p].fill(-1); locks[p].fill(false); quotes[p].fill(0);forcedPerks[p]=false
             offers[p].fill(-1); evolutions[p].fill(-1); rerolls[p] = 0; freeUsed[p] = 0; heals[p] = 0
         }
     }
@@ -48,12 +50,14 @@ class Shop {
 
     /** After a boss stage a player is offered a choice of perks to take. */
     private fun offerPerks(w: World, p: Int, force:Boolean=false) {
-        offers[p].fill(-1)
+        offers[p].fill(-1);forcedPerks[p]=force
         if (!force && offerEvolution(w,p)) return
-        if (!force && w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
-        var n = 0
-        val free = IntArray(Perks.count)
-        for (k in 0 until SkillTree.ORIGINAL_PERKS) if (!w.players.has(p, k)) free[n++] = k
+        val round=PerkRounds.roundAt(w.stage)
+        if(!force&&(round<0||PerkRounds.choice(w.players.rewardRounds[p].toList(),round)>=0))return
+        var n=0
+        val free=IntArray(Perks.count)
+        val pool=if(force&&round<0)Perks.runIds else PerkRounds.pools[round]
+        for(k in pool)if(!w.players.has(p,k)&& (force||k !in w.players.rewardRounds[p]))free[n++]=k
         for (slot in 0 until minOf(Perks.OFFERED, n)) {
             val pick = w.rng.int(slot, n - 1)
             val held = free[slot]
@@ -107,13 +111,13 @@ class Shop {
         val k = offers.getOrNull(p)?.getOrNull(slot) ?: return false
         if (k < 0 || w.players.has(p,k)) return false
         val pl = w.players
-        if (SkillTree.isNode(k)) return false
+        if(!Perks.isRunPerk(k))return false
+        val round=PerkRounds.roundAt(w.stage)
+        if(!forcedPerks[p]&&(round<0||PerkRounds.roundOf(k)!=round||PerkRounds.choice(pl.rewardRounds[p].toList(),round)>=0||k in pl.rewardRounds[p]))return false
         pl.perks[p] = pl.perks[p] or (1 shl k)
         pl.recordReward(p,w.stage,k)
-        if (k == Perks.THICK_SKIN) {
-            pl.maxHp[p] += 2
-            pl.hp[p] = min(pl.hp[p] + 2, pl.maxHp[p])
-        }
+        val bonus=Perks.hullBonus(k)
+        if(bonus>0){pl.maxHp[p]+=bonus;pl.hp[p]=min(pl.hp[p]+bonus,pl.maxHp[p])}
         offers[p].fill(-1)
         return true
     }
@@ -262,7 +266,10 @@ class Shop {
         if (!canReroll(w, p)) return false
         val price=rerollPrice(w,p)
         w.players.coins[p]-=price
-        if(price==0)freeUsed[p]++ else rerolls[p]++
+        if(price==0){freeUsed[p]++
+            val pl=w.players
+            if(pl.combo(p,PerkCombo.RECLAMATION)&&pl.hp[p] in 1 until pl.maxHp[p])pl.hp[p]++
+        }else rerolls[p]++
         restock(w, p)
         return true
     }
@@ -291,8 +298,13 @@ class Shop {
             cp.quotes[p].copyInto(quotes[p])
             if (!cp.stockSaved[p]) restock(w, p)
             cp.perkOffer[p].copyInto(offers[p])
-            for(i in offers[p].indices)if(SkillTree.isNode(offers[p][i]))offers[p][i]=-1
-            if(offerEvolution(w,p)) offers[p].fill(-1)
+            forcedPerks[p]=false
+            val round=PerkRounds.roundAt(w.stage)
+            val hadPending=offers[p].any{it>=0}
+            if(offerEvolution(w,p))offers[p].fill(-1)
+            else if(round<0||PerkRounds.choice(w.players.rewardRounds[p].toList(),round)>=0)offers[p].fill(-1)
+            else if(hadPending&&offers[p].any{it>=0&&(PerkRounds.roundOf(it)!=round||w.players.has(p,it)||it in w.players.rewardRounds[p])})offerPerks(w,p)
+            else for(i in offers[p].indices)if(!Perks.isRunPerk(offers[p][i]))offers[p][i]=-1
             // One-time migration: an alpha.10 shop with no remaining cards can
             // immediately offer new reserves instead of requiring a paid refresh.
             if(cp.loadedUpgradeCount <= Upgrades.RESERVE_POWER && w.stage >= 15 &&

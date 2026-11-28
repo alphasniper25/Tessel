@@ -200,7 +200,7 @@ fun DevScreen(
 
                 Group("Elites and Perks", footer = "Elites: every enemy that comes is elite. Perks: taken at the start of a trial run.") {
                     ToggleRow("Elite Enemies", dev.elites, { v -> change { it.copy(elites = v) } })
-                    for (k in 0 until SkillTree.ORIGINAL_PERKS) {
+                    for (k in Perks.runIds) {
                         Divider()
                         ToggleRow(
                             Perks.of(k).name,

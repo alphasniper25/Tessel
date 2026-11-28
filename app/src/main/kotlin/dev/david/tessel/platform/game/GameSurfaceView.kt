@@ -320,7 +320,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             world.players.coins[0] = dev.startCoins
             world.bringDevBoss()
             world.devUpgrades(dev.upgrades)
-            world.devPerks(dev.perks.filter{it in 0 until SkillTree.ORIGINAL_PERKS}.toSet())
+            world.devPerks(dev.perks.filter{Perks.isRunPerk(it)}.toSet())
             world.devSetFrame(scenario.frame)
             world.devSetSkillMask(scenario.skillMask)
             if(scenario.allMissions)world.players.missionMask[0]=CardMission.allMask

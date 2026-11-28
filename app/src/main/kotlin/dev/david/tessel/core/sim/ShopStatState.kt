@@ -30,7 +30,7 @@ data class ShopStatState(
                 put("Drone impact",p.damage(0)*spec.impact to "HP")
                 val rate=(p.fireRate(0)/(Balance.FIRE_RATE*frame.rate)).coerceIn(.5f,2.4f)
                 put("Drone replacement",(spec.respawn*TICK_HZ/rate).toInt().coerceAtLeast(30)/TICK_HZ.toFloat() to "s")
-                put("Drone command range",(spec.reach*(1f+Upgrades.delta(p.levels[0],UpgradeStat.RANGE)*.5f+p.skill(0,SkillBonus.RANGE)*.005f)).coerceAtMost(540f) to "u")
+                put("Drone command range",(spec.reach*(1f+Upgrades.delta(p.levels[0],UpgradeStat.RANGE)*.5f+p.skill(0,SkillBonus.RANGE)*.005f)*p.perkRangeFactor(0)).coerceAtMost(540f) to "u")
             }else if(!frame.melee){
                 put("Damage per bullet",p.damage(0) to "HP")
                 put("Fire rate",p.fireRate(0) to "/s")

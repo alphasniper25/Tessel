@@ -248,8 +248,9 @@ class CoreFight(private val w: World) {
             }
             pl.perks[p] = pl.perks[p] and (1 shl perk).inv()
             stolen[p] = stolen[p] or (1 shl perk)
-            if (perk == Perks.THICK_SKIN) {
-                pl.maxHp[p] = max(1, pl.maxHp[p] - 2)
+            val bonus=Perks.hullBonus(perk)
+            if (bonus>0) {
+                pl.maxHp[p] = max(1, pl.maxHp[p] - bonus)
                 pl.hp[p] = min(pl.hp[p], pl.maxHp[p])
             }
             w.events.add(Events.PERK_STOLEN, p, pl.x[p], pl.y[p], 0f, 0f, 0f, perk)
@@ -264,9 +265,10 @@ class CoreFight(private val w: World) {
             for (k in 0 until Perks.count) {
                 if (mask shr k and 1 == 0) continue
                 pl.perks[p] = pl.perks[p] or (1 shl k)
-                if (k == Perks.THICK_SKIN) {
-                    pl.maxHp[p] += 2
-                    if (pl.hp[p] > 0) pl.hp[p] = min(pl.maxHp[p], pl.hp[p] + 2)
+                val bonus=Perks.hullBonus(k)
+                if (bonus>0) {
+                    pl.maxHp[p] += bonus
+                    if (pl.hp[p] > 0) pl.hp[p] = min(pl.maxHp[p], pl.hp[p] + bonus)
                 }
                 w.events.add(Events.PERK_BACK, p, pl.x[p], pl.y[p], 0f, 0f, 0f, k)
             }
