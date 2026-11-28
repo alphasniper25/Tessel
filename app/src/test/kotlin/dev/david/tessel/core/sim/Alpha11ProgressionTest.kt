@@ -45,8 +45,9 @@ class Alpha11ProgressionTest {
         w.skipTo(17)
         for(u in 0 until Upgrades.RESERVE_POWER) w.players.levels[0][u] = Upgrades.of(u).maxLevel
         w.shop.open(w)
-        assertEquals(setOf(Upgrades.RESERVE_POWER, Upgrades.RESERVE_HULL, Upgrades.RESERVE_DRIVE),
-            (0 until SHOP_SLOTS).map { w.shop.item(0,it) }.toSet())
+        val offers=(0 until SHOP_SLOTS).map{w.shop.item(0,it)}
+        assertEquals(SHOP_SLOTS,offers.size)
+        assertTrue(offers.all{it in Upgrades.RESERVE_POWER..Upgrades.RESERVE_DRIVE})
         assertFalse(w.shop.perkPending(0))
         assertEquals(0L,w.players.skillMask(0))
     }

@@ -172,7 +172,7 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         click("×");click("Perks");capture("31-perks-stage-five-gate")
     }
     @Test fun marketAdvanced(){
-        val shop=sampleShop(mask=SkillGraph.bit(0) or SkillGraph.bit(9),perks=PerkCombo.LAST_LIGHT.mask or (1 shl Perks.OVERCLOCK))
+        val shop=sampleShop(mask=SkillGraph.bit(0) or SkillGraph.bit(9),perks=PerkCombo.LAST_LIGHT.mask)
         show{Market(shop)}
         capture("32-upgrades-radial")
         tapUpgrade(Upgrades.DAMAGE);capture("33-upgrade-inspection")

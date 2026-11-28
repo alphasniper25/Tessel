@@ -76,4 +76,20 @@ class RunShopMapTest{
         compose.onNodeWithText("Second Wind").assertDoesNotExist()
         compose.onNodeWithText("Next Stage").assertIsNotEnabled()
     }
+
+    @Test fun repeatedOffersCanBeSelectedBySlotRatherThanType(){
+        val stat=dev.david.tessel.core.sim.ShopStatState(
+            List(Upgrades.count){if(it==Upgrades.MAGNET)2 else 0},9,12,
+            CharacterDef.BALANCED,TankEvolution.BASIC,0,0L,0,false,Difficulty.NORMAL,17,0)
+        val a=ShopOffer(0,"Magnet","+25% pickup radius",2,8,26,false,true,levels=1,rarity=CardRarity.COMMON,upgradeId=Upgrades.MAGNET)
+        val b=ShopOffer(1,"Magnet","+75% pickup radius",2,8,90,false,true,levels=3,rarity=CardRarity.RARE,upgradeId=Upgrades.MAGNET)
+        compose.setContent{TesselTheme{RunShopScreen(ShopView(17,420,9,12,listOf(a,b,offer(Upgrades.DAMAGE,2)),25,2,true,9,true,stats=stat),false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{_,_->},{_,_->},{_,_->})}}
+        compose.waitForIdle()
+        tap(Upgrades.MAGNET)
+        compose.onNodeWithText("Pickup radius").assertExists()
+        compose.onNodeWithText("#2 · Rare").performClick()
+        compose.onNodeWithText("Rank 2 → 5 / 8").assertExists()
+        compose.onNodeWithText("Buy 90").performClick()
+        assertEquals(1,bought)
+    }
 }

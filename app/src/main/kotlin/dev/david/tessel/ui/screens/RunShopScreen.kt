@@ -151,44 +151,69 @@ private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->
             footer="$totalOffers / 3 offers · Filled sockets = bought ranks · Tap lit track",frame=shop.frame,character=shop.character,look=shop.look)
         val id=selected.takeIf{it in 0 until Upgrades.count}
         if(id!=null&&(selectedOffer!=null||shop.devPreview)){
-            val wide=maxWidth>=580.dp
-            val mod=if(wide)Modifier.align(Alignment.CenterEnd).width(290.dp).fillMaxHeight(.96f) else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(.8f)
+            val wide=maxWidth>=720.dp
+            val mod=if(wide)Modifier.align(Alignment.CenterEnd).width(minOf(440.dp,maxWidth*.50f)).fillMaxHeight(.97f)
+                else if(maxWidth>=580.dp)Modifier.align(Alignment.CenterEnd).width(310.dp).fillMaxHeight(.96f)
+                else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(.90f)
             val def=Upgrades.of(id);val offer=selectedOffer
+            val owned=rank(id);val cap=if(shop.devPreview)maxOf(owned,Upgrades.runCap(id))else Upgrades.runCap(id)
+            val changes=remember(shop.stats,id,offer?.levels){shop.stats?.forecast(id,offer?.levels?:0).orEmpty()}
+            val tint=if(offer==null)c.accent else rarityColor(offer.rarity,c.dark,c.accent,c.coin)
             InspectPanel(mod,def.name,offer?.rarity?.label ?: "Developer inspection",MarketIcon.upgrade(id),if(offer==null)c.accent else rarityColor(offer.rarity,c.dark,c.accent,c.coin),{selected=-1},
                 body={
                     if(choices.size>1){
-                        Text("Choose one of ${choices.size} rolled offers",Type.footnote,c.ink2)
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-                            for(option in choices)SecondaryButton("#${option.slot+1} · ${option.rarity.label}",{selectedSlot=option.slot},tint=if(option.slot==offer?.slot)c.accent else c.ink)
+                            for(option in choices){
+                                val active=option.slot==offer?.slot
+                                val color=rarityColor(option.rarity,c.dark,c.accent,c.coin)
+                                Box(Modifier.heightIn(min=34.dp).clip(RoundedCornerShape(6.dp)).background(if(active)c.track else c.surface)
+                                    .border(1.dp,if(active)color else c.line,RoundedCornerShape(6.dp)).clickable{selectedSlot=option.slot}.padding(horizontal=8.dp,vertical=5.dp),
+                                    contentAlignment=Alignment.Center){Text("#${option.slot+1} · ${option.rarity.label}",Type.footnote,color)}
+                            }
                         }
                     }
-                    Text(offer?.blurb?:def.blurb,Type.footnote,c.ink2)
-                    val rank=rank(id);val cap=if(shop.devPreview)maxOf(rank,Upgrades.runCap(id))else Upgrades.runCap(id)
-                    Text("Rank $rank → ${(rank+(offer?.levels?:0)).coerceAtMost(cap)} / $cap",Type.subhead,c.ink)
-                    RankSockets(cap,rank,offer?.levels?:0,if(offer!=null)rarityColor(offer.rarity,c.dark,c.accent,c.coin)else c.accent)
-                    if(offer!=null){
-                        Text("Requirements",Type.caption,c.ink2)
-                        PurchaseRequirement("Stage","${shop.stage} / ${Upgrades.firstStage(id)}",shop.stage>=Upgrades.firstStage(id))
-                        PurchaseRequirement("Coins","${shop.coins} / ${offer.price}",shop.coins>=offer.price)
-                        PurchaseRequirement("Rank slots","${(cap-rank).coerceAtLeast(0)} available",!offer.maxed)
-                        if(!Upgrades.offered(id,shop.frame))PurchaseRequirement("Tank compatibility","Incompatible",false)
-                        if(shop.stats!=null&&!CardMission.eligible(id,shop.stats.missionMask,offer.rarity))PurchaseRequirement("Mission","Locked",false)
-                        if(shop.perkOffers.isNotEmpty()||shop.selfReady)PurchaseRequirement("Shop access","Finish reward / ready",false)
-                        val changes=remember(shop.stats,id,offer.levels){shop.stats?.forecast(id,offer.levels).orEmpty()}
-                        if(changes.isNotEmpty()){
-                            Text("Your stats after purchase",Type.caption,c.ink2)
-                            for(change in changes){
-                                Column(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(6.dp)).padding(6.dp)){
-                                    Text(change.label,Type.footnote,c.ink2)
-                                    Text("${statNumber(change.before,change.label)} → ${statNumber(change.after,change.label)} ${change.unit}",Type.headline,c.accent)
-                                }
+                    val requirements:@Composable ()->Unit={
+                        Column(verticalArrangement=Arrangement.spacedBy(2.dp)){
+                            if(offer!=null){
+                                Text("Requirements",Type.caption,c.ink2)
+                                PurchaseRequirement("Stage","${shop.stage} / ${Upgrades.firstStage(id)}",shop.stage>=Upgrades.firstStage(id))
+                                PurchaseRequirement("Coins","${shop.coins} / ${offer.price}",shop.coins>=offer.price)
+                                PurchaseRequirement("Rank slots","${(cap-owned).coerceAtLeast(0)} left",!offer.maxed)
+                                if(!Upgrades.offered(id,shop.frame))PurchaseRequirement("Tank","Incompatible",false)
+                                if(shop.stats!=null&&!CardMission.eligible(id,shop.stats.missionMask,offer.rarity))PurchaseRequirement("Mission","Locked",false)
+                                if(shop.perkOffers.isNotEmpty()||shop.selfReady)PurchaseRequirement("Shop","Wait",false)
                             }
-                            Text("Current build · includes active modifiers",Type.caption,c.ink3)
-                        }else if(shop.stats!=null)Text("No further effective increase at the current stat cap.",Type.footnote,c.ink2)
+                        }
                     }
+                    val forecast:@Composable ()->Unit={
+                        Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                            if(offer!=null){
+                                Text("Your stats after purchase",Type.caption,c.ink2)
+                                for(change in changes){
+                                    Column(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(6.dp)).padding(5.dp)){
+                                        Text(change.label,Type.footnote,c.ink2)
+                                        Text("${statNumber(change.before,change.label)} → ${statNumber(change.after,change.label)} ${change.unit}",Type.headline,tint)
+                                    }
+                                }
+                                if(changes.isEmpty()&&shop.stats!=null)Text("No further effective increase at the current stat cap.",Type.footnote,c.ink2)
+                            }
+                            Text("Rank $owned → ${(owned+(offer?.levels?:0)).coerceAtMost(cap)} / $cap",Type.subhead,c.ink)
+                            RankSockets(cap,owned,offer?.levels?:0,tint)
+                        }
+                    }
+                    if(wide&&offer!=null){
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.Top){
+                            Box(Modifier.weight(1f)){requirements()}
+                            Box(Modifier.weight(1f)){forecast()}
+                        }
+                    }else{
+                        forecast();requirements()
+                    }
+                    Text(offer?.blurb?:def.blurb,Type.footnote,c.ink2)
+                    if(shop.stats!=null&&offer!=null)Text("Current build · includes active modifiers",Type.caption,c.ink3)
                     if(shop.devPreview){
                         Text("DEV · exact rank (0–${def.maxLevel})",Type.caption,c.coin)
-                        var rankInput by remember(id,rank){mutableStateOf(rank.toString())}
+                        var rankInput by remember(id,owned){mutableStateOf(owned.toString())}
                         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
                             BasicTextField(rankInput,{rankInput=it.filter{ch->ch.isDigit()}.take(3)},singleLine=true,textStyle=Type.body.copy(color=c.ink),cursorBrush=SolidColor(c.accent),modifier=Modifier.weight(1f).background(c.track,RoundedCornerShape(6.dp)).padding(8.dp))
                             MarketButton("Set",{onDevRank(id,(rankInput.toIntOrNull()?:0).coerceIn(0,def.maxLevel))})
@@ -223,7 +248,8 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
             Text("Frame · ${shop.frame.label}",Type.footnote,c.ink2,Modifier.weight(1f),maxLines=1)
             if(pending)MarketButton(if(rewards)"Perk map" else "Choose reward",{rewards=!rewards;selected=-1;catalog=false})
             if(shop.devPreview||unrecorded.isNotEmpty())MarketButton(if(catalog)"Rounds" else if(shop.devPreview)"Dev perks" else "Other perks",{catalog=!catalog;rewards=false;selected=-1})
-            Text("${PerkCombo.entries.count{it.active(shop.perkMask)}} fusions",Type.footnote,c.ink2)
+            val activeFusions=PerkCombo.entries.count{it.active(shop.perkMask)}
+            Text("$activeFusions fusion"+if(activeFusions==1)""else "s",Type.footnote,c.ink2)
         }
         if(!pending&&shop.stage<Bestiary.BOSS_EVERY&&!shop.devPreview)
             StageGateNotice("PERKS & EVOLUTION · STAGE ${Bestiary.BOSS_EVERY}","Clear stage ${Bestiary.BOSS_EVERY} to choose your first boss reward. ${shop.stage}/${Bestiary.BOSS_EVERY} stages cleared.",Modifier.fillMaxWidth().padding(bottom=4.dp))
@@ -530,8 +556,10 @@ private fun statNumber(value:Float,label:String):String{
 @Composable
 private fun RankSockets(cap:Int,owned:Int,offered:Int,tint:Color){
     val c=Theme.colors
-    Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
-        for(row in (1..cap).toList().chunked(12)){
+    BoxWithConstraints(Modifier.fillMaxWidth()){
+      val perRow=((maxWidth.value+3f)/17f).toInt().coerceIn(1,16)
+      Column(verticalArrangement=Arrangement.spacedBy(3.dp)){
+        for(row in (1..cap).toList().chunked(perRow)){
             Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
                 for(rank in row)Canvas(Modifier.size(14.dp)){
                     val r=size.minDimension*.40f
@@ -541,5 +569,6 @@ private fun RankSockets(cap:Int,owned:Int,offered:Int,tint:Color){
                 }
             }
         }
+      }
     }
 }
