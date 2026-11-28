@@ -144,6 +144,21 @@ class UpgradeTreeShopTest {
         assertEquals(ShopMode.TREE,s.shopMode);assertEquals(1,s.treeLevels[n.upgrade]);assertEquals(25,s.treeLastEvolution)
         h.close()
     }
+    @Test fun earlySharedRanksAndSpecialistGatesPermitMeaningfulInvestment(){
+        val w=fixture(4)
+        for(rank in 1..5)buy(w,Upgrades.DAMAGE,rank)
+        for(rank in 1..3)buy(w,Upgrades.MAX_HEALTH,rank)
+        assertFalse(w.shop.canBuyTree(w,0,node(Upgrades.DAMAGE,6).id))
+        assertTrue(UpgradeTree.visibleNodes(TankEvolution.BASIC,0).none{it.lane.specialized})
+        for(frame in TankEvolution.entries)for(lane in UpgradeTree.lanes){
+            val gates=(1..lane.ranks).map{UpgradeTree.minStage(node(lane.upgrade,it),frame)}
+            assertTrue(gates.zipWithNext().all{(a,b)->a<=b})
+        }
+        val ram=node(Upgrades.RAM_DAMAGE)
+        assertEquals(5,UpgradeTree.minStage(node(Upgrades.RAM_DAMAGE,2),TankEvolution.RAMMER))
+        assertTrue(UpgradeTree.price(ram,5,CharacterDef.BALANCED,0)<=Upgrades.price(ram.upgrade,0,5))
+        assertEquals(15,UpgradeTree.minStage(node(Upgrades.DRONE_POWER,2),TankEvolution.OVERSEER))
+    }
     @Test fun stageGatesAndDiscoveryWorkEvenInInfiniteMoney(){
         val w=fixture(1,coins=0);w.infiniteMoney=true
         val n=node(Upgrades.DAMAGE,2)

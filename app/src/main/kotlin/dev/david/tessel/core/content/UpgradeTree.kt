@@ -64,6 +64,20 @@ object UpgradeTree{
     }
     fun visibleNodes(frame:TankEvolution,lastEvolution:Int)=nodes.filter{visibleLane(it.lane,frame,lastEvolution)}
     fun sector(n:UpgradeNode,frame:TankEvolution)=if(frame.drones&&n.lane.sector==UpgradeSector.WEAPON)UpgradeSector.DRONES else n.lane.sector
+    // Keep early shared investment useful, and let newly evolved specialists
+    // catch up without a random-card rarity multiplier. These gates are tree-only.
+    private val stageGates=mapOf(
+        Upgrades.DAMAGE to intArrayOf(1,2,2,3,4,7,10,14,18,23,29,35),
+        Upgrades.MAX_HEALTH to intArrayOf(1,2,3,6,10,15,21),
+        Upgrades.SPEED to intArrayOf(1,2,4,7,10,14,18,23,29,35),
+        Upgrades.MAGNET to intArrayOf(1,3,5,9,14,20,27,35),
+        Upgrades.WEALTH to intArrayOf(1,4,8,14,20),
+        Upgrades.HEAL_POWER to intArrayOf(2,6,12,18,26),
+        Upgrades.FIRE_RATE to intArrayOf(5,5,7,9,12,15,19,23,28,34),
+        Upgrades.RANGE to intArrayOf(5,5,7,9,12,15,19,23,28,34),
+        Upgrades.DRONE_POWER to intArrayOf(15,15,17,20,23),
+        Upgrades.RAM_DAMAGE to intArrayOf(5,5,6,7,8,10,12,14,17,20,24,28,32,36,40)
+    )
     fun minStage(n:UpgradeNode,frame:TankEvolution):Int{
         val l=n.lane
         // Gun specializations have different pacing without removing a valid stat path.
@@ -75,7 +89,8 @@ object UpgradeTree{
             else->0
         }
         // Every rank remains purchasable eventually; late reserves are staggered through stage 49.
-        return (l.firstStage+(n.rank-1)*l.stageStep+shift).coerceIn(if(l.specialized)5 else 1,49)
+        val gate=stageGates[n.upgrade]?.getOrNull(n.rank-1)?: (l.firstStage+(n.rank-1)*l.stageStep)
+        return (gate+shift).coerceIn(if(l.specialized)5 else 1,49)
     }
     fun prerequisite(n:UpgradeNode):UpgradeNode?=if(n.rank>1)node(n.upgrade,n.rank-1)
         else if(n.lane.parent>=0)node(n.lane.parent,n.lane.parentRank) else null
@@ -88,8 +103,14 @@ object UpgradeTree{
         visibleLane(n.lane,frame,lastEvolution)&&stage>=minStage(n,frame)&&
             levels.getOrElse(n.upgrade){0}==n.rank-1&&discovery(n,levels)==UpgradeDiscovery.REVEALED
     fun price(n:UpgradeNode,stage:Int,character:CharacterDef,perkMask:Int):Int{
-        // Guaranteed selection has a modest premium over random single-rank cards.
-        var price=Upgrades.price(n.upgrade,n.rank-1,stage)*1.15
+        // No premium during the early waves; specialist impact/drone ranks
+        // cost slightly less to compensate for their narrower usefulness.
+        val factor=when{
+            n.lane.sector==UpgradeSector.DRONES||n.lane.sector==UpgradeSector.RAM->.90
+            stage<=5->1.0
+            else->1.05
+        }
+        var price=Upgrades.price(n.upgrade,n.rank-1,stage)*factor
         if(character==CharacterDef.BALANCED)price*=.9
         if(perkMask and (1 shl Perks.HAGGLER)!=0)price*=.9
         return price.roundToInt().coerceAtLeast(1)

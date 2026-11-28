@@ -3,3 +3,6 @@
 - Infinite money toggle under profile Developer options. Isolated solo trial, no save or ledger progress, no fabricated wallet or refund spend. Normal and team campaigns unaffected.
 - Full-screen map with visible owned/revealed/hidden ranks, branch selection and tank specs. Stage-five specialization choice reveals relevant lanes; refund incompatible purchases on later transitions. Original portrait Arsenal and gameplay remain unchanged.
 - Format 9 (old saves migrate as classic), protocol 30, versionCode 38. Regression and matched bot campaign audit required before distribution; actual human playtesting remains necessary.
+
+## Balance pass 2
+- First matched 33-campaign audit per mode: TREE reached stage 50 in 10 runs and won 4; CLASSIC reached stage 50 in 9 and won 8. Early tree spending lagged despite larger wallets. Open shared power/hull/speed ranks earlier; allow two initial impact ranks at stage 5 and two drone power ranks at stage 15. Remove early premium, reduce later premium to 5%, discount dedicated impact and drone ranks 10%. Retain all 153 node IDs, legacy mode economy, combat definitions and specialization visibility. Re-run matched audits before handoff.
