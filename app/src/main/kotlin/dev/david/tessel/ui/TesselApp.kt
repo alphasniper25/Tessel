@@ -107,6 +107,7 @@ fun TesselApp(
 
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
+    var profileName by remember { mutableStateOf(lobby.myName) }
     var lobbyOpen by rememberSaveable { mutableStateOf(false) }
     var statsOpen by rememberSaveable { mutableStateOf(false) }
     var cardsOpen by rememberSaveable { mutableStateOf(false) }
@@ -140,6 +141,7 @@ fun TesselApp(
     LaunchedEffect(shop) { shop?.let { lastShop = it } }
     // Opening the tree is always a deliberate player action.
     LaunchedEffect(mode) { treeOpen=false;if(mode!=Mode.HOME)profileOpen=false }
+    LaunchedEffect(lobbyOpen) { if(!lobbyOpen)profileName=lobby.myName }
     LaunchedEffect(summary) { summary?.let { lastSummary = it } }
     LaunchedEffect(Unit) { onStart?.invoke() }
     // Once the host presses Start, every phone leaves the lobby for the arena.
@@ -277,7 +279,7 @@ fun TesselApp(
                 onTree = { game.menuSound();treeOpen=true },
                 onSettings = { game.menuSound();settingsOpen = true },
                 onProfile = { game.menuSound();profileOpen=true },
-                playerName=lobby.myName,
+                playerName=profileName,
                 onLogo = if (settings.devUnlocked) {
                     {
                         settingsOpen = true
@@ -319,8 +321,8 @@ fun TesselApp(
             )
         }
 
-        AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
-            dev.david.tessel.ui.screens.PlayerProfileScreen(lobby.myName,ledger, onName={lobby.setUsername(it)},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
+        AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen && !cardsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
+            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
         }
 
         // The lobby and settings slide in from the trailing edge and leave the same way.
@@ -351,7 +353,7 @@ fun TesselApp(
                 now = System.currentTimeMillis(),
                 onErase = ledgerStore::erase,
                 onBack = { statsOpen = false },
-                onCodex = { statsOpen=false;cardsOpen=true;game.menuSound() },
+                onCodex = { statsOpen=false;profileOpen=false;cardsOpen=true;game.menuSound() },
             )
         }
 

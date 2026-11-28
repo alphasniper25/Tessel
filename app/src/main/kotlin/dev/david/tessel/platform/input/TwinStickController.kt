@@ -68,7 +68,7 @@ class TwinStickController(private val density: Float) {
             height = h.toFloat()
             safe=ScreenFit.safe(w,h,insetLeft,insetTop,insetRight,insetBottom)
             applyRadius()
-            val pad=EDGE_PAD_DP*density
+            val pad=maxOf(EDGE_PAD_DP*density,stickRadius)
             minX=ScreenFit.centered(safe.left,pad,safe.left,safe.right)
             minY=ScreenFit.centered(safe.top,pad,safe.top,safe.bottom)
             maxX=ScreenFit.centered(safe.right,pad,safe.left,safe.right)

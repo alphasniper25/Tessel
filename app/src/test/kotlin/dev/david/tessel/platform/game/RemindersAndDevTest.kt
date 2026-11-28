@@ -134,7 +134,9 @@ class RemindersAndDevTest {
 
     private fun openSettings() {
         settle(1000)
-        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithContentDescription("Player profile").performClick()
+        settle()
+        compose.onNodeWithText("Settings").performScrollTo().performClick()
         settle()
     }
 

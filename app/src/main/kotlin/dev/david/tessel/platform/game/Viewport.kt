@@ -30,6 +30,7 @@ class Viewport {
     fun follow(width: Int, height: Int, zoom: Float, x: Float, y: Float) {
         fit(width, height)
         scale *= zoom.coerceIn(1f, 1.85f)
+        if(width<=0 || height<=0)return
         val spanX = ARENA_W * scale; val spanY = ARENA_H * scale
         left = if (spanX <= width) (width - spanX) / 2f else (width / 2f - x * scale).coerceIn(width - spanX, 0f)
         top = if (spanY <= height) (height - spanY) / 2f else (height / 2f - y * scale).coerceIn(height - spanY, 0f)

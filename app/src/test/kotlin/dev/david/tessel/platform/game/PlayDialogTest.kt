@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.sim.Checkpoint
@@ -186,5 +188,23 @@ class PlayDialogTest {
         compose.onNodeWithText("Shop").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Next Stage").assertIsDisplayed()
+    }
+
+    @Test
+    fun profileIsTheHomeEntryForSettingsAndUnconfiguredServices(){
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithContentDescription("Player profile").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Google sign-in").assertIsDisplayed()
+        compose.onNodeWithText("Not connected · planned").assertIsDisplayed()
+        compose.onNodeWithText("Google Play").assertIsDisplayed()
+        compose.onNodeWithText("Settings").performScrollTo().performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Profile").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Google sign-in").assertIsDisplayed()
+        compose.onNodeWithText("Home").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Play").assertIsDisplayed()
     }
 }

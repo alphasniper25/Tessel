@@ -42,7 +42,7 @@ private fun ProfileMark(modifier:Modifier=Modifier){
 @Composable
 fun ProfileButton(name:String,onClick:()->Unit){
     val c=Theme.colors
-    Row(Modifier.heightIn(min=48.dp).clipProfile().clickable(role=Role.Button,onClick=onClick)
+    Row(Modifier.heightIn(min=48.dp).clickable(role=Role.Button,onClick=onClick)
         .semantics{contentDescription="Player profile"}.padding(horizontal=8.dp),
         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
         Text(name,Type.footnote,c.ink2,Modifier.widthIn(max=112.dp),maxLines=1)
@@ -51,7 +51,6 @@ fun ProfileButton(name:String,onClick:()->Unit){
         }
     }
 }
-private fun Modifier.clipProfile()=this.then(Modifier) // no oversized decorative container
 
 @Composable
 fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,onSettings:()->Unit,onStats:()->Unit,onBack:()->Unit){
