@@ -150,13 +150,13 @@ class RemindersAndDevTest {
     }
 
     @Test
-    fun sevenTapsOnTheVersionAskForTheCodeAndTheRightCodeUnlocks() {
+    fun fiveTapsOnTheVersionAskForTheCodeAndTheRightCodeUnlocks() {
         launch(seen = true)
         openSettings()
-        tapVersion(7)
+        tapVersion(5)
         settle(1500)
         compose.onNodeWithText("Enter the code.").assertExists()
-        for (d in "33155") compose.onNodeWithText(d.toString()).performClick()
+        for (d in "5144") compose.onNodeWithText(d.toString()).performClick()
         settle()
         assertTrue(store.settings.value.devUnlocked)
         compose.onNodeWithText("Start Stage").assertExists()
@@ -166,9 +166,9 @@ class RemindersAndDevTest {
     fun aWrongCodeClearsAndDoesNotUnlock() {
         launch(seen = true)
         openSettings()
-        tapVersion(7)
+        tapVersion(5)
         settle(1500)
-        for (d in "11111") compose.onNodeWithText(d.toString()).performClick()
+        for (d in "1111") compose.onNodeWithText(d.toString()).performClick()
         settle()
         assertFalse(store.settings.value.devUnlocked)
         compose.onNodeWithText("That is not it.").assertExists()
@@ -261,12 +261,53 @@ class RemindersAndDevTest {
     }
 
     @Test
-    fun withDeveloperOptionsOnTheLogoOpensThem() {
-        launch(seen = true)
-        store.update { it.copy(devUnlocked = true) }
+    fun developerOptionsAreBelowSettingsInProfile(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true)}
         settle(1000)
-        compose.onNodeWithContentDescription("Tessel logo").performClick()
+        compose.onNodeWithContentDescription("Player profile").performClick()
         settle()
-        compose.onNodeWithText("Try a Run With These").performScrollTo().assertExists()
+        compose.onNodeWithText("Developer Options").performScrollTo().performClick()
+        settle()
+        compose.onNodeWithText("Open Shop · Stage 1").assertExists()
+        compose.onNodeWithText("Try a Run With These").assertExists()
+    }
+    @Test
+    fun developerCanOpenArbitraryShopWithoutSavingOrCreditingRewards(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true,dev=Dev(startStage=17,startCoins=5000,frame=10,startHp=3))}
+        settle(400)
+        game.startDevShop(Difficulty.NORMAL)
+        waitForMode(Mode.SHOP);settle()
+        val shop=game.shop.value!!
+        assertEquals(17,shop.stage);assertEquals(5000,shop.coins)
+        assertEquals(3,shop.hp);assertTrue(shop.devTrial)
+        assertEquals(3,shop.offers.size)
+        assertTrue(saves.saves.value.isEmpty())
+        game.devRank(dev.david.tessel.core.content.Upgrades.MAX_HEALTH,4)
+        val until=System.currentTimeMillis()+3000
+        while(game.shop.value?.upgradeRanks?.getOrNull(7)!=4&&System.currentTimeMillis()<until){compose.waitForIdle();Thread.sleep(10)}
+        assertEquals(4,game.shop.value!!.upgradeRanks[7])
+        assertEquals(7,game.shop.value!!.hp)
+        game.saveForLater();waitForMode(Mode.HOME)
+        assertTrue(saves.saves.value.isEmpty())
+    }
+    @Test
+    fun directDeveloperCommandsAreRejectedWhenLockedAndInNormalShop(){
+        launch(seen=true)
+        game.startDevShop(Difficulty.NORMAL);settle()
+        assertEquals(Mode.HOME,game.mode.value)
+        saves.write(1,dev.david.tessel.core.sim.Checkpoint(Difficulty.NORMAL,3,200,1,true,0).apply{
+            present[0]=true;hp[0]=10;maxHp[0]=10;coins[0]=200
+        })
+        game.continueRun(1);waitForMode(Mode.SHOP)
+        store.update{it.copy(devUnlocked=true)};settle()
+        game.devRank(0,99);game.devToggleSkill(0);game.devTogglePerk(0)
+        game.startDevShop(Difficulty.NORMAL);settle()
+        assertFalse(game.shop.value!!.devTrial)
+        assertEquals(0,game.shop.value!!.upgradeRanks[0])
+        assertEquals(0L,game.shop.value!!.skillNodes)
+        assertEquals(0,game.shop.value!!.perkMask)
+        assertEquals(200,game.shop.value!!.coins)
     }
 }

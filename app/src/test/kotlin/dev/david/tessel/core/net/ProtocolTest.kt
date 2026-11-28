@@ -125,6 +125,7 @@ class ProtocolTest {
         w.players.coins[CLIENT] = 77
         val s = roundTrip(w)
         assertTrue(s.hasShop)
+        assertEquals(w.players.levels[CLIENT].toList(),s.upgradeRanks.toList())
         assertEquals(77, s.coins[CLIENT])
         for (slot in 0 until dev.david.tessel.core.sim.SHOP_SLOTS) {
             assertEquals(w.shop.item(CLIENT, slot), s.shopItem[slot])

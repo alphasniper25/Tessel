@@ -126,7 +126,7 @@ fun TesselApp(
     LaunchedEffect(tapSeq) {
         if (tapSeq == 0) return@LaunchedEffect
         delay(DevAccess.QUIET_MS)
-        if (taps.settle()) codeOpen = true
+        if (taps.settle() && settingsOpen && !settings.devUnlocked) codeOpen = true
     }
     val startTutorial = {
         settingsOpen = false

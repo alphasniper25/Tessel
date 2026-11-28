@@ -1,54 +1,17 @@
 package dev.david.tessel.core.dev
-
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
-
-class TapCounterTest {
-    private fun taps(c: TapCounter, n: Int) = repeat(n) { c.tap() }
-
-    @Test
-    fun sevenTapsThenQuietOpensIt() {
-        val c = TapCounter()
-        taps(c, 7)
-        assertTrue(c.settle())
-        assertFalse("only once", c.settle())
+class TapCounterTest{
+    @Test fun exactlyFiveThenQuietOnly(){
+        for(n in 0..15){
+            val c=TapCounter();repeat(n){c.tap()}
+            assertEquals(n==5,c.settle());assertFalse(c.settle())
+        }
     }
-
-    @Test
-    fun moreThanSevenDoesNotOpenIt() {
-        val c = TapCounter()
-        taps(c, 8)
-        assertFalse(c.settle())
+    @Test fun separateBurstsCannotAccumulate(){
+        val c=TapCounter();repeat(2){c.tap()};assertFalse(c.settle())
+        repeat(3){c.tap()};assertFalse(c.settle())
+        repeat(5){c.tap()};assertTrue(c.settle())
     }
-
-    @Test
-    fun fewerThanSevenDoesNotOpenIt() {
-        val c = TapCounter()
-        taps(c, 6)
-        assertFalse(c.settle())
-    }
-
-    @Test
-    fun spammingPastSevenAndSettlingStartsOver() {
-        val c = TapCounter()
-        taps(c, 12)
-        assertFalse(c.settle())
-        taps(c, 7)
-        assertTrue(c.settle())
-    }
-
-    @Test
-    fun aPauseInTheMiddleSplitsTheRun() {
-        val c = TapCounter()
-        taps(c, 4)
-        assertFalse("a second of quiet ended the first run", c.settle())
-        taps(c, 3)
-        assertFalse("three more are three, not seven in all", c.settle())
-    }
-
-    @Test
-    fun theCodeIsFiveDigits() {
-        assertTrue(DevAccess.CODE.length == DevAccess.CODE_LENGTH)
-    }
+    @Test fun accessPinHasFourDigits(){assertEquals("5144",DevAccess.CODE);assertEquals(4,DevAccess.CODE_LENGTH)}
 }

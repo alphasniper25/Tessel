@@ -195,9 +195,9 @@ private fun UpgradeTreeMap(shop:ShopView,selected:Int,onSelect:(Int)->Unit,onBuy
             }
         }
         Row(Modifier.align(Alignment.TopStart).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-            SecondaryButton("−",{zoom=(zoom/1.3f).coerceAtLeast(1f);if(zoom==1f){panX=0f;panY=0f}})
-            SecondaryButton("+",{zoom=(zoom*1.3f).coerceAtMost(4f)})
-            SecondaryButton("Fit",{zoom=1f;panX=0f;panY=0f})
+            TreeControl("−",{zoom=(zoom/1.3f).coerceAtLeast(1f);if(zoom==1f){panX=0f;panY=0f}})
+            TreeControl("+",{zoom=(zoom*1.3f).coerceAtMost(4f)})
+            TreeControl("Fit",{zoom=1f;panX=0f;panY=0f})
             Text("${(zoom*100).roundToInt()}%",Type.caption,c.ink2)
         }
         Column(Modifier.align(Alignment.BottomStart).padding(6.dp)){
@@ -215,7 +215,7 @@ private fun UpgradeTreeMap(shop:ShopView,selected:Int,onSelect:(Int)->Unit,onBuy
                         Text(d.name,Type.headline,c.ink)
                         if(focused!=null)Text(focused.rarity.label,Type.caption,rarityColor(focused.rarity,c.accent,c.dark))
                     }
-                    SecondaryButton("×",{onSelect(-1)})
+                    TreeControl("×",{onSelect(-1)})
                 }
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
                     Text(focused?.blurb?:d.blurb,Type.subhead,c.ink)
@@ -306,8 +306,16 @@ private fun PerkTree(shop:ShopView,onReward:(Int)->Unit,onDevPerk:((Int)->Unit)?
                     }
                 }
                 if(onDevPerk!=null&&selected>=0)SecondaryButton(if(owned(selected))"DEV Remove" else "DEV Grant",{onDevPerk(selected)})
-                SecondaryButton("×",{selected=-1;combo=-1})
+                TreeControl("×",{selected=-1;combo=-1})
             }
         }
+    }
+}
+
+@Composable private fun TreeControl(label:String,action:()->Unit){
+    val c=Theme.colors
+    Box(Modifier.height(38.dp).widthIn(min=38.dp).clip(RoundedCornerShape(6.dp)).background(c.track)
+        .clickable(onClick=action).padding(horizontal=8.dp),contentAlignment=Alignment.Center){
+        Text(label,Type.subhead,c.ink)
     }
 }

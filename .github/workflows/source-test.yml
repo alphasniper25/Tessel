@@ -1,9 +1,9 @@
-name: TESSEL alpha.16 source checks
+name: TESSEL alpha.16.1 source checks
 on:
   push:
-    branches: [test/alpha16]
+    branches: [rework/alpha16]
 concurrency:
-  group: alpha16-${{ github.ref }}
+  group: alpha16-rework-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha16-unit-tests
+          name: TESSEL-alpha16-rework-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7

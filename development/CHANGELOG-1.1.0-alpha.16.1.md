@@ -1,0 +1,6 @@
+# TESSEL alpha.16.1 — rework from alpha.16
+- Direct ancestor alpha.16; no alpha.17/18 changes inherited. Version code 40; save format 8; wire 30.
+- Exactly five version taps followed by PIN 5144. Unified developer testing page and profile shortcut below Settings. Open actual stage shop or trial arena with selected stage, wallet, health, any frame, all perks, all 60 skills, rank levels, missions, enemy/boss tuning, invincibility, spawn and speed controls. Trial is always excluded from saved slots and score/mission ledger. Direct shop dev rank/skill/perk/frame/offer controls validate isolated solo trial.
+- Full-screen upgrade graph uses real three random offers and normal buy/lock/refresh/heal/ready actions. No regular upgrade cards. Skills reuse discovery map; Perks tab displays earned/available rewards plus five synergies derived from actual perk mask. No extra perk rewards or random draw changes. New combos: Phoenix Protocol, Siege Cycle, Reactive Armor, Salvage Current, Field Quartermaster.
+- First graphical layout is a constellation prototype, not final owner-approved design. Alternatives presented separately for review.
+- Source-only validation. No APK assembly requested for this candidate.
