@@ -126,7 +126,7 @@ fun DevScreen(
             ) {
                 Group(
                     "Solo Trial",
-                    footer = "These only reach a run started with Try a Run With These. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
+                    footer = "These only reach an explicit developer trial or shop preview. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
                 ) {
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.x4, vertical = Space.x2),

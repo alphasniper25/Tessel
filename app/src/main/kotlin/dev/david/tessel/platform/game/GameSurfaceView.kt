@@ -700,6 +700,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             devUnlocked=s.devUnlocked
             dev = if(devUnlocked)s.dev else Dev()
             applyDev(live = true)
+            if(current==Mode.SHOP&&devRun&&playingAs==Role.SOLO)publishShop()
         }
     }
 

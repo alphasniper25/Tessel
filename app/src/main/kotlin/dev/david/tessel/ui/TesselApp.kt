@@ -66,7 +66,7 @@ import dev.david.tessel.ui.screens.PausePanel
 import dev.david.tessel.ui.screens.PlayPanel
 import dev.david.tessel.ui.screens.RunOverCard
 import dev.david.tessel.ui.screens.SettingsScreen
-import dev.david.tessel.ui.screens.ShopPanel
+import dev.david.tessel.ui.screens.RunShopScreen
 import dev.david.tessel.ui.screens.StatsScreen
 import dev.david.tessel.ui.screens.TutorialCard
 import kotlinx.coroutines.delay
@@ -228,9 +228,14 @@ fun TesselApp(
             )
         }
 
-        Sheet(visible = mode == Mode.SHOP && !treeOpen, onDismiss = null) {
-            (shop ?: lastShop)?.let {
-                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
+        // A single full-screen shop workspace replaces the old upgrade card sheet.
+        if(mode==Mode.SHOP&&!devOpen&&!settingsOpen&&!waitingOnSomeone){
+            (shop?:lastShop)?.let{
+                RunShopScreen(it,settings.vibration,game::buy,game::heal,game::reroll,game::nextStage,
+                    game::pickPerk,game::setCardLocked,game::buySkill,
+                    onSave={if(it.devPreview)game.leaveRun() else game.saveForLater()},
+                    onDevOptions={if(it.devPreview&&settings.devUnlocked)devOpen=true},
+                    onDevRank=game::devRank,onDevPerk=game::devPerk,onDevSkill=game::devSkill)
             }
         }
 
@@ -490,7 +495,8 @@ fun TesselApp(
     }
 
     val treeHandlesBack=treeOpen && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
-    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || devOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
+    val shopHandlesBack=mode==Mode.SHOP&&!devOpen&&!settingsOpen&&lobbyState !is LobbyState.Reconnecting&&!held
+    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && !shopHandlesBack && (profileOpen || devOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false
