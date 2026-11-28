@@ -12,9 +12,19 @@ class PerkComboTest {
             for(id in c.inputs)assertFalse(c.active(c.mask and (1 shl id).inv()))
             assertEquals(c.inputs.size,c.inputs.map{PerkRounds.roundOf(it)}.distinct().size)
         }
-        assertEquals(18,PerkCombo.entries.flatMap{it.inputs}.toSet().size)
-        assertEquals(6,PerkCombo.entries.count{it.inputs.size==2})
-        assertEquals(6,PerkCombo.entries.count{it.inputs.size==3})
+        assertEquals(5,PerkCombo.entries.size)
+        assertEquals(3,PerkCombo.entries.count{it.inputs.size==2})
+        assertEquals(2,PerkCombo.entries.count{it.inputs.size==3})
+        var pairs=0;var triples=0
+        for(a in PerkRounds.pools[0])for(b in PerkRounds.pools[1]){
+            val mask=(1 shl a) or (1 shl b)
+            if(PerkCombo.entries.any{it.active(mask)})pairs++
+            for(c in PerkRounds.pools[2]){
+                val complete=mask or (1 shl c)
+                if(PerkCombo.entries.any{it.inputs.size==3&&it.active(complete)})triples++
+            }
+        }
+        assertEquals(3,pairs);assertEquals(2,triples)
     }
     @Test fun phoenixPulseClearsNearbyShotsAndNegativeStatusWhenSecondWindTriggers(){
         val w=World(seed=12);val p=w.players
@@ -35,17 +45,6 @@ class PerkComboTest {
         w.hurtPlayer(0,Cause.shot(Bestiary.FANNER),loss=2,allowRam=false)
         assertEquals(before-3,p.hp[0])
     }
-    @Test fun purgeProtocolClearsDebuffsOnTenthKillAndLivingArmorRegeneratesAtHalf(){
-        val w=World(seed=12);val p=w.players
-        p.perks[0]=PerkCombo.FIELD_RUNNER.mask or PerkCombo.REACTIVE_PLATING.mask
-        p.kills[0]=9;p.poisonTicks[0]=120;p.stun[0]=20
-        val e=w.spawnEnemy(Bestiary.PIP,p.x[0]+30f,p.y[0])
-        w.damageEnemy(e,100000f,1f,0f,0)
-        assertEquals(10,p.kills[0]);assertEquals(0,p.poisonTicks[0]);assertEquals(0,p.stun[0])
-        p.hp[0]=p.maxHp[0];assertEquals(0,p.regenSeconds(0))
-        p.hp[0]=p.maxHp[0]/2;assertEquals(8,p.regenSeconds(0))
-        p.evolution[0]=TankEvolution.RAMMER;assertEquals(4,p.regenSeconds(0))
-    }
     @Test fun salvageCacheAddsOneFreeRefreshAndPreservesSpentRefreshes(){
         val w=World(seed=12);w.reset(seed=12);w.devOpenShop()
         w.shop.devReward(w,dev.david.tessel.core.dev.DevReward.NONE)
@@ -60,43 +59,46 @@ class PerkComboTest {
         rounds[1]=Perks.SECOND_WIND;rounds[3]=Perks.LAST_STAND
         assertTrue(PerkTimeline.links(rounds,1 shl Perks.SECOND_WIND).isEmpty())
         val links=PerkTimeline.links(rounds,PerkCombo.LAST_LIGHT.mask)
-        assertEquals(listOf(MapLink(200,100),MapLink(201,100)),links)
+        assertEquals(listOf(MapLink(PerkTimeline.perkNode(Perks.SECOND_WIND),100),MapLink(PerkTimeline.perkNode(Perks.LAST_STAND),100)),links)
         assertTrue(PerkTimeline.unrecorded(rounds,PerkCombo.LAST_LIGHT.mask).isEmpty())
         assertEquals(listOf(Perks.SECOND_WIND,Perks.LAST_STAND),PerkTimeline.unrecorded(List(9){-1},PerkCombo.LAST_LIGHT.mask))
     }
 
-    @Test fun thirdRoundCompletesSolarRebirthAndAddsThirdLink(){
-        val w=World(seed=12);val p=w.players
-        p.perks[0]=PerkCombo.SOLAR_REBIRTH.mask
-        p.recordReward(0,10,Perks.SECOND_WIND);p.recordReward(0,20,Perks.LAST_STAND);p.recordReward(0,30,Perks.VITAL_CORE)
-        p.hp[0]=1
-        val x=p.x[0];val y=p.y[0]
-        w.hostile.add(1,x+150f,y,0f,0f,120,1f,5f,0,-1)
-        w.hurtPlayer(0,Cause.shot(Bestiary.FANNER),loss=3,allowRam=false)
-        assertEquals(3,p.hp[0]);assertEquals(0,w.hostile.life[0])
-        val edges=PerkTimeline.links(p.rewardRounds[0].toList(),p.perks[0])
-        assertEquals(3,edges.count{it.b==PerkTimeline.FUSION_BASE+PerkCombo.SOLAR_REBIRTH.ordinal})
-    }
-    @Test fun stormCellPhaseEscapeAndReprisalApplyEngineEffects(){
+    @Test fun tripleFusionCompletesOnlyWithThirdRoundAndLinksAllThreeActualNodes(){
         val w=World(seed=13);val p=w.players
-        p.perks[0]=PerkCombo.STORM_CELL.mask;p.sinceHit[0]=OVERCLOCK_TICKS
-        w.hurtPlayer(0,Cause.shot(Bestiary.FANNER),loss=2,allowRam=false)
-        assertEquals(3*TICK_HZ,p.surge[0])
-        p.perks[0]=PerkCombo.PHASE_ESCAPE.mask or PerkCombo.REPRISAL.mask
-        p.hp[0]=2;p.kills[0]=9;p.poisonTicks[0]=120;p.invuln[0]=0
+        val combo=PerkCombo.PHASE_ESCAPE
+        p.recordReward(0,10,Perks.SIPHON);p.recordReward(0,20,Perks.QUICK_FEET)
+        p.perks[0]=(1 shl Perks.SIPHON) or (1 shl Perks.QUICK_FEET)
+        assertTrue(PerkTimeline.links(p.rewardRounds[0].toList(),p.perks[0]).isEmpty())
+        p.perks[0]=combo.mask;p.recordReward(0,30,Perks.AFTERBURNER)
+        p.hp[0]=2;p.kills[0]=9;p.poisonTicks[0]=120;p.stun[0]=20;p.invuln[0]=0
         val e=w.spawnEnemy(Bestiary.PIP,p.x[0]+30f,p.y[0])
         w.damageEnemy(e,100000f,1f,0f,0)
-        assertEquals(3,p.hp[0]);assertEquals(0,p.poisonTicks[0]);assertEquals(TICK_HZ,p.invuln[0])
+        assertEquals(0,p.poisonTicks[0]);assertEquals(0,p.stun[0]);assertEquals(TICK_HZ,p.invuln[0])
+        assertEquals(combo.inputs.map{MapLink(PerkTimeline.perkNode(it),PerkTimeline.FUSION_BASE+combo.ordinal)},
+            PerkTimeline.links(p.rewardRounds[0].toList(),p.perks[0]))
     }
-    @Test fun surveyorHorizonAndReclamationApplyRealStats(){
+    @Test fun reprisalHealsAtHalfOnlyWithAllThreePerks(){
         val w=World(seed=14);val p=w.players
-        val radius=p.magnet(0);val speed=p.moveSpeed(0)
-        p.perks[0]=PerkCombo.HORIZON.mask
-        assertEquals(radius*1.2f,p.magnet(0),.001f)
-        assertEquals(speed*1.15f,p.moveSpeed(0),.001f)
-        p.hp[0]--;assertEquals(speed,p.moveSpeed(0),.001f)
-        w.devOpenShop();w.shop.devReward(w,dev.david.tessel.core.dev.DevReward.NONE)
-        p.perks[0]=PerkCombo.RECLAMATION.mask
-        val hp=p.hp[0];assertTrue(w.shop.reroll(w,0));assertEquals(hp+1,p.hp[0])
+        p.perks[0]=PerkCombo.REPRISAL.mask;p.hp[0]=2;p.kills[0]=9
+        val e=w.spawnEnemy(Bestiary.PIP,p.x[0]+30f,p.y[0])
+        w.damageEnemy(e,100000f,1f,0f,0);assertEquals(3,p.hp[0])
+        p.perks[0]=p.perks[0] and (1 shl Perks.DEADEYE).inv()
+        p.kills[0]=19;p.hp[0]=2
+        val e2=w.spawnEnemy(Bestiary.PIP,p.x[0]+50f,p.y[0])
+        w.damageEnemy(e2,100000f,1f,0f,0);assertEquals(2,p.hp[0])
+    }
+    @Test fun allEighteenPerksAreOnThreeNonOverlappingConcentricRings(){
+        val pts=Perks.runIds.map{PerkTimeline.perkPoint(it)}
+        for(id in Perks.runIds){
+            val (x,y)=PerkTimeline.perkPoint(id)
+            assertEquals(PerkTimeline.radii[PerkRounds.roundOf(id)],kotlin.math.hypot(x,y),.001f)
+        }
+        for(i in pts.indices)for(j in i+1 until pts.size)
+            assertTrue(kotlin.math.hypot(pts[i].first-pts[j].first,pts[i].second-pts[j].second)>2*PerkTimeline.NODE_RADIUS)
+        for(i in PerkCombo.entries.indices){
+            val (x,y)=PerkTimeline.fusionPoint(i)
+            assertTrue(kotlin.math.hypot(x,y)>PerkTimeline.radii.last()+2*PerkTimeline.NODE_RADIUS)
+        }
     }
 }

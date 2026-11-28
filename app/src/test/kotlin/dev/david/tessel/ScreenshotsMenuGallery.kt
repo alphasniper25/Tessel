@@ -44,8 +44,8 @@ abstract class MenuGalleryBase {
         compose.mainClock.advanceTimeBy(1200)
         compose.waitForIdle()
     }
-    fun capture(name:String){
-        compose.mainClock.advanceTimeBy(500)
+    fun capture(name:String,advance:Long=500L){
+        compose.mainClock.advanceTimeBy(advance)
         compose.waitForIdle()
         val bmp=compose.onRoot().captureToImage().asAndroidBitmap()
         check(bmp.width>100&&bmp.height>100)
@@ -88,11 +88,10 @@ abstract class MenuGalleryBase {
         w.devSetSkillMask(mask);w.players.perks[0]=perks
         val pl=w.players
         if(stage>5)pl.recordReward(0,5,TankEvolution.REWARD_BASE+TankEvolution.TWIN.ordinal)
-        if(stage>=10&&perks and (1 shl Perks.SECOND_WIND)!=0)pl.recordReward(0,10,Perks.SECOND_WIND)
         if(stage>15)pl.recordReward(0,15,TankEvolution.REWARD_BASE+TankEvolution.TRIPLET.ordinal)
-        if(stage>=20&&perks and (1 shl Perks.LAST_STAND)!=0)pl.recordReward(0,20,Perks.LAST_STAND)
         if(stage>25)pl.recordReward(0,25,TankEvolution.REWARD_BASE+TankEvolution.FOCUS.ordinal)
-        if(stage>=30&&perks and (1 shl Perks.VITAL_CORE)!=0)pl.recordReward(0,30,Perks.VITAL_CORE)
+        for((i,at) in PerkRounds.stages.withIndex())if(stage>=at)
+            PerkRounds.pools[i].firstOrNull{perks and (1 shl it)!=0}?.let{pl.recordReward(0,at,it)}
         w.devOpenShop()
         // Choose three valid real offers to make the different rarities visible.
         w.shop.devStock(w,if(repeatMagnet)listOf(CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON),CardCode.pack(Upgrades.MAGNET,CardRarity.RARE),CardCode.pack(Upgrades.DAMAGE,CardRarity.UNCOMMON))else listOf(CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE),CardCode.pack(Upgrades.MAX_HEALTH,CardRarity.COMMON),CardCode.pack(Upgrades.WEALTH,CardRarity.UNCOMMON)))
@@ -111,9 +110,9 @@ abstract class MenuGalleryBase {
             perkOffers=rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
             devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
-    @Composable fun Market(s:ShopView){
+    @Composable fun Market(s:ShopView,onPerk:(Int)->Unit={}){
         currentShop=s
-        RunShopScreen(s,false,{}, {}, {}, {}, {}, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
+        RunShopScreen(s,false,{}, {}, {}, {}, onPerk, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
     }
 }
 @RunWith(RobolectricTestRunner::class)
@@ -185,9 +184,9 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         click("×");click("Perks");capture("36-perks-radial-sigils")
         tapPerkCombo(0);capture("37-perk-combo-active")
         click("×")
-        val (x,y)=PerkTimeline.roundPoint(0)
+        val (x,y)=PerkTimeline.perkPoint(Perks.SECOND_WIND)
         compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
-        capture("38-perk-combo-hint")
+        capture("38-perk-choice-detail")
     }
     @Test fun repeatOffersAndForecast(){
         show{Market(sampleShop(stage=17,wallet=420,repeatMagnet=true))}
@@ -204,14 +203,35 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
     @Test fun perkRoundsBeforeFusion(){
         show{Market(sampleShop(stage=17,perks=1 shl Perks.SECOND_WIND))}
         click("Perks");capture("66-perk-rounds-before-fusion")
-        val (x,y)=PerkTimeline.roundPoint(0)
+        val (x,y)=PerkTimeline.perkPoint(Perks.SECOND_WIND)
         compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
         capture("67-perk-round-inspection")
     }
     @Test fun threeRoundFusionAndRoundChoice(){
-        show{Market(sampleShop(stage=32,perks=PerkCombo.SOLAR_REBIRTH.mask))}
+        show{Market(sampleShop(stage=32,perks=PerkCombo.PHASE_ESCAPE.mask))}
         click("Perks");capture("68-three-round-fusion-map")
-        tapPerkCombo(PerkCombo.SOLAR_REBIRTH.ordinal);capture("69-three-round-fusion-detail")
+        tapPerkCombo(PerkCombo.PHASE_ESCAPE.ordinal);capture("69-three-round-fusion-detail")
+    }
+    @Test fun actualRevealAnimationFrames(){
+        val combo=PerkCombo.PHASE_ESCAPE
+        val before=sampleShop(stage=30,perks=combo.mask and (1 shl Perks.AFTERBURNER).inv(),reward=1)
+        // The real production screen receives a representative valid reward snapshot.
+        val choices=listOf(Perks.AFTERBURNER,Perks.VITAL_CORE,Perks.LONGSHOT).mapIndexed{i,id->PerkOffer(i,Perks.of(id).name,Perks.of(id).blurb,id=id)}
+        var live by mutableStateOf(before.copy(perkOffers=choices))
+        val after=sampleShop(stage=30,perks=combo.mask)
+        show{Market(live){slot->if(slot==0)live=after}}
+        capture("72-before-final-perk")
+        compose.mainClock.autoAdvance=false
+        compose.onAllNodesWithText("Take")[0].performClick()
+        capture("73-fusion-reveal-lines",240)
+        capture("74-fusion-reveal-node",360)
+        capture("75-fusion-reveal-settled",1000)
+        compose.mainClock.autoAdvance=true
+    }
+    @Test fun expandedRankMesh(){
+        show{Market(sampleShop(stage=17,wallet=420,repeatMagnet=true))}
+        capture("76-upgrade-full-circle-mesh")
+        click("+");capture("77-upgrade-full-circle-zoom")
     }
     @Test fun roundThreeChoices(){
         show{Market(sampleShop(stage=30,perks=PerkCombo.LAST_LIGHT.mask,reward=1))}

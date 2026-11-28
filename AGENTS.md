@@ -104,3 +104,6 @@
 ## Alpha.16.1 three-round refinement
 - No generated UI images. Render actual production Compose via existing screenshots job. Three exclusive six-perk pools, stages 10/20/30; one choice per round. Evolution schedule unchanged. Save FORMAT 9 with legacy history, wire 36. New IDs 19–26 (legacy skill IDs 10–18 preserved). Six pair and six triple synergies; keep original perks, core theft disables derived effects. No APK without approval.
 - Full-size rank nodes, same radius on all tracks, expand as rank is purchased/rolled; no miniature rank socket rendering. UI only; existing transaction validation retained. Skill tree untouched.
+
+## Concentric perk refinement
+- Three full concentric perk pools, six nodes each; only chosen perks filled; future rings dim. No hints, sigils, unlock banners, automatic inspection or visible unused fusion nodes. Exactly five secret recipes, 3 pair + 2 triple, real effects. New fusion lines animate to external gold node over 950ms and settle. Wire 37, FORMAT 9. Native Android screenshots, not generated art. No APK.
