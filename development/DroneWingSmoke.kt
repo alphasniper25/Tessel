@@ -14,10 +14,10 @@ fun main(){
  }
  test("destroyed drone waits for serial replenishment; fire rate improves interval") {
   fun time(up:Int):Int{val w=world(TankEvolution.OVERSEER);w.players.levels[0][Upgrades.FIRE_RATE]=up;step(w,1);w.droneWing.hp[0]=0;var n=0;while(w.droneWing.count(0)==0&&n<200){step(w,1);n++};check(w.droneWing.count(0)==1);return n}
-  val a=time(0);val b=time(10);check(a in 60..70);check(b in 30 until a)
+  val a=time(0);val b=time(10);check(a in 55..65);check(b in 30 until a)
  }
  test("loss at full cap waits the full replacement interval") {
-  val w=world(TankEvolution.OVERSEER);step(w,900);w.droneWing.hp[0]=0;step(w,65);check(w.droneWing.count(0)==3);step(w,1);check(w.droneWing.count(0)==4)
+  val w=world(TankEvolution.OVERSEER);step(w,900);w.droneWing.hp[0]=0;val interval=(TankEvolution.OVERSEER.droneSpec!!.respawn*TICK_HZ).toInt();step(w,interval-1);check(w.droneWing.count(0)==3);step(w,1);check(w.droneWing.count(0)==4)
  }
  test("idle orbit, aim-stick rally and release return") {
   val w=world(TankEvolution.OVERSEER);step(w,600);val x=w.players.x[0];val y=w.players.y[0];val d=w.droneWing

@@ -54,3 +54,11 @@
 - Skill IDs 10–18 are appended perk bits; original boss perks remain 0–9. Skill points are earned at stages 7/13/19/26/32/38/44 and recovered from cleared-stage count on older saves; maximum seven points in a normal run. Three independent ranks per branch. No account grind, no new serialized field. Core theft excludes skill bits.
 - Reserve upgrade IDs 20–22 are appended; available only from stage 15. Checkpoint FORMAT=7 uses its existing upgrade-count header; wire version 25 rejects old peers. Preserve three paid slots, locks, free/paid reroll accounting, and local camera only in multiplayer.
 - Assemble only debug APK as an intermediate after unit tests pass; never deliver until pinned permanent test signer, package, monotonic versionCode and APK hash are independently verified.
+
+## Alpha.12 — audio, codex and progression visibility
+- Preserve the original geometric engine and existing save layout, with test application ID unchanged. VersionCode 33; Wire.VERSION 26 deliberately rejects mixed alpha.11/12 peers because drone balance and skill timing changed.
+- First run skill point moves from stage 7 to 3; other six milestones unchanged. Old saves never lose a point. Existing mask, host validation and fixed three shop slots preserved. Show the full tree from home and every shop; pause allows inspection only. No account power grind.
+- Codex filters and read-only previews use all actual frame definitions. CodexDemo is an isolated deterministic World with no persistence, scoring or networking; one preview at a time, loop after 480 ticks. Keep live camera separate.
+- Original synthesized effects only, per-event priorities/rate limits, master volume and menu sound preference. No licensed music.
+- Drone HP/caps unchanged. Invulnerable boss states excluded from contact; small provisional balance changes to reach, damage, speed and refill.
+- Run full Android unit suite then assemble debug; permanent test signing must match the pinned original certificate and version/package check. Never expose private backup/password or publish the temporary CI APK.

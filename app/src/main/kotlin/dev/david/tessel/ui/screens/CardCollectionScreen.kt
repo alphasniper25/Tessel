@@ -49,6 +49,8 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
     var tier by rememberSaveable{mutableIntStateOf(0)}
     var status by rememberSaveable{mutableIntStateOf(0)}
     var family by rememberSaveable{mutableIntStateOf(0)}
+    var cardBuild by rememberSaveable{mutableIntStateOf(0)}
+    var moreFilters by rememberSaveable{mutableStateOf(false)}
     var frameId by rememberSaveable{mutableIntStateOf(-1)}
     var cardId by rememberSaveable{mutableIntStateOf(-1)}
     val detail=frameId>=0 || cardId>=0
@@ -95,7 +97,11 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                     item{Spacer(Modifier.height(12.dp))}
                 }
             }else{
-                FilterBar(listOf("All","Unlocked","Locked","Legacy"),status,{status=it})
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Box(Modifier.weight(1f)){FilterBar(listOf("All","Unlocked","Locked","Legacy"),status,{status=it})}
+                    SecondaryButton(if(moreFilters)"Hide build" else "Build filter",{moreFilters=!moreFilters})
+                }
+                if(moreFilters){FilterBar(BuildFilter.entries.map{it.label},cardBuild,{cardBuild=it})}
                 Spacer(Modifier.height(4.dp))
                 FilterBar(listOf("All families")+CardFamily.entries.map(::familyName),family,{family=it})
                 val cards=(0 until Upgrades.count).filter { id ->
@@ -104,6 +110,7 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                     val unlocked=!legacy && (mission==null || mission.unlocked(totals))
                     (tab!=2 || mission!=null) &&
                     (family==0 || Upgrades.of(id).family.ordinal==family-1) &&
+                    (cardBuild==0 || CodexCatalog.compatible(id,BuildFilter.entries[cardBuild])) &&
                     when(status){1->unlocked;2->!legacy&&!unlocked;3->legacy;else->true}
                 }
                 Text(if(tab==2)"${CardMission.entries.count{it.unlocked(totals)}} / ${CardMission.entries.size} missions unlocked" else "${cards.size} cards · Tap for stats and compatible builds",Type.footnote,c.ink2,Modifier.padding(vertical=4.dp))

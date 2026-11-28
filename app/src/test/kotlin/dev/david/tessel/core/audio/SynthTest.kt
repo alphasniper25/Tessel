@@ -23,4 +23,23 @@ class SynthTest {
         assertEquals("WAVE", String(wav, 8, 4))
         assertEquals(44 + samples.size * 2, wav.size)
     }
+
+    @Test fun allClipsHaveSmoothBoundariesAndDistinctSignatures() {
+        val clips=Synth.Sound.entries.map{Synth.make(it)}
+        for(clip in clips){
+            assertEquals(0,clip.first().toInt());assertEquals(0,clip.last().toInt())
+            assertTrue(clip.size <= Synth.RATE)
+        }
+        assertEquals(clips.size,clips.map{it.contentHashCode()}.toSet().size)
+    }
+    @Test fun weaponVoicesFollowFrames() {
+        val F=dev.david.tessel.core.content.TankEvolution.BASIC
+        assertEquals(Synth.Sound.SHOT,Synth.weapon(F))
+        assertEquals(Synth.Sound.CANNON,Synth.weapon(dev.david.tessel.core.content.TankEvolution.DESTROYER))
+        assertEquals(Synth.Sound.SNIPER,Synth.weapon(dev.david.tessel.core.content.TankEvolution.RANGER))
+        assertEquals(Synth.Sound.RAPID,Synth.weapon(dev.david.tessel.core.content.TankEvolution.MINIGUN))
+        assertEquals(Synth.Sound.DRONE,Synth.weapon(dev.david.tessel.core.content.TankEvolution.OVERSEER))
+        assertEquals(Synth.Sound.RAM,Synth.weapon(dev.david.tessel.core.content.TankEvolution.SPIKE))
+        assertEquals(Synth.Sound.RAIL,Synth.weapon(dev.david.tessel.core.content.TankEvolution.PRISM))
+    }
 }
