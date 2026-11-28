@@ -211,7 +211,7 @@ private fun Tile(
     Column(
         modifier
             .pressScale(source, enabled)
-            .height(if(evolution!=null) 148.dp else 124.dp)
+            .height(if(evolution!=null) 168.dp else 150.dp)
             .alpha(if (faded) 0.45f else 1f)
             .clip(RoundedCornerShape(Corner.button))
             .background(if (c.dark) c.raised else c.ground)

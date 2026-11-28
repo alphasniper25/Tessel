@@ -91,7 +91,7 @@ class Renderer(private val density: Float, palette: Palette) {
     }
 
     /** [me] is the player this phone controls; everyone else is drawn as a teammate. */
-    fun draw(canvas: Canvas, w: World, blend: Float, view: Viewport, shards: Shards, move: StickView, aim: StickView, me: Int) {
+    fun draw(canvas: Canvas, w: World, blend: Float, view: Viewport, shards: Shards, move: StickView, aim: StickView, me: Int, preview: Boolean = false) {
         // Only shows on screens that are not 20:9; marks where the arena stops.
         canvas.drawColor(palette.surface)
         fill.color = palette.ground
@@ -118,8 +118,7 @@ class Renderer(private val density: Float, palette: Palette) {
         }
         for (p in 0 until w.playerCount) if (w.players.present[p]) drawHealth(canvas, w, p, blend, view, p == me)
         drawTeammateMarkers(canvas,w,view,me)
-        drawStick(canvas, move)
-        drawStick(canvas, aim)
+        if(!preview) { drawStick(canvas,move);drawStick(canvas,aim) }
 
         if (showStats) {
             statsPaint.color = palette.ink3

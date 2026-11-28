@@ -88,14 +88,14 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(Space.x2)) {
                 SecondaryButton("Play Together", onTogether, Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
-                    SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
-                    SecondaryButton("Tank & Card Codex", onCards, Modifier.weight(1f))
+                    SecondaryButton("Codex", onCards, Modifier.weight(1f))
+                    SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
                 }
-                SecondaryButton("Skill Tree",onTree,Modifier.fillMaxWidth(),tint=c.accent)
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
+                    SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
                     SecondaryButton("Statistics", onStats, Modifier.weight(1f))
-                    SecondaryButton("Settings", onSettings, Modifier.weight(1f))
                 }
+                SecondaryButton("Settings",onSettings,Modifier.fillMaxWidth())
             }
         }
     }

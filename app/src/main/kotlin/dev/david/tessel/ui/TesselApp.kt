@@ -341,6 +341,7 @@ fun TesselApp(
                 now = System.currentTimeMillis(),
                 onErase = ledgerStore::erase,
                 onBack = { statsOpen = false },
+                onCodex = { statsOpen=false;cardsOpen=true;game.menuSound() },
             )
         }
 
@@ -348,7 +349,7 @@ fun TesselApp(
             visible = cardsOpen && mode == Mode.HOME,
             enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
             exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
-        ) { CardCollectionScreen(ledger, onBack = { cardsOpen = false }) }
+        ) { CardCollectionScreen(ledger, onBack = { cardsOpen = false;game.menuSound() }, onTap=game::menuSound) }
 
         AnimatedVisibility(visible = garageOpen && mode == Mode.HOME, enter = fadeIn(Springs.ui()), exit = fadeOut(Springs.ui())) {
             dev.david.tessel.ui.screens.GarageScreen(settings, ledger, store::update, onBack = { garageOpen = false })
@@ -484,7 +485,7 @@ fun TesselApp(
         }
     }
 
-    BackHandler(enabled = treeOpen || settingsOpen || lobbyOpen || statsOpen || cardsOpen || garageOpen || playOpen || mode != Mode.HOME) {
+    BackHandler(enabled = treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false

@@ -59,7 +59,7 @@ private val tabs = listOf("Overview", "Runs", "Logbook", "Achievements")
  * runs themselves, and a logbook of every enemy and boss met so far.
  */
 @Composable
-fun StatsScreen(ledger: Ledger, now: Long, onErase: () -> Unit, onBack: () -> Unit) {
+fun StatsScreen(ledger: Ledger, now: Long, onErase: () -> Unit, onBack: () -> Unit, onCodex: (() -> Unit)? = null) {
     val c = Theme.colors
     var tab by rememberSaveable { mutableIntStateOf(0) }
     Column(
@@ -71,6 +71,7 @@ fun StatsScreen(ledger: Ledger, now: Long, onErase: () -> Unit, onBack: () -> Un
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
             BackButton("Home", onBack, Modifier.align(Alignment.CenterStart))
             Text("Statistics", Type.headline, c.ink, Modifier.align(Alignment.Center))
+            if(onCodex!=null) dev.david.tessel.ui.components.SecondaryButton("Codex",onCodex,Modifier.align(Alignment.CenterEnd))
         }
         Box(Modifier.fillMaxWidth().padding(horizontal = Space.x6), contentAlignment = Alignment.Center) {
             Segmented(tabs, tab, { tab = it }, Modifier.widthIn(max = 600.dp))

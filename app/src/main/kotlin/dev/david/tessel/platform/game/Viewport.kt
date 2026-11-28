@@ -48,6 +48,13 @@ class Viewport {
         follow(width, height, min(zoom, (target / base).coerceAtLeast(1f)), (minX + maxX) / 2f, (minY + maxY) / 2f)
     }
 
+    /** Close, isolated codex training camera. Never used in live gameplay. */
+    fun preview(width: Int,height: Int,x: Float,y: Float) {
+        scale=min(width/720f,height/360f).coerceAtLeast(.01f)
+        left=width/2f-x*scale
+        top=height/2f-y*scale
+    }
+
     fun screenX(worldX: Float) = left + worldX * scale
     fun screenY(worldY: Float) = top + worldY * scale
 }

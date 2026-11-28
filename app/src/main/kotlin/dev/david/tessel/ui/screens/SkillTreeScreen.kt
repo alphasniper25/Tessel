@@ -3,6 +3,8 @@ package dev.david.tessel.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,7 +29,7 @@ fun SkillTreeScreen(clearedStage:Int, mask:Int, available:List<PerkOffer>, canSp
     val earned=SkillTree.earned(clearedStage)
     val points=SkillTree.unspent(clearedStage,mask)
     val tints=listOf(c.accent,c.perk,c.coin)
-    Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)) {
+    Column(Modifier.fillMaxSize().background(c.ground).pointerInput(Unit){detectTapGestures { }}.windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)) {
         Row(Modifier.fillMaxWidth().height(52.dp),verticalAlignment=Alignment.CenterVertically) {
             BackButton(backLabel,onBack)
             Spacer(Modifier.weight(1f))

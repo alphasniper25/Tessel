@@ -1023,7 +1023,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if(drones>lastDroneCount) sfx.play(Sound.DRONE,now,250L,.45f)
         lastDroneCount=drones
         val hits=snap?.fired?.get(me) ?: shown.players.fired[me]
-        val damage=snap?.dealt?.get(me) ?: shown.players.dealt[me]
+        val damage=snap?.dealt?.get(me)?.toFloat() ?: shown.players.dealt[me]
         if(shown.players.evolution[me].drones && hits>lastDroneHits) sfx.play(Sound.DRONE,now,120L,.8f)
         if(shown.players.evolution[me].melee && damage>lastRamDamage) sfx.play(Sound.RAM,now,150L,.85f)
         lastDroneHits=hits;lastRamDamage=damage
