@@ -115,6 +115,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
                     Wire.UNLOCK_CARD -> world.shop.setLocked(world, player, arg, false)
                     Wire.BUY -> world.shop.buy(world, player, arg)
                     Wire.BUY_SKILL -> world.shop.buySkill(world,player,arg)
+                    Wire.BUY_TREE -> world.shop.buyTree(world,player,arg and 255)
                     Wire.HEAL -> world.shop.heal(world, player)
                     Wire.REROLL -> world.shop.reroll(world, player)
                     Wire.READY -> { markReady(player); false }
@@ -267,7 +268,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
     fun close() = packetEncoder.close()
 
     private fun isShopAction(kind: Int) = when (kind) {
-        Wire.BUY, Wire.HEAL, Wire.REROLL, Wire.PERK, Wire.LOCK_CARD, Wire.UNLOCK_CARD, Wire.BUY_SKILL -> true
+        Wire.BUY, Wire.HEAL, Wire.REROLL, Wire.PERK, Wire.LOCK_CARD, Wire.UNLOCK_CARD, Wire.BUY_SKILL, Wire.BUY_TREE -> true
         else -> false
     }
 

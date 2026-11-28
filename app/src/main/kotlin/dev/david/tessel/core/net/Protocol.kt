@@ -6,6 +6,8 @@ import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.CardCode
+import dev.david.tessel.core.content.ShopMode
+import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.sim.TICK_HZ
 import dev.david.tessel.core.sim.Events
 import dev.david.tessel.core.sim.MAX_COINS
@@ -72,7 +74,7 @@ object Protocol {
         buf.put(w.stage.coerceAtMost(255).toByte())
         buf.put(w.phase.ordinal.toByte())
         buf.putInt(w.stageTicks)
-        buf.put(((if (paused) 1 else 0) or (if (waiting) 2 else 0) or (if (breaking) 4 else 0) or (if (w.victory) 8 else 0)).toByte())
+        buf.put(((if (paused) 1 else 0) or (if (waiting) 2 else 0) or (if (breaking) 4 else 0) or (if (w.victory) 8 else 0) or (if(w.shopMode==ShopMode.TREE)16 else 0)).toByte())
         buf.put(w.difficulty.ordinal.toByte())
         buf.put(w.playerCount.toByte())
         buf.put(ready.toByte())
@@ -224,6 +226,10 @@ object Protocol {
             buf.put((if (s.canReroll(w, forPlayer)) 1 else 0).toByte())
             for (k in 0 until TankEvolution.REWARD_SLOTS) buf.put(s.rewardOffer(forPlayer, k).toByte())
         }
+        if(w.shopMode==ShopMode.TREE){
+            for(level in pl.levels[forPlayer])buf.put(level.toByte())
+            buf.putShort(pl.lastEvolutionStage[forPlayer].toShort())
+        }
     }
 
     /** Reads a snapshot written by [writeSnapshot]; [buf] must sit just past the header. */
@@ -241,6 +247,7 @@ object Protocol {
         s.waiting = flags and 2 != 0
         s.breaking = flags and 4 != 0
         s.victory = flags and 8 != 0
+        s.shopMode=if(flags and 16!=0)ShopMode.TREE else ShopMode.CLASSIC
         s.difficulty = Difficulty.entries[buf.get().toInt()]
         s.playerCount = buf.get().toInt().coerceIn(1, MAX_PLAYERS)
         s.ready = buf.get().toInt() and 0xFF
@@ -385,6 +392,10 @@ object Protocol {
                 s.perkOffer[k] = if (TankEvolution.validReward(id)) id else -1
             }
         }
+        if(s.shopMode==ShopMode.TREE){
+            for(u in s.treeLevels.indices)s.treeLevels[u]=(buf.get().toInt() and 255).coerceIn(0,Upgrades.of(u).maxLevel)
+            s.treeLastEvolution=buf.short.toInt().coerceAtLeast(0)
+        }else{s.treeLevels.fill(0);s.treeLastEvolution=0}
     }
 
     /**

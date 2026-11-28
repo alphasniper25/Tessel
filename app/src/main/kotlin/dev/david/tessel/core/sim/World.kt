@@ -2,6 +2,7 @@ package dev.david.tessel.core.sim
 
 import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.ShopMode
 import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.StatusEffect
 import dev.david.tessel.core.content.CampaignScaling
@@ -98,6 +99,17 @@ class World(seed: Long = 1L) {
     val enemies = EnemyPool(MAX_ENEMIES)
     val coins = CoinPool(MAX_COINS)
     val shop = Shop()
+    var shopMode=ShopMode.CLASSIC
+        private set
+    // Never serialized or accepted from a peer. Only an isolated solo trial may enable this.
+    var infiniteMoney=false
+    fun canAfford(p:Int,price:Int)=price>=0&&(infiniteMoney&&playerCount==1&&!duel.on||players.coins[p]>=price)
+    fun spend(p:Int,price:Int):Int{
+        check(canAfford(p,price))
+        if(infiniteMoney&&playerCount==1&&!duel.on)return 0
+        players.coins[p]-=price
+        return price
+    }
     private val director = Director()
     private val brains = Brains(this)
 
@@ -211,7 +223,9 @@ class World(seed: Long = 1L) {
         reset(seed = seed)
     }
 
-    fun reset(players: Int = 1, seed: Long = rng.nextLong(), difficulty: Difficulty = this.difficulty) {
+    fun reset(players: Int = 1, seed: Long = rng.nextLong(), difficulty: Difficulty = this.difficulty, shopMode:ShopMode=ShopMode.CLASSIC) {
+        this.shopMode=shopMode
+        infiniteMoney=false
         rng.seed(seed)
         practice = false
         this.difficulty = difficulty
@@ -329,7 +343,7 @@ class World(seed: Long = 1L) {
      * the very start of a run; at any other moment the fight in progress is lost.
      */
     fun capture(): Checkpoint {
-        val cp = Checkpoint(difficulty, stage, tick, playerCount, phase == Phase.SHOP, bossesDown)
+        val cp = Checkpoint(difficulty, stage, tick, playerCount, phase == Phase.SHOP, bossesDown).also{it.shopMode=shopMode}
         val pl = players
         for (p in 0 until playerCount) {
             cp.present[p] = pl.present[p]
@@ -364,7 +378,7 @@ class World(seed: Long = 1L) {
      * or went down, comes back at half health.
      */
     fun restore(cp: Checkpoint, seed: Long, seated: (Int) -> Boolean) {
-        reset(players = cp.players, seed = seed, difficulty = cp.difficulty)
+        reset(players = cp.players, seed = seed, difficulty = cp.difficulty,shopMode=cp.shopMode)
         val pl = players
         for (p in 0 until cp.players) {
             pl.maxHp[p] = cp.maxHp[p].coerceAtLeast(1)

@@ -29,6 +29,7 @@ class Checkpoint(
     val inShop: Boolean,
     val bossesDown: Int,
 ) {
+    var shopMode=dev.david.tessel.core.content.ShopMode.CLASSIC
     val present = BooleanArray(MAX_PLAYERS)
     val hp = IntArray(MAX_PLAYERS)
     val maxHp = IntArray(MAX_PLAYERS)
@@ -84,7 +85,7 @@ class Checkpoint(
         buf.putShort(stage.toShort())
         buf.putInt(tick)
         buf.put(players.toByte())
-        buf.put((if (inShop) 1 else 0).toByte())
+        buf.put(((if(inShop)1 else 0) or (if(shopMode==dev.david.tessel.core.content.ShopMode.TREE)2 else 0)).toByte())
         buf.putShort(bossesDown.toShort())
         buf.put(Upgrades.count.toByte())
         buf.put(SHOP_SLOTS.toByte())
@@ -133,7 +134,7 @@ class Checkpoint(
 
     companion object {
         /** Bump when the layout changes. Saves from a version before [OLDEST] are dropped rather than misread. */
-        const val FORMAT = 8
+        const val FORMAT = 9
         private const val OLDEST = 1
 
         /** Null when [bytes] are not a save this version can read. */
@@ -148,12 +149,14 @@ class Checkpoint(
                 val tick = buf.int
                 val players = buf.get().toInt()
                 if (players !in 1..MAX_PLAYERS || stage < 1) return null
-                val inShop = buf.get().toInt() != 0
+                val shopFlags=buf.get().toInt() and 255
+                val inShop=if(format>=9)shopFlags and 1!=0 else shopFlags!=0
                 val bosses = buf.short.toInt()
                 val upgrades = buf.get().toInt() and 0xFF
                 val slots = buf.get().toInt() and 0xFF
                 val cp = Checkpoint(difficulty, stage, tick, players, inShop, bosses)
                 cp.loadedUpgradeCount = upgrades
+                if(format>=9&&shopFlags and 2!=0)cp.shopMode=dev.david.tessel.core.content.ShopMode.TREE
                 for (p in 0 until players) {
                     cp.present[p] = buf.get().toInt() != 0
                     cp.ids[p] = buf.long
