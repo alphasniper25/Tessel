@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,6 +88,7 @@ fun TesselApp(
     soloSaves: SoloSaves,
     updater: Updater,
     onStart: (() -> Unit)?,
+    onArsenalOrientation:(Boolean)->Unit={},
 ) {
     val c = Theme.colors
     val settings by store.settings.collectAsState()
@@ -140,7 +143,11 @@ fun TesselApp(
     LaunchedEffect(settings) { game.applySettings(settings) }
     LaunchedEffect(shop) { shop?.let { lastShop = it } }
     // Opening the tree is always a deliberate player action.
-    LaunchedEffect(mode) { treeOpen=false;if(mode!=Mode.HOME)profileOpen=false }
+    LaunchedEffect(mode) { treeOpen=false;if(mode!=Mode.HOME){profileOpen=false;cardsOpen=false} }
+    val arsenalVisible=cardsOpen && mode==Mode.HOME
+    val orientationRequest by rememberUpdatedState(onArsenalOrientation)
+    LaunchedEffect(arsenalVisible){orientationRequest(arsenalVisible)}
+    DisposableEffect(Unit){onDispose{orientationRequest(false)}}
     LaunchedEffect(lobbyOpen) { if(!lobbyOpen)profileName=lobby.myName }
     LaunchedEffect(summary) { summary?.let { lastSummary = it } }
     LaunchedEffect(Unit) { onStart?.invoke() }
@@ -358,7 +365,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = cardsOpen && mode == Mode.HOME,
+            visible = arsenalVisible,
             enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
             exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
         ) { CardCollectionScreen(ledger, onBack = { cardsOpen = false;game.menuSound() }, onTap=game::menuSound) }
@@ -493,7 +500,8 @@ fun TesselApp(
         }
     }
 
-    BackHandler(enabled = profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME) {
+    val treeHandlesBack=treeOpen && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
+    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false

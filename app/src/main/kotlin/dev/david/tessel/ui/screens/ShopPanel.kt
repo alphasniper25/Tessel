@@ -100,7 +100,7 @@ fun ShopPanel(
                         else -> "${SkillGraph.count(shop.skillNodes)}/60 owned · Save coins to unlock more"
                     },Type.footnote,c.ink2)
                 }
-                dev.david.tessel.ui.components.SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
+                dev.david.tessel.ui.components.SecondaryButton("Skill Tree",onTree,Modifier.weight(1f))
             }
             Spacer(Modifier.height(Space.x2))
         }

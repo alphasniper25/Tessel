@@ -56,7 +56,7 @@ fun HomeScreen(
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)
         .padding(horizontal=Space.x4,vertical=Space.x2)){
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-            Text("TESSEL",Type.caption,c.ink2)
+            Spacer(Modifier.size(1.dp))
             Spacer(Modifier.weight(1f))
             ProfileButton(playerName,onProfile)
         }
@@ -72,7 +72,7 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(Space.x2))
             Text("TESSEL", Type.largeTitle, c.ink)
-            Text("ARENA SURVIVAL  /  ALPHA 15",Type.caption,c.accent)
+            Text("ARENA SURVIVAL  /  ALPHA 16",Type.caption,c.accent)
             Spacer(Modifier.height(Space.x2))
             val best = ledger.bestOverall()
             val line = if (best == null) {
@@ -94,7 +94,7 @@ fun HomeScreen(
                 SecondaryButton("Play Together", onTogether, Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
                     SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
-                    SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
+                    SecondaryButton("Skill Tree",onTree,Modifier.weight(1f))
                 }
                 SecondaryButton("Arsenal", onCards, Modifier.fillMaxWidth())
                 SecondaryButton("Statistics",onStats,Modifier.fillMaxWidth())

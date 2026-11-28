@@ -47,6 +47,8 @@ data class SkillNode(val id:Int,val name:String,val sector:SkillSector,val bonus
     val root get()=!bridge && id%9==0
 }
 data class SkillEdge(val a:Int,val b:Int)
+/** Discovery is a presentation of ownership, never an additional saved or purchasable state. */
+enum class SkillVisibility { HIDDEN, REVEALED, OWNED }
 object SkillGraph {
     const val COUNT=60
     const val FIRST_STAGE=3
@@ -104,6 +106,11 @@ object SkillGraph {
     fun bit(id:Int)=if(id in 0 until COUNT) 1L shl id else 0L
     fun owns(mask:Long,id:Int)=mask and bit(id)!=0L
     fun connected(mask:Long,id:Int)=nodes.getOrNull(id)?.let{it.root || mask and adjacency[id]!=0L}?:false
+    fun visibility(mask:Long,id:Int):SkillVisibility=when {
+        owns(mask,id)->SkillVisibility.OWNED
+        connected(mask,id)->SkillVisibility.REVEALED
+        else->SkillVisibility.HIDDEN
+    }
     fun eligible(mask:Long,id:Int,stage:Int):Boolean{
         val n=nodes.getOrNull(id)?:return false
         return !owns(mask,id) && stage>=n.minStage && connected(mask,id)

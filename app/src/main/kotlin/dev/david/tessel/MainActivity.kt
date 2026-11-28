@@ -1,6 +1,7 @@
 package dev.david.tessel
 
 import android.content.pm.ApplicationInfo
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -59,7 +60,11 @@ class MainActivity : ComponentActivity() {
         // nothing that can be touched, touches fall through to the game view
         // untouched, with no translation between toolkits.
         val menus = ComposeView(this).apply {
-            setContent { TesselTheme { TesselApp(game, lobby, store, ledger, saves, updater, onStart) } }
+            setContent { TesselTheme { TesselApp(game, lobby, store, ledger, saves, updater, onStart,
+                onArsenalOrientation={open->
+                    val desired=if(open) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    if(requestedOrientation!=desired)requestedOrientation=desired
+                }) } }
         }
         setContentView(
             FrameLayout(this).apply {
