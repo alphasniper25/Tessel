@@ -51,4 +51,16 @@ class SettingsStoreTest {
         assertEquals(FpsLimit.NATIVE,custom.fpsLimit);assertEquals(EffectsQuality.LOW,custom.effectsQuality)
         assertTrue(custom.vibration);assertTrue(PerformancePreset.entries.none{it.matches(custom)})
     }
+
+    @Test fun shopModeAndInfiniteTrialPersistButTurningDeveloperModeOffRestoresDefault(){
+        val store=SettingsStore(context)
+        assertEquals(dev.david.tessel.core.content.ShopMode.TREE,store.settings.value.effectiveShopMode)
+        store.update{it.copy(developerMode=true,shopMode=dev.david.tessel.core.content.ShopMode.CLASSIC,dev=it.dev.copy(infiniteMoney=true))}
+        val restored=SettingsStore(context)
+        assertTrue(restored.settings.value.infiniteTrial)
+        assertEquals(dev.david.tessel.core.content.ShopMode.CLASSIC,restored.settings.value.effectiveShopMode)
+        restored.update{it.copy(developerMode=false)}
+        assertFalse(restored.settings.value.infiniteTrial)
+        assertEquals(dev.david.tessel.core.content.ShopMode.TREE,restored.settings.value.effectiveShopMode)
+    }
 }

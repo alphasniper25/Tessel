@@ -245,7 +245,7 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
                         Text(if(evolution)"Your choice reveals the matching upgrade paths." else "This perk stays with you for the run.",Type.footnote,c.ink2)
                         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical=7.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                             for(offer in shop.perkOffers){
-                                Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(8.dp)).padding(8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(8.dp)).clickable(enabled=!ready&&rewardPending<0){if(rewardPending<0){rewardPending=offer.slot;onPerk(offer.slot)}}.padding(8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                     offer.evolution?.let{TankPreview(build.character,build.look,Modifier.size(56.dp),it)}
                                     Column(Modifier.weight(1f)){Text(offer.name,Type.headline,c.ink);Text(offer.blurb,Type.footnote,c.ink2)}
                                     SecondaryButton("Choose",{if(rewardPending<0){rewardPending=offer.slot;onPerk(offer.slot)}},enabled=!ready&&rewardPending<0)

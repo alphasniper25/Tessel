@@ -18,6 +18,12 @@ import androidx.compose.ui.geometry.Offset
 import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.ui.screens.SkillMapCamera
 import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.ShopMode
+import dev.david.tessel.core.content.UpgradeTree
+import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.ui.screens.UpgradeMapLayout
+import dev.david.tessel.ui.screens.UpgradeMapCamera
 import dev.david.tessel.core.sim.Checkpoint
 import dev.david.tessel.platform.net.CoopLobby
 import dev.david.tessel.platform.store.LedgerStore
@@ -51,6 +57,7 @@ class PlayDialogTest {
     private lateinit var game: GameSurfaceView
     private lateinit var saves: SoloSaves
     private val orientationRequests=mutableListOf<Boolean>()
+    private lateinit var store:SettingsStore
     private fun tapSkill(id:Int){
         val n=SkillGraph.nodes[id]
         compose.onNodeWithTag("skill-map").performTouchInput {
@@ -69,8 +76,8 @@ class PlayDialogTest {
         val ledger = LedgerStore(File(dir, "ledger.dat"))
         game.ledger = ledger
         val lobby = CoopLobby(compose.activity, game)
-        val store = SettingsStore(compose.activity)
-        store.update { it.copy(tutorialSeen = true) }
+        store = SettingsStore(compose.activity)
+        store.update { it.copy(tutorialSeen = true,developerMode=false,shopMode=ShopMode.TREE,dev=dev.david.tessel.platform.store.Dev()) }
         val updater = Updater(compose.activity)
         compose.setContent { TesselTheme { TesselApp(game, lobby, store, ledger, saves, updater, null,onArsenalOrientation={orientationRequests.add(it)}) } }
     }
@@ -149,6 +156,7 @@ class PlayDialogTest {
 
     @Test
     fun skillTreeIsVisibleFromHomeBeforeAnyRunAndCanReturn() {
+        store.update{it.copy(developerMode=true,shopMode=ShopMode.CLASSIC)}
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Skill Tree").performClick()
         compose.waitForIdle()
@@ -241,5 +249,74 @@ class PlayDialogTest {
         compose.onNodeWithText("Home").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Play").assertIsDisplayed()
+    }
+
+    private fun tapUpgrade(upgrade:Int,rank:Int,frame:TankEvolution=TankEvolution.BASIC,lastEvolution:Int=0){
+        val n=UpgradeTree.node(upgrade,rank)!!
+        val layout=UpgradeMapLayout(frame,lastEvolution)
+        val point=layout.point(n.id)!!
+        compose.onNodeWithTag("upgrade-map").performTouchInput{
+            val cam=UpgradeMapCamera()
+            click(Offset(cam.sx(layout,width.toFloat(),height.toFloat(),point.x),cam.sy(layout,width.toFloat(),height.toFloat(),point.y)))
+        }
+        compose.waitForIdle()
+    }
+
+    @Test fun newCampaignUsesTreeAndExistingClassicSaveRemainsClassic(){
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Skill Tree").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("upgrade-map").assertIsDisplayed()
+        compose.onNodeWithText("Specialization revealed after your stage 5 choice").assertIsDisplayed()
+        compose.onNodeWithText("Specs").performClick()
+        compose.onNodeWithText("Current build").assertIsDisplayed()
+        compose.onNodeWithText("×").performClick()
+        compose.onNodeWithText("Home").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Play").performClick()
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onNodeWithText("New Run").performClick()
+        waitForMode(Mode.PLAYING)
+        val until=System.currentTimeMillis()+5000
+        while(saves.saves.value.isEmpty()&&System.currentTimeMillis()<until)Thread.sleep(10)
+        assertEquals(ShopMode.TREE,saves.saves.value.first().checkpoint.shopMode)
+    }
+
+    @Test fun treeShopPurchasesRealRankAndShowsSpecsWithoutCardShop(){
+        val cp=Checkpoint(Difficulty.NORMAL,3,200,1,true,0).also{it.shopMode=ShopMode.TREE}
+        cp.present[0]=true;cp.hp[0]=10;cp.maxHp[0]=10;cp.coins[0]=200
+        saves.write(1,cp)
+        compose.mainClock.advanceTimeBy(1000);compose.onNodeWithText("Play").performClick();compose.mainClock.advanceTimeBy(1500)
+        compose.onNodeWithText("Continue").performClick();waitForMode(Mode.SHOP);compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("upgrade-map").assertIsDisplayed()
+        compose.onNodeWithText("Refresh",substring=true).assertDoesNotExist()
+        tapUpgrade(Upgrades.DAMAGE,1)
+        val price=UpgradeTree.price(UpgradeTree.node(Upgrades.DAMAGE,1)!!,3,dev.david.tessel.core.content.CharacterDef.BALANCED,0)
+        compose.onNodeWithText("Unlock · $price").performScrollTo().performClick()
+        val until=System.currentTimeMillis()+5000
+        while(game.shop.value?.treeBuild?.levels?.get(Upgrades.DAMAGE)!=1&&System.currentTimeMillis()<until){compose.waitForIdle();Thread.sleep(10)}
+        assertEquals(1,game.shop.value?.treeBuild?.levels?.get(Upgrades.DAMAGE))
+        assertEquals(200-price,game.shop.value?.coins)
+        compose.onNodeWithText("×").performClick()
+        compose.onNodeWithText("Specs").performClick()
+        compose.onNodeWithText("Current build").assertIsDisplayed()
+        compose.onNodeWithText("Shot damage").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("×").performClick()
+        compose.onNodeWithText("Next Stage").performClick()
+        waitForMode(Mode.PLAYING)
+    }
+
+    @Test fun profileDeveloperToggleSelectsLegacyShopAndInfiniteTrialDoesNotSave(){
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithContentDescription("Player profile").performClick();compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Developer options").performScrollTo().performClick()
+        compose.onNodeWithText("Card shop").performScrollTo().performClick()
+        compose.onNodeWithText("Infinite money").performScrollTo().performClick()
+        compose.runOnIdle{assertTrue(store.settings.value.infiniteTrial);assertEquals(ShopMode.CLASSIC,store.settings.value.effectiveShopMode)}
+        compose.onNodeWithText("Home").performClick();compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Play").performClick();compose.mainClock.advanceTimeBy(1500)
+        compose.onNodeWithText("Start Trial").performClick()
+        waitForMode(Mode.PLAYING);Thread.sleep(200)
+        assertTrue(saves.saves.value.isEmpty())
     }
 }

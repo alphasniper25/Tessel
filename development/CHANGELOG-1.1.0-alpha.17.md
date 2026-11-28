@@ -1,0 +1,5 @@
+# TESSEL alpha.17 — upgrade tree campaign
+- New default tree shop, classic shop retained via developer options; persisted run mode and host synchronization. 153 possible rank nodes in the catalog, with shared and tank-specific paths. Stage gates, prerequisites and explicit costs; no rarity or random cards. Legendary Core Breaker and retired cards omitted. Nonlegendary upgrade effects unlocked by run progression rather than card draws. Existing boss perk and evolution choices retained.
+- Infinite money toggle under profile Developer options. Isolated solo trial, no save or ledger progress, no fabricated wallet or refund spend. Normal and team campaigns unaffected.
+- Full-screen map with visible owned/revealed/hidden ranks, branch selection and tank specs. Stage-five specialization choice reveals relevant lanes; refund incompatible purchases on later transitions. Original portrait Arsenal and gameplay remain unchanged.
+- Format 9 (old saves migrate as classic), protocol 30, versionCode 38. Regression and matched bot campaign audit required before distribution; actual human playtesting remains necessary.

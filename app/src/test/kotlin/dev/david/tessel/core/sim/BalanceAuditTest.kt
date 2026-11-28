@@ -111,6 +111,30 @@ class BalanceAuditTest {
             check(s.pickPerk(w,p,best))
         }
         repeat(2){if(pl.hp[p]<=pl.maxHp[p]-3&&s.canHeal(w,p))s.heal(w,p)}
+        if(w.shopMode==ShopMode.TREE){
+            var spend=0
+            var ranks=0
+            repeat(8){
+                val f=pl.evolution[p]
+                val candidate=UpgradeTree.nodes.filter{s.canBuyTree(w,p,it.id)}.maxByOrNull{node->
+                    val weight=when(UpgradeTree.sector(node,f)){
+                        UpgradeSector.POWER->10.0
+                        UpgradeSector.HULL->if(pl.hp[p]<pl.maxHp[p]*.65f)11.0 else 6.0
+                        UpgradeSector.MOBILITY->5.0
+                        UpgradeSector.ECONOMY->if(w.stage<18)5.5 else 2.5
+                        UpgradeSector.WEAPON->8.0
+                        UpgradeSector.DRONES->10.0
+                        UpgradeSector.RAM->10.0
+                    }
+                    val priority=when(node.upgrade){Upgrades.DAMAGE->1.45;Upgrades.FIRE_RATE,Upgrades.DRONE_POWER,Upgrades.RAM_DAMAGE->1.30;Upgrades.MAGNET->.80;else->1.0}
+                    val price=UpgradeTree.price(node,w.stage,pl.character[p],pl.perks[p])
+                    weight*priority/price.coerceAtLeast(1)
+                } ?:return@repeat
+                val before=pl.coins[p]
+                if(s.buyTree(w,p,candidate.id)){spend+=before-pl.coins[p];ranks++}
+            }
+            return ShopResult(ranks,spend)
+        }
         val budget=pl.coins[p]
         // Three profiles spend roughly 20%, 35% or 50% of shop-entry cash on the graph.
         val fraction=when(policy%3){0->.20;1->.35;else->.50}
@@ -177,16 +201,17 @@ class BalanceAuditTest {
 
     @Test fun matchedCampaignsMeasureActualShopAndSkillPacing(){
         val dir=directory()
+        val shopMode=if(System.getenv("TESSEL_SHOP_MODE")=="TREE")ShopMode.TREE else ShopMode.CLASSIC
         val goals=listOf(TankEvolution.FOCUS,TankEvolution.GATLING,TankEvolution.ANNIHILATOR,TankEvolution.RANGER,TankEvolution.MOTHERSHIP,TankEvolution.SPIKE)
         File(dir,"campaigns.csv").bufferedWriter().use{out->
-            out.appendLine("difficulty,team,goal,seed,stage,victory,ended,seconds,earned,wallet,peak_wallet,card_purchases,upgrade_ranks,skill_nodes,skill_spend,first_skill_stage,damage,kills,hits,bosses,final_frame,peak_enemies")
+            out.appendLine("difficulty,team,goal,seed,stage,victory,ended,seconds,earned,wallet,peak_wallet,purchases,upgrade_ranks,legacy_skill_nodes,tree_or_skill_spend,first_skill_stage,damage,kills,hits,bosses,final_frame,peak_enemies")
             File(dir,"stages.csv").bufferedWriter().use{stages->
-                stages.appendLine("difficulty,team,goal,seed,stage,earned_delta,wallet_before,wallet_after,card_purchases,upgrade_ranks,skill_nodes,skill_spend,hp,max_hp,frame")
+                stages.appendLine("difficulty,team,goal,seed,stage,earned_delta,wallet_before,wallet_after,purchases,upgrade_ranks,legacy_skill_nodes,tree_or_skill_spend,hp,max_hp,frame")
                 val cases=Difficulty.entries.flatMap{d->goals.mapIndexed{i,g->Triple(d,1,g)}}+
                     goals.map{Triple(Difficulty.NORMAL,2,it)}+listOf(TankEvolution.PRISM,TankEvolution.DREADNOUGHT,TankEvolution.TEMPEST).map{Triple(Difficulty.NORMAL,1,it)}
                 for((idx,case) in cases.withIndex()){
                     val (d,team,goal)=case;val seed=8803L+idx*177L
-                    val w=World(seed);w.reset(team,seed,d)
+                    val w=World(seed);w.reset(team,seed,d,shopMode)
                     for(p in 0 until team)w.players.chooseCharacter(p,CharacterDef.entries[(idx+p)%CharacterDef.entries.size],d.bonusHp)
                     val inp=Array(MAX_PLAYERS){PlayerInput()}
                     var ticks=0;var purchases=0;var previousEarned=0;var peakWallet=0;var peak=0;var firstSkill=-1;var skillSpend=0
@@ -197,7 +222,7 @@ class BalanceAuditTest {
                             val result=shop(w,0,goal,idx);val bought=result.cards;purchases+=bought
                             if(team==2)shop(w,1,goals[(idx+1)%goals.size],idx+1)
                             val newMask=p.skillMask(0);val spend=result.skillSpend
-                            skillSpend+=spend;if(firstSkill<0&&newMask!=0L)firstSkill=w.stage
+                            skillSpend+=spend;if(firstSkill<0&&(newMask!=0L||(shopMode==ShopMode.TREE&&bought>0)))firstSkill=w.stage
                             stages.appendLine(listOf(d.name,team,goal.label,seed,w.stage,p.earned[0]-previousEarned,before,p.coins[0],bought,p.bought(0),SkillGraph.count(newMask),spend,p.hp[0],p.maxHp[0],p.evolution[0].label).joinToString(","))
                             stages.flush();previousEarned=p.earned[0];w.nextStage()
                         }

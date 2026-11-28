@@ -493,7 +493,7 @@ fun TesselApp(
         if(treeOpen && !waitingOnSomeone && (mode==Mode.HOME || mode==Mode.SHOP || mode==Mode.PAUSED)) {
             val currentShop=shop.takeIf { mode==Mode.SHOP }
             val run=runStats.takeIf { mode==Mode.PAUSED }
-            val preview=run?.treeBuild ?: if(mode==Mode.HOME&&settings.effectiveShopMode==ShopMode.TREE)UpgradeBuild(character=settings.tankClass,look=settings.tankLook) else null
+            val preview=run?.treeBuild ?: if(mode==Mode.HOME&&settings.effectiveShopMode==ShopMode.TREE)UpgradeBuild(character=settings.tankClass,look=settings.tankLook,hp=(dev.david.tessel.core.content.Balance.PLAYER_HP+settings.difficulty.bonusHp+settings.tankClass.extraHp).coerceAtLeast(1),maxHp=(dev.david.tessel.core.content.Balance.PLAYER_HP+settings.difficulty.bonusHp+settings.tankClass.extraHp).coerceAtLeast(1)) else null
             if(preview!=null){
                 UpgradeTreeShopScreen((run?.stage?:1).minus(1).coerceAtLeast(0),preview,run?.coinsInHand?:0,
                     backLabel=if(mode==Mode.PAUSED)"Pause" else "Home",infinite=run?.infiniteMoney==true,onBack={treeOpen=false;game.menuSound()})

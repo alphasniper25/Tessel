@@ -1,9 +1,9 @@
-name: TESSEL alpha.16 source checks
+name: TESSEL alpha.17 source checks
 on:
   push:
-    branches: [test/alpha16]
+    branches: [test/alpha17]
 concurrency:
-  group: alpha16-${{ github.ref }}
+  group: alpha17-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,9 +33,51 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha16-unit-tests
+          name: TESSEL-alpha17-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7
-      # Source-only candidate: no APK assembly, signing or publication.
+      - name: Assemble authorized debug APK intermediate
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TESSEL-alpha17-debug-intermediate-NOT-UPDATE-SIGNED
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
 
+
+  campaign-balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [CLASSIC,TREE]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+      - name: Matched legal-purchase campaign audit
+        env:
+          TESSEL_BALANCE_AUDIT: '1'
+          TESSEL_SHOP_MODE: ${{ matrix.mode }}
+          TESSEL_BALANCE_OUT: ${{ github.workspace }}/balance-results
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest --tests '*BalanceAuditTest.matchedCampaignsMeasureActualShopAndSkillPacing'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TESSEL-alpha17-balance-${{ matrix.mode }}
+          path: |
+            balance-results/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 30
