@@ -1332,6 +1332,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     }
 
     private fun dropCoop() {
+        // Clear sandbox/practice discoveries before resetting the isolation flags.
+        if(cheating||practice!=null)tally.clear()
         checkpoint = null
         duelSetup = null
         duelFlow.value = false

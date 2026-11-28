@@ -300,4 +300,25 @@ class RemindersAndDevTest {
         assertEquals(Mode.HOME,game.mode.value)
         assertEquals(null,game.shop.value)
     }
+
+    @Test
+    fun leavingADeveloperTrialCannotLeakEnemyLogbookEntries(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true)}
+        settle(400)
+        game.startDevRun(Difficulty.NORMAL)
+        waitForMode(Mode.PLAYING)
+        assertTrue(game.sandbox.value)
+        // Simulate pending enemy discovery from the current frame before leaving.
+        val field=GameSurfaceView::class.java.getDeclaredField("tally").apply{isAccessible=true}
+        val tally=field.get(game) as dev.david.tessel.core.stats.Tally
+        tally.defeat(0,17)
+        game.leaveRun()
+        waitForMode(Mode.HOME)
+        assertFalse(game.sandbox.value)
+        assertFalse(game.ledger!!.state.value.seen[0])
+        assertEquals(0,game.ledger!!.state.value.defeated[0])
+        assertEquals(0,game.ledger!!.state.value.totals.runs)
+        assertTrue(saves.saves.value.isEmpty())
+    }
 }
