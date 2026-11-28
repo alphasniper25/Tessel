@@ -38,7 +38,7 @@ internal fun DrawScope.perkSigil(code:Int,at:Offset,unit:Float,color:Color){
         val x=at.x+(k-1)*unit*2.7f
         fun p(a:Float,b:Float)=Offset(x+a*unit,at.y+b*unit)
         fun l(a:Float,b:Float,c:Float,d:Float)=drawLine(color,p(a,b),p(c,d),width,StrokeCap.Round)
-        when((code*3+k*2)%7){
+        when((code/(if(k==0)1 else if(k==1)7 else 49)+k*2)%7){
             0->{l(-.8f,1f,0f,-1f);l(0f,-1f,.8f,1f);l(-.45f,.1f,.45f,.1f)}
             1->{l(0f,-1f,0f,1f);l(0f,-1f,.85f,-.4f);l(.85f,-.4f,0f,.2f);l(0f,.2f,-.7f,.8f)}
             2->{l(-.8f,-1f,.8f,-1f);l(.8f,-1f,-.8f,1f);l(-.8f,1f,.8f,1f);l(0f,-.35f,0f,.35f)}
