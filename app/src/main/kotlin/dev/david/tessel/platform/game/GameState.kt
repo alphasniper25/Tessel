@@ -4,6 +4,7 @@ import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.sim.Cause
+import dev.david.tessel.core.sim.UpgradeBuild
 import dev.david.tessel.core.tutorial.TutorialStep
 
 /** What the screen is doing, as the menus see it. */
@@ -63,6 +64,8 @@ class ShopView(
     val perkMask: Int = 0,
     val skillNodes: Long = 0L,
     val freeRefreshesLeft: Int = 0,
+    val treeBuild:UpgradeBuild?=null,
+    val infiniteMoney:Boolean=false,
 )
 
 /** One player's column in the run's statistics. */
@@ -116,8 +119,10 @@ class RunSummary(
     val won: Boolean = false,
     val skillNodes: Long = 0L,
     val coinsInHand: Int = 0,
+    val treeBuild:UpgradeBuild?=null,
+    val infiniteMoney:Boolean=false,
 ) {
     val you get() = team.firstOrNull { it.you }
 
-    fun withBest(best: Boolean) = RunSummary(seconds, stage, kills, coins, difficulty, players, bosses, team, score, breakdown, killedBy, best, perks, duel, won, skillNodes, coinsInHand)
+    fun withBest(best: Boolean) = RunSummary(seconds, stage, kills, coins, difficulty, players, bosses, team, score, breakdown, killedBy, best, perks, duel, won, skillNodes, coinsInHand, treeBuild, infiniteMoney)
 }

@@ -65,9 +65,11 @@ fun PlayPanel(
     initialCharacter: CharacterDef = CharacterDef.BALANCED,
     look: dev.david.tessel.core.content.TankLook = dev.david.tessel.core.content.TankLook(),
     onBack: (() -> Unit)? = null,
+    trial:Boolean=false,
+    shopMode:dev.david.tessel.core.content.ShopMode=dev.david.tessel.core.content.ShopMode.TREE,
 ) {
     val c = Theme.colors
-    val full = saves.size >= SoloSaves.SLOTS
+    val full = !trial&&saves.size >= SoloSaves.SLOTS
     var selected by remember(initialCharacter) { mutableIntStateOf(initialCharacter.ordinal) }
     val frame=CharacterDef.fromId(selected)
     // Permanent header and footer; only the two content columns scroll. No fixed 292dp sheet.
@@ -78,7 +80,7 @@ fun PlayPanel(
             Spacer(Modifier.weight(1f))
             Text("Start a run",Type.title2,c.ink)
             Spacer(Modifier.weight(1f))
-            Text("SOLO",Type.caption,c.ink2)
+            Text(if(trial)"DEV TRIAL" else shopMode.label.uppercase(),Type.caption,c.ink2)
         }
         Divider()
         Row(Modifier.weight(1f).fillMaxWidth().padding(vertical=Space.x2),horizontalArrangement=Arrangement.spacedBy(Space.x4)){
@@ -126,9 +128,9 @@ fun PlayPanel(
         Row(Modifier.fillMaxWidth().padding(top=Space.x2),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(Space.x4)){
             Column(Modifier.weight(1f)){
                 Text(if(full)"All slots occupied" else "${difficulty.label} · ${frame.label}",Type.headline,c.ink)
-                Text(if(full)"Delete a saved run to start another." else "First evolution after stage 5",Type.footnote,c.ink2)
+                Text(if(full)"Delete a saved run to start another." else if(trial)"Infinite money · no saved progress" else "First evolution after stage 5",Type.footnote,c.ink2)
             }
-            PrimaryButton("New Run",{if(onNewCharacter==null)onNew() else onNewCharacter(frame)},Modifier.weight(1f),enabled=!full)
+            PrimaryButton(if(trial)"Start Trial" else "New Run",{if(onNewCharacter==null)onNew() else onNewCharacter(frame)},Modifier.weight(1f),enabled=!full)
         }
     }
 }
@@ -145,7 +147,7 @@ private fun SavedRun(save: SoloSave, now: Long, onContinue: () -> Unit, onDelete
             .background(c.raised)
             .padding(Space.x3),
     ) {
-        Text("Stage ${cp.nextStage}  ·  ${cp.difficulty.label}", Type.headline, c.ink, maxLines = 1)
+        Text("Stage ${cp.nextStage}  ·  ${cp.difficulty.label} · ${cp.shopMode.label}", Type.headline, c.ink, maxLines = 1)
         Text("Score ${grouped(cp.score())}  ·  ${clock(cp.seconds)}  ·  ${ago(save.savedAt, now)}",
             Type.footnote.merge(Type.numbers), c.ink2, maxLines = 1)
         if (asking == 0) {

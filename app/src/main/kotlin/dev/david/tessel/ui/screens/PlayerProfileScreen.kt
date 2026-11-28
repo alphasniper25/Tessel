@@ -25,6 +25,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.AccountProgress
+import dev.david.tessel.core.content.ShopMode
+import dev.david.tessel.platform.store.Settings
 import dev.david.tessel.core.content.GarageCatalog
 import dev.david.tessel.core.stats.Ledger
 import dev.david.tessel.ui.components.*
@@ -53,7 +55,7 @@ fun ProfileButton(name:String,onClick:()->Unit){
 }
 
 @Composable
-fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,onSettings:()->Unit,onStats:()->Unit,onBack:()->Unit){
+fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,onSettings:()->Unit,onStats:()->Unit,onBack:()->Unit,settings:Settings=Settings(),onChange:((Settings)->Settings)->Unit={},onAdvanced:()->Unit={}){
     val c=Theme.colors
     var username by rememberSaveable(initialName){mutableStateOf(initialName)}
     var saved by rememberSaveable{mutableStateOf(false)}
@@ -104,6 +106,15 @@ fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,o
                 SecondaryButton("Settings",onSettings,Modifier.fillMaxWidth())
                 SecondaryButton("Statistics",onStats,Modifier.fillMaxWidth())
                 Text("${GarageCatalog.earned(ledger.totals)} lifetime garage credits earned",Type.footnote,c.ink2)
+                Divider()
+                ToggleRow("Developer options",settings.developerMode,{v->onChange{it.copy(developerMode=v)}},detail="Test alternate shops and solo-run tools.")
+                if(settings.developerMode){
+                    Text("Shop for new campaigns",Type.subhead,c.ink)
+                    Segmented(listOf("Card shop","Upgrade tree"),settings.shopMode.ordinal,{i->onChange{it.copy(shopMode=ShopMode.entries[i])}})
+                    Text("Existing saves keep their original shop. The host chooses the team shop.",Type.caption,c.ink2)
+                    ToggleRow("Infinite money",settings.dev.infiniteMoney,{v->onChange{it.copy(dev=it.dev.copy(infiniteMoney=v))}},detail="Solo test runs only; no saves, scores or account rewards.")
+                    SecondaryButton("Advanced developer options",onAdvanced,Modifier.fillMaxWidth())
+                }
             }
         }
     }

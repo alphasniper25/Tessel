@@ -49,7 +49,7 @@ private fun sectorTint(sector:SkillSector,dark:Boolean):Color {
  * names or effects. Ownership is the only source of discovery. */
 @Composable
 fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
-    onSpend:(Int)->Unit,onBack:()->Unit,backLabel:String="Home") {
+    onSpend:(Int)->Unit,onBack:()->Unit,backLabel:String="Home",infiniteMoney:Boolean=false) {
     val c=Theme.colors
     var selected by rememberSaveable { mutableIntStateOf(-1) }
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
@@ -80,7 +80,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
             Spacer(Modifier.weight(1f))
             Text("$count / ${SkillGraph.COUNT} unlocked",Type.subhead,c.ink)
             Spacer(Modifier.width(10.dp))
-            if(backLabel=="Home")Text("Preview",Type.footnote,c.ink2) else CoinAmount(coins,style=Type.headline)
+            if(backLabel=="Home")Text("Preview",Type.footnote,c.ink2) else if(infiniteMoney)Text("∞",Type.headline,c.coin) else CoinAmount(coins,style=Type.headline)
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(bottom=4.dp).clip(RoundedCornerShape(10.dp)).background(c.surface)) {
             val wide=maxWidth>=580.dp

@@ -3,6 +3,7 @@ package dev.david.tessel.platform.store
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.ShopMode
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.GarageCatalog
 import dev.david.tessel.core.content.TankLook
@@ -36,11 +37,12 @@ data class Dev(
     val invincible: Boolean = false,
     val noSpawns: Boolean = false,
     val speed: Float = 1f,
+    val infiniteMoney:Boolean=false,
 ) {
     val active get() = this != Dev()
 
     /** Anything that changes how a run plays once it is going; a start stage or coins only matter at the start. */
-    val changesTheRun get() = invincible || noSpawns || speed != 1f || off.isNotEmpty() || boss >= 0 || elites || tweaks.values.any { it != Tweak() }
+    val changesTheRun get() = infiniteMoney || invincible || noSpawns || speed != 1f || off.isNotEmpty() || boss >= 0 || elites || tweaks.values.any { it != Tweak() }
 
     fun tweak(kind: Int) = tweaks[kind] ?: Tweak()
 }
@@ -96,7 +98,12 @@ data class Settings(
     val menuSounds: Boolean = true,
     val fpsLimit:FpsLimit=FpsLimit.SIXTY,
     val effectsQuality:EffectsQuality=EffectsQuality.MEDIUM,
-)
+    val developerMode:Boolean=false,
+    val shopMode:ShopMode=ShopMode.TREE,
+) {
+    val effectiveShopMode get()=if(developerMode)shopMode else ShopMode.TREE
+    val infiniteTrial get()=developerMode&&dev.infiniteMoney
+}
 
 /** Settings in one small preferences file. Writes happen off the main thread. */
 class SettingsStore(context: Context) {
@@ -126,6 +133,9 @@ class SettingsStore(context: Context) {
             .putInt(KEY_BREAK, next.breakEvery)
             .putBoolean(KEY_TUTORIAL, next.tutorialSeen)
             .putBoolean(KEY_DEV_UNLOCKED, next.devUnlocked)
+            .putBoolean("developer_mode",next.developerMode)
+            .putString("shop_mode",next.shopMode.name)
+            .putBoolean("dev_infinite_money",next.dev.infiniteMoney)
             .putString(KEY_DEV_OFF, next.dev.off.joinToString(","))
             .putInt(KEY_DEV_BOSS, next.dev.boss)
             .putString(KEY_DEV_TWEAKS, encodeTweaks(next.dev.tweaks))
@@ -160,6 +170,8 @@ class SettingsStore(context: Context) {
         breakEvery = prefs.getInt(KEY_BREAK, 0).coerceIn(0, MAX_BREAK_MINUTES),
         tutorialSeen = prefs.getBoolean(KEY_TUTORIAL, false),
         devUnlocked = prefs.getBoolean(KEY_DEV_UNLOCKED, false),
+        developerMode=prefs.getBoolean("developer_mode",false),
+        shopMode=enumOr(prefs.getString("shop_mode",null),ShopMode.TREE),
         tankClass = enumOr(prefs.getString("tank_class", null), CharacterDef.BALANCED),
         cosmeticOwned = prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask),
         tankLook = TankLook.decode(prefs.getString("tank_look", null), prefs.getInt("cosmetic_owned", GarageCatalog.defaultMask)),
@@ -179,6 +191,7 @@ class SettingsStore(context: Context) {
             startStage = prefs.getInt(KEY_DEV_STAGE, 1).coerceIn(1, 99),
             startCoins = prefs.getInt(KEY_DEV_COINS, 0).coerceAtLeast(0),
             invincible = prefs.getBoolean(KEY_DEV_INVINCIBLE, false),
+            infiniteMoney=prefs.getBoolean("dev_infinite_money",false),
             noSpawns = prefs.getBoolean(KEY_DEV_NO_SPAWNS, false),
             speed = prefs.getFloat(KEY_DEV_SPEED, 1f).takeIf { it in DEV_SPEEDS } ?: 1f,
         ),

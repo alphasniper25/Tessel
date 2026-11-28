@@ -101,7 +101,7 @@ fun DevScreen(
             ) {
                 Group(
                     "Solo Trial",
-                    footer = "These only reach a run started with Try a Run With These. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
+                    footer = "These only reach a run started with Try a Run With These. Infinite money also starts a trial from Play when profile developer mode is enabled. A team never gets cheats. A trial run is not saved, not counted and not in the logbook.",
                 ) {
                     val picked = (dev.off.size + (if (dev.boss >= 0) 1 else 0) + dev.tweaks.size)
                     NavRow(
@@ -135,6 +135,8 @@ fun DevScreen(
                             onSelect = { i -> change { it.copy(startCoins = COINS[i]) } },
                         )
                     }
+                    Divider()
+                    ToggleRow("Infinite money",dev.infiniteMoney,{v->change{it.copy(infiniteMoney=v)}},detail="Unlimited purchases in isolated solo trials.")
                     Divider()
                     ToggleRow("Invincible", dev.invincible, { v -> change { it.copy(invincible = v) } }, detail = "Hits still show, but cost no health.")
                     Divider()

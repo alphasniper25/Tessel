@@ -143,7 +143,8 @@ class Hud(private val density: Float, fontScale: Float) {
         fill.color = palette.coin
         canvas.drawCircle(left + 6f * density, coinRow, 6f * density, fill)
         number.color = palette.ink
-        buf.clear().putGrouped(pl.coins[me])
+        buf.clear()
+        if(w.infiniteMoney)buf.put("∞") else buf.putGrouped(pl.coins[me])
         fittedBuffer(canvas,left+18f*density,coinRow+number.textSize*.35f,number,safe.width*.25f)
 
         if (practice) return

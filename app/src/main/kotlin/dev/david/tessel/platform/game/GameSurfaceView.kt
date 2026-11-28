@@ -18,6 +18,9 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.core.content.ShopMode
+import dev.david.tessel.core.content.UpgradeTree
+import dev.david.tessel.core.sim.UpgradeBuild
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.Shape
 import dev.david.tessel.core.content.CardMission
@@ -217,6 +220,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     // Developer options for solo runs, and whether this run used any, which keeps it out of the records.
     @Volatile private var dev = Dev()
+    private var preferredShop=ShopMode.TREE
+    private var developerEnabled=false
     private var cheating = false
 
     /** The run in progress was started from the developer page; only then do the options reach it. */
@@ -256,13 +261,13 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     // Commands from the menus and the lobby. Each one runs on the game thread, in order.
 
     /** A normal run: developer options stay out of it. */
-    fun startRun(difficulty: Difficulty, character: CharacterDef = CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
+    fun startRun(difficulty: Difficulty, character: CharacterDef = CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = developerEnabled&&dev.infiniteMoney, character = character) }
 
     /** A trial run from the developer page, with its options on. */
     fun startDevRun(difficulty: Difficulty) = onGameThread { beginSolo(difficulty, withDev = true) }
 
     /** A new solo run in a free slot. With every slot taken it does not start; the menus ask for one to be freed first. */
-    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED) {
+    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED, shopMode:ShopMode=preferredShop) {
         // A run that uses developer options goes into no save slot and no record.
         val cheat = withDev && dev.active
         val slot = if (cheat) -1 else saves?.free() ?: 0
@@ -270,7 +275,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         dropCoop()
         devRun = withDev
         applyDev()
-        world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
+        world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty,shopMode=shopMode)
+        world.infiniteMoney=cheat&&dev.infiniteMoney
         world.players.chooseCharacter(0, character, difficulty.bonusHp)
         world.players.appearance[0] = preferredLook
         world.players.missionMask[0] = cardUnlockMask()
@@ -356,6 +362,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         val solo = playingAs == Role.SOLO && practice == null && devRun
         val d = if (solo) dev else Dev()
         world.invincible = d.invincible
+        world.infiniteMoney=solo&&d.infiniteMoney
         if (practice == null) world.spawning = !d.noSpawns
         gameSpeed = d.speed
         for (k in 0 until Bestiary.size) {
@@ -368,7 +375,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         world.devElites = d.elites
         world.devAllow(if (d.off.isEmpty()) null else BooleanArray(Bestiary.size) { it !in d.off })
         if (!solo) return
-        if (live && current != Mode.HOME && d.changesTheRun && !cheating) markCheating(true)
+        if (live && current != Mode.HOME && d.changesTheRun && !cheating){
+            markCheating(true);if(soloSlot>0)saves?.delete(soloSlot);soloSlot=-1;tally.clear()
+        }
     }
 
     /** Carries on the solo run kept in [slot]: in the shop it stopped at, or from the start. */
@@ -399,7 +408,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if (duel != null) {
             world.startDuel(players, SystemClock.elapsedRealtimeNanos(), duel)
         } else {
-            world.reset(players = players, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
+            world.reset(players = players, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty,shopMode=preferredShop)
             for (p in 0 until players) {
                 val choice = choices.getOrNull(p) ?: continue
                 world.players.chooseCharacter(p, choice.character, difficulty.bonusHp)
@@ -504,7 +513,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     fun playAgain(difficulty: Difficulty) = onGameThread {
         when (playingAs) {
-            Role.SOLO -> beginSolo(difficulty, character = world.players.character[0])
+            Role.SOLO -> beginSolo(difficulty, withDev=devRun,character=world.players.character[0],shopMode=world.shopMode)
             Role.HOST -> if (current == Mode.OVER) host?.markRematchReady(0, cardUnlockMask())
             Role.CLIENT -> if (current == Mode.OVER) client?.action(Wire.RESTART, cardUnlockMask())
         }
@@ -544,6 +553,12 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if(current!=Mode.SHOP || shopFlow.value?.selfReady==true || (host?.ready ?: 0) and (1 shl HOST_PLAYER)!=0) return@onGameThread
         if(playingAs==Role.CLIENT) { pendingShopSound(Sound.SKILL);client?.action(Wire.BUY_SKILL,id) }
         else if(world.shop.buySkill(world,HOST_PLAYER,id)) { shopSound(Sound.SKILL);publishShop();keep() }
+    }
+
+    fun buyTree(id:Int)=onGameThread{
+        if(current!=Mode.SHOP || id !in UpgradeTree.nodes.indices || shopFlow.value?.selfReady==true || (host?.ready?:0) and (1 shl HOST_PLAYER)!=0)return@onGameThread
+        if(playingAs==Role.CLIENT){pendingShopSound(Sound.SKILL);client?.action(Wire.BUY_TREE,id)}
+        else if(world.shop.buyTree(world,HOST_PLAYER,id)){shopSound(Sound.SKILL);publishShop();keep()}
     }
 
     fun setCardLocked(slot: Int, locked: Boolean) = onGameThread {
@@ -662,6 +677,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             hud.showLink = s.showLink
             breakEvery = s.breakEvery
             dev = s.dev
+            preferredShop=s.effectiveShopMode
+            developerEnabled=s.developerMode
             applyDev(live = true)
         }
     }
@@ -866,6 +883,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     /** Host: takes a checkpoint of the run as it is now and hands it on to be stored. */
     private fun keep() {
+        if(cheating)return
         when (playingAs) {
             Role.HOST -> {
                 val cp = world.capture()
@@ -987,7 +1005,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             return RunSummary(
                 s.tick / TICK_HZ, s.stage, s.kills[me], s.earned[me], s.difficulty, Integer.bitCount(s.present), s.bossesDown, team,
                 score = breakdown.total, breakdown = breakdown, killedBy = s.killedBy[me],
-                perks = perkNames(s.perks[me]), won = s.victory, skillNodes=s.skillNodes[me], coinsInHand=s.coins[me],
+                perks = perkNames(s.perks[me]), won = s.victory, skillNodes=s.skillNodes[me], coinsInHand=s.coins[me],treeBuild=snapshotBuild(s),
             )
         }
         val pl = world.players
@@ -1017,7 +1035,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         return RunSummary(
             world.tick / TICK_HZ, world.stage, pl.kills[me], pl.earned[me], world.difficulty, world.presentCount(), world.bossesDown, team,
             score = breakdown.total, breakdown = breakdown, killedBy = pl.killedBy[me],
-            perks = perkNames(pl.perks[me]), won = world.victory, skillNodes=pl.skillMask(me), coinsInHand=pl.coins[me],
+            perks = perkNames(pl.perks[me]), won = world.victory, skillNodes=pl.skillMask(me), coinsInHand=if(world.infiniteMoney)Int.MAX_VALUE else pl.coins[me],treeBuild=if(world.shopMode==ShopMode.TREE)UpgradeBuild.from(pl,me) else null,infiniteMoney=world.infiniteMoney,
         )
     }
 
@@ -1246,7 +1264,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if (setup != null) {
             world.startDuel(world.playerCount, SystemClock.elapsedRealtimeNanos(), setup)
         } else {
-            world.reset(players = world.playerCount, seed = SystemClock.elapsedRealtimeNanos(), difficulty = world.difficulty)
+            world.reset(players = world.playerCount, seed = SystemClock.elapsedRealtimeNanos(), difficulty = world.difficulty,shopMode=world.shopMode)
             for (p in 0 until world.playerCount) {
                 world.players.chooseCharacter(p, characters[p], world.difficulty.bonusHp)
                 world.players.missionMask[p] = masks[p]
@@ -1280,6 +1298,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     }
 
     private fun dropCoop() {
+        // Flush the old run under its original recording policy before clearing trial state.
+        flushLog()
         checkpoint = null
         duelSetup = null
         duelFlow.value = false
@@ -1335,7 +1355,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         publishedReady = ready
         shopFlow.value = ShopView(
             stage = world.stage,
-            coins = pl.coins[me],
+            coins = if(world.infiniteMoney)Int.MAX_VALUE else pl.coins[me],
             hp = pl.hp[me],
             maxHp = pl.maxHp[me],
             offers = offers,
@@ -1353,10 +1373,14 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
+            treeBuild=if(world.shopMode==ShopMode.TREE)UpgradeBuild.from(pl,me) else null,
+            infiniteMoney=world.infiniteMoney,
         )
     }
 
     /** Rebuilds the joining phone's shop view, but only when something in it changed. */
+    private fun snapshotBuild(s:Snapshot):UpgradeBuild?=if(s.shopMode==ShopMode.TREE)UpgradeBuild(s.evolution[me],s.character[me],s.appearance[me],s.treeLevels.toList(),s.treeLastEvolution,s.perks[me],s.hp[me],s.maxHp[me]) else null
+
     private fun publishClientShop(s: Snapshot) {
         if (!s.hasShop) return
         var key = s.coins[me] * 31 + s.hp[me]
@@ -1369,6 +1393,10 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         key = key * 31 + s.skillNodes[me].hashCode()
         key = key * 31 + s.freeRefreshesLeft
         key = key * 31 + s.healPrice
+        key=key*31+s.shopMode.ordinal
+        key=key*31+s.treeLevels.contentHashCode()
+        key=key*31+s.treeLastEvolution
+        key=key*31+s.evolution[me].ordinal
         for (slot in 0 until SHOP_SLOTS) {
             key = key * 31 + s.shopItem[slot]
             key = key * 31 + s.shopLevel[slot]
@@ -1387,7 +1415,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 Sound.HEAL -> s.healsLeft<prior.healsLeft
                 Sound.REROLL -> s.freeRefreshesLeft!=prior.freeRefreshesLeft || s.rerollPrice!=prior.rerollPrice || prior.offers.any{ s.shopItem[it.slot]>=0 && (Upgrades.of(s.shopItem[it.slot]).name!=it.name || s.shopRarity[it.slot]!=it.rarity) }
                 Sound.LOCK,Sound.UNLOCK -> prior.offers.any{it.locked!=s.shopLocked[it.slot]}
-                Sound.SKILL,Sound.EVOLVE -> s.skillNodes[me]!=prior.skillNodes || s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
+                Sound.SKILL,Sound.EVOLVE -> (s.shopMode==ShopMode.TREE && prior.treeBuild?.levels!=s.treeLevels.asList()) || s.skillNodes[me]!=prior.skillNodes || s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
                 else -> false
             }
             if(changed && SystemClock.uptimeMillis()-shopSoundAt<2000L) shopSound(sound)
@@ -1436,6 +1464,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
+            treeBuild=snapshotBuild(s),
         )
     }
 

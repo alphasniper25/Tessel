@@ -73,7 +73,7 @@ fun ShopPanel(
                 val team = if (shop.coop) "   ·   ${shop.readyCount} of ${shop.teamSize} ready" else ""
                 Text("Health ${shop.hp} of ${shop.maxHp}$team", Type.footnote.merge(Type.numbers), c.ink2)
             }
-            CoinAmount(shop.coins, style = Type.title3)
+            if(shop.infiniteMoney)Text("∞",Type.title3,c.coin) else CoinAmount(shop.coins, style = Type.title3)
             if(onSave!=null) dev.david.tessel.ui.components.BackButton("Exit", { confirmExit=true })
         }
         Spacer(Modifier.height(Space.x2))
