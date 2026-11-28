@@ -223,6 +223,10 @@ object Protocol {
             buf.put(s.freeRefreshesLeft(w,forPlayer).toByte())
             buf.put((if (s.canReroll(w, forPlayer)) 1 else 0).toByte())
             for (k in 0 until TankEvolution.REWARD_SLOTS) buf.put(s.rewardOffer(forPlayer, k).toByte())
+            for(level in pl.levels[forPlayer])buf.put(level.toByte())
+            buf.putShort(pl.sinceHit[forPlayer].coerceIn(0,Short.MAX_VALUE.toInt()).toShort())
+            buf.putInt(pl.missionMask[forPlayer])
+            for(id in pl.rewardRounds[forPlayer])buf.put(id.toByte())
         }
     }
 
@@ -384,6 +388,10 @@ object Protocol {
                 val id = buf.get().toInt()
                 s.perkOffer[k] = if (TankEvolution.validReward(id)) id else -1
             }
+            for(i in s.shopAllLevels.indices)s.shopAllLevels[i]=buf.get().toInt() and 255
+            s.shopSinceHit=buf.short.toInt().coerceAtLeast(0)
+            s.shopMissionMask=buf.int
+            for(i in s.shopRewardRounds.indices){val id=buf.get().toInt();s.shopRewardRounds[i]=if(dev.david.tessel.core.content.RewardRounds.valid(id))id else -1}
         }
     }
 

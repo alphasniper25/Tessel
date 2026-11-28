@@ -1408,6 +1408,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
+            stats=dev.david.tessel.core.sim.ShopStatState.from(pl,me,world.difficulty,world.stage),rewardRounds=pl.rewardRounds[me].toList(),
             devPreview=canEditDev(),debugLevels=if(canEditDev())pl.levels[me].toList() else emptyList(),frame=pl.evolution[me],character=pl.character[me],look=pl.appearance[me],
         )
     }
@@ -1425,6 +1426,11 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         key = key * 31 + s.skillNodes[me].hashCode()
         key = key * 31 + s.freeRefreshesLeft
         key = key * 31 + s.healPrice
+        key=key*31+s.shopAllLevels.contentHashCode()
+        key=key*31+s.shopRewardRounds.contentHashCode()
+        key=key*31+s.shopSinceHit
+        key=key*31+s.shopMissionMask
+        key=key*31+s.maxHp[me]
         for (slot in 0 until SHOP_SLOTS) {
             key = key * 31 + s.shopItem[slot]
             key = key * 31 + s.shopLevel[slot]
@@ -1493,6 +1499,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
+            stats=dev.david.tessel.core.sim.ShopStatState(s.shopAllLevels.toList(),s.hp[me],s.maxHp[me],s.character[me],s.evolution[me],s.perks[me],s.skillNodes[me],s.shopSinceHit,s.surge[me]>0,s.difficulty,s.stage,s.shopMissionMask),rewardRounds=s.shopRewardRounds.toList(),
             frame=s.evolution[me],character=s.character[me],look=s.appearance[me],
         )
     }

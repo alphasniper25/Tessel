@@ -80,6 +80,8 @@ class PlayerState {
 
     /** Perks taken, as a mask of [Perks] ids. */
     val perks = IntArray(MAX_PLAYERS)
+    val rewardRounds=Array(MAX_PLAYERS){IntArray(dev.david.tessel.core.content.RewardRounds.COUNT){-1}}
+    fun recordReward(p:Int,stage:Int,id:Int){val index=dev.david.tessel.core.content.RewardRounds.index(stage);if(index>=0&&dev.david.tessel.core.content.RewardRounds.valid(id))rewardRounds[p][index]=id}
     private val graphMasks=LongArray(MAX_PLAYERS)
     private val graphBonuses=Array(MAX_PLAYERS){IntArray(SkillBonus.entries.size)}
     fun skillMask(p:Int)=graphMasks[p]
@@ -103,22 +105,22 @@ class PlayerState {
 
     fun has(p: Int, perk: Int) = perks[p] shr perk and 1 != 0
     fun combo(p:Int,combo:PerkCombo)=combo.active(perks[p])
-    fun siphonInterval(p:Int)=if(combo(p,PerkCombo.FIELD_RUNNER))20 else 25
-    fun shockwaveFactor(p:Int)=if(combo(p,PerkCombo.REACTIVE_PLATING))1.4f else 1f
-    private fun lastLightFactor(p:Int)=if(hp[p] in 1..2&&combo(p,PerkCombo.LAST_LIGHT))1.15f else 1f
+    fun capacitorReady(p:Int)=combo(p,PerkCombo.REACTOR_SYNC)&&sinceHit[p]>=OVERCLOCK_TICKS
+    fun purgeDue(p:Int)=combo(p,PerkCombo.FIELD_RUNNER)&&kills[p]>0&&kills[p]%10==0
+    fun clearStatus(p:Int){poisonTicks[p]=0;poisonSource[p]=-1;stun[p]=0}
 
     fun damage(p: Int): Float {
         var d = scaled(p, UpgradeStat.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE_BONUS))
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
-        return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * lastLightFactor(p) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
+        return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
     }
 
     fun fireRate(p: Int): Float {
         var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE) * character[p].fireScale
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
-        if (has(p, Perks.HEAVY_ROUNDS)) r *= if(combo(p,PerkCombo.REACTOR_SYNC)&&sinceHit[p]>=OVERCLOCK_TICKS).93f else .85f
+        if (has(p, Perks.HEAVY_ROUNDS)) r *= .85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
         return r * evolution[p].rate * skillFactor(p,SkillBonus.FIRE_RATE)
     }
@@ -127,12 +129,13 @@ class PlayerState {
     fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
     fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)
     fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE) * lastLightFactor(p)
+    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)
         val level=Upgrades.delta(levels[p],UpgradeStat.REGEN).toInt()
-        return if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(if(evolution[p].melee) 2 else 4)
+        val normal=if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(if(evolution[p].melee) 2 else 4)
+        return if(combo(p,PerkCombo.REACTIVE_PLATING)&&hp[p]>0&&hp[p]*2<=maxHp[p])if(normal==0)8 else minOf(normal,8) else normal
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
@@ -177,6 +180,7 @@ class PlayerState {
             levels[i].fill(0)
             missionMask[i] = 0
             perks[i] = 0
+            rewardRounds[i].fill(-1)
             setSkills(i,0L)
             windUsed[i] = false
             sinceHit[i] = OVERCLOCK_TICKS

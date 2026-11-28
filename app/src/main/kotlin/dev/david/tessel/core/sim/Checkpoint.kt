@@ -58,6 +58,7 @@ class Checkpoint(
     val skillNodes=LongArray(MAX_PLAYERS)
     val heals = IntArray(MAX_PLAYERS)
     val perks = IntArray(MAX_PLAYERS)
+    val rewardRounds=Array(MAX_PLAYERS){IntArray(dev.david.tessel.core.content.RewardRounds.COUNT){-1}}
     val perkOffer = Array(MAX_PLAYERS) { IntArray(Perks.OFFERED) { -1 } }
 
     /** Seconds of play so far. */
@@ -76,7 +77,7 @@ class Checkpoint(
     val names = Array(MAX_PLAYERS) { "" }
 
     fun write(): ByteArray {
-        val buf = ByteBuffer.allocate(64 + players * (182 + Upgrades.count * 5 + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
+        val buf = ByteBuffer.allocate(64 + players * (198 + Upgrades.count * 5 + SHOP_SLOTS * 6)).order(ByteOrder.LITTLE_ENDIAN)
         buf.put('T'.code.toByte())
         buf.put('C'.code.toByte())
         buf.put(FORMAT.toByte())
@@ -123,7 +124,8 @@ class Checkpoint(
                 buf.putInt(quotes[p][slot])
             }
             buf.putLong(skillNodes[p] or SkillGraph.fromLegacy(perks[p]))
-            buf.put(freeRerollsUsed[p].coerceIn(0,3).toByte())
+            buf.put(freeRerollsUsed[p].coerceIn(0,4).toByte())
+            for(id in rewardRounds[p])buf.put(id.toByte())
         }
         val out = ByteArray(buf.position())
         buf.flip()
@@ -133,7 +135,7 @@ class Checkpoint(
 
     companion object {
         /** Bump when the layout changes. Saves from a version before [OLDEST] are dropped rather than misread. */
-        const val FORMAT = 8
+        const val FORMAT = 9
         private const val OLDEST = 1
 
         /** Null when [bytes] are not a save this version can read. */
@@ -210,7 +212,8 @@ class Checkpoint(
                     } else cp.stockSaved[p] = cp.stock[p].any { it >= 0 }
                     if(format>=8){
                         cp.skillNodes[p]=(buf.long and SkillGraph.MASK) or SkillGraph.fromLegacy(cp.perks[p])
-                        cp.freeRerollsUsed[p]=(buf.get().toInt() and 255).coerceIn(0,3)
+                        cp.freeRerollsUsed[p]=(buf.get().toInt() and 255).coerceIn(0,if(format>=9)4 else 3)
+                        if(format>=9)for(i in cp.rewardRounds[p].indices){val id=buf.get().toInt();cp.rewardRounds[p][i]=if(dev.david.tessel.core.content.RewardRounds.valid(id))id else -1}
                     }else{
                         cp.skillNodes[p]=SkillGraph.fromLegacy(cp.perks[p])
                         val free=minOf(cp.rerolls[p],SkillTree.freeRefreshes(cp.perks[p]))

@@ -263,7 +263,6 @@ fun DevScreen(
                                 SecondaryButton("Random",{stock=stock.toMutableList().also{it[slot]=-1}})
                                 for(u in 0 until Upgrades.count)SecondaryButton(Upgrades.of(u).name,{
                                     stock=stock.toMutableList().also{a->
-                                        for(i in a.indices)if(CardCode.item(a[i])==u)a[i]=-1
                                         a[slot]=CardCode.pack(u,rarity)
                                     }
                                 })

@@ -86,7 +86,7 @@ class Shop {
             val chosen=evolutions[p].getOrElse(slot){-1}
             val pl=w.players
             if(chosen==TankEvolution.STAY_BASIC && pl.evolution[p]==TankEvolution.BASIC){
-                pl.lastEvolutionStage[p]=w.stage; evolutions[p].fill(-1); offers[p].fill(-1); return true
+                pl.lastEvolutionStage[p]=w.stage;pl.recordReward(p,w.stage,chosen); evolutions[p].fill(-1); offers[p].fill(-1); return true
             }
             val next=TankEvolution.fromReward(chosen) ?: return false
             if(next.parent!=pl.evolution[p].ordinal) return false
@@ -99,7 +99,7 @@ class Shop {
             }
             val hpGain=(next.hullBonus-pl.evolution[p].hullBonus).coerceAtLeast(0)
             pl.maxHp[p]+=hpGain; if(pl.hp[p]>0) pl.hp[p]=min(pl.maxHp[p],pl.hp[p]+hpGain)
-            pl.evolution[p]=next; pl.shieldCooldown[p]=0; pl.lastEvolutionStage[p]=w.stage
+            pl.evolution[p]=next; pl.shieldCooldown[p]=0; pl.lastEvolutionStage[p]=w.stage;pl.recordReward(p,w.stage,chosen)
             evolutions[p].fill(-1); offers[p].fill(-1)
             restock(w,p)
             return true
@@ -109,6 +109,7 @@ class Shop {
         val pl = w.players
         if (SkillTree.isNode(k)) return false
         pl.perks[p] = pl.perks[p] or (1 shl k)
+        pl.recordReward(p,w.stage,k)
         if (k == Perks.THICK_SKIN) {
             pl.maxHp[p] += 2
             pl.hp[p] = min(pl.hp[p] + 2, pl.maxHp[p])
@@ -139,27 +140,9 @@ class Shop {
         require(w.playerCount==1&&w.phase==Phase.SHOP)
         val original=stock[0].copyOf()
         stock[0].fill(-1);locks[0].fill(false);quotes[0].fill(0)
-        val used=mutableSetOf<Int>()
         for(slot in 0 until SHOP_SLOTS){
-            val raw=requested.getOrElse(slot){-1};val id=CardCode.item(raw)
-            if(id>=0&&used.add(id))stock[0][slot]=raw
-        }
-        // Preserve the original random choices where they do not conflict with a forced node.
-        for(slot in 0 until SHOP_SLOTS){
-            if(stock[0][slot]>=0)continue
-            val id=CardCode.item(original[slot])
-            if(id>=0&&used.add(id))stock[0][slot]=original[slot]
-        }
-        for(slot in 0 until SHOP_SLOTS){
-            if(item(0,slot)>=0)continue
-            val candidates=(0 until Upgrades.count).filter { id->
-                id !in used&&Upgrades.availableAt(id,w.stage)&&Upgrades.offered(id,w.players.evolution[0])&&
-                    CardMission.eligible(id,w.players.missionMask[0],CardRarity.COMMON)&&w.players.levels[0][id]<Upgrades.runCap(id)
-            }
-            if(candidates.isNotEmpty()){
-                val id=candidates[w.rng.int(0,candidates.lastIndex)]
-                stock[0][slot]=CardCode.pack(id,CardRarity.COMMON);used.add(id)
-            }
+            val raw=requested.getOrElse(slot){-1}
+            stock[0][slot]=if(CardCode.valid(raw))raw else original[slot]
         }
     }
 
@@ -201,7 +184,6 @@ class Shop {
         for (k in 0 until levelsBought(w, p, slot)) total += Upgrades.price(u, w.players.levels[p][u] + k, w.stage)
         total *= rarity(p, slot).premium
         if (w.players.has(p, Perks.HAGGLER)) total *= 0.9
-        if (w.players.combo(p,PerkCombo.SALVAGE_CONTRACT))total *= .95
         if(w.players.character[p] == dev.david.tessel.core.content.CharacterDef.BALANCED) total *= 0.9
         total *= 1.0 - w.players.skill(p,SkillBonus.CARD_DISCOUNT)*.01
         return total.roundToInt().coerceAtLeast(1)
@@ -227,6 +209,7 @@ class Shop {
         val pl = w.players
         val n = levelsBought(w, p, slot)
         val paid=price(w,p,slot)
+        val priorRank=pl.levels[p][u]
         pl.coins[p] -= paid
         pl.upgradeSpent[p][u] = (pl.upgradeSpent[p][u].toLong()+paid).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         pl.levels[p][u] += n
@@ -238,6 +221,14 @@ class Shop {
         stock[p][slot] = -1
         locks[p][slot] = false
         quotes[p][slot] = 0
+        // Independent rolls can share a type. Reprice the remaining slots immediately;
+        // a locked partial bundle never costs more per rank than its original quote.
+        for(other in 0 until SHOP_SLOTS)if(item(p,other)==u){
+            val before=minOf(rarity(p,other).levels,(Upgrades.runCap(u)-priorRank).coerceAtLeast(0))
+            val after=levelsBought(w,p,other)
+            if(after==0){stock[p][other]=-1;locks[p][other]=false;quotes[p][other]=0}
+            else if(locks[p][other]&&after<before&&before>0)quotes[p][other]=(quotes[p][other].toDouble()*after/before).roundToInt().coerceAtLeast(1)
+        }
         return true
     }
 
@@ -259,14 +250,13 @@ class Shop {
         return true
     }
 
-    fun freeRefreshesLeft(w:World,p:Int)=(w.players.skill(p,SkillBonus.FREE_REFRESH)-freeUsed[p]).coerceAtLeast(0)
+    fun freeRefreshesLeft(w:World,p:Int)=(w.players.skill(p,SkillBonus.FREE_REFRESH)+(if(w.players.combo(p,PerkCombo.SALVAGE_CONTRACT))1 else 0)-freeUsed[p]).coerceAtLeast(0)
     fun rerollPrice(w: World, p: Int): Int =
         if(freeRefreshesLeft(w,p)>0)0 else (Upgrades.rerollPrice(w.stage,rerolls[p])*(1.0-w.players.skill(p,SkillBonus.REROLL_DISCOUNT)*.01)).roundToInt().coerceAtLeast(1)
 
     fun canReroll(w: World, p: Int) = p in 0 until w.playerCount &&
         !perkPending(p) && locks[p].any { !it } && w.players.coins[p] >= rerollPrice(w, p) &&
-        (0 until Upgrades.count).any { u -> Upgrades.availableAt(u,w.stage) && CardMission.eligible(u, w.players.missionMask[p]) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u] < Upgrades.runCap(u) &&
-            (0 until SHOP_SLOTS).none { slot -> locked(p, slot) && item(p, slot) == u } }
+        (0 until Upgrades.count).any { u -> Upgrades.availableAt(u,w.stage) && CardMission.eligible(u, w.players.missionMask[p]) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u] < Upgrades.runCap(u) }
 
     fun reroll(w: World, p: Int): Boolean {
         if (!canReroll(w, p)) return false
@@ -309,7 +299,7 @@ class Shop {
                 (0 until SHOP_SLOTS).all { maxed(w,p,it) }) restock(w,p)
             // Old saved offers may contain retired cards.
             for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && (!Upgrades.availableAt(item(p,slot),w.stage) || !Upgrades.offered(item(p,slot),w.players.evolution[p]) || !CardMission.eligible(item(p,slot),w.players.missionMask[p],rarity(p,slot)))) {
-                val available=(0 until Upgrades.count).filter { u -> Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }
+                val available=(0 until Upgrades.count).filter { u -> Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) }
                 stock[p][slot]=if(available.isEmpty()) -1 else CardCode.pack(available[w.rng.int(0,available.lastIndex)],CardRarity.COMMON)
                 locks[p][slot]=false;quotes[p][slot]=0
             }
@@ -317,17 +307,16 @@ class Shop {
     }
 
     private fun restock(w: World, p: Int) {
-        val used = BooleanArray(Upgrades.count)
-        // Reserve every retained offer before drawing anything, even a lock in the last slot.
+        // Each slot rolls independently. Retain valid locks, including duplicate types.
         for (slot in 0 until SHOP_SLOTS) {
             val u = item(p, slot)
-            if (locked(p, slot) && u >= 0 && Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) used[u] = true
+            if (locked(p, slot) && u >= 0 && Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && CardMission.eligible(u, w.players.missionMask[p], rarity(p, slot)) && !maxed(w, p, slot)) Unit
             else { locks[p][slot] = false; stock[p][slot] = -1; quotes[p][slot] = 0 }
         }
         val character = w.players.character[p]
         for (slot in 0 until SHOP_SLOTS) {
             if (locked(p, slot)) continue
-            val available = (0 until Upgrades.count).filter { !used[it] && Upgrades.availableAt(it,w.stage) && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
+            val available = (0 until Upgrades.count).filter { Upgrades.availableAt(it,w.stage) && CardMission.eligible(it, w.players.missionMask[p]) && Upgrades.offered(it,w.players.evolution[p]) && w.players.levels[p][it] < Upgrades.runCap(it) }
             if (available.isEmpty()) continue
             var tier = CardRarity.roll(w.rng, w.players.skill(p,SkillBonus.LUCK))
             var pool = available.filter { CardMission.eligible(it, w.players.missionMask[p], tier) }
@@ -346,7 +335,6 @@ class Shop {
             val family = families.first { ticket -= weight(it); ticket <= 0 }
             val candidates = pool.filter { Upgrades.of(it).family == family }
             val u = candidates[w.rng.int(0, candidates.lastIndex)]
-            used[u] = true
             stock[p][slot] = CardCode.pack(u, tier)
         }
     }

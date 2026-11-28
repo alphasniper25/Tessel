@@ -11,6 +11,7 @@ import dev.david.tessel.core.content.CoreRules
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
@@ -393,6 +394,7 @@ class World(seed: Long = 1L) {
             cp.revived[p] = pl.revived[p]
             pl.levels[p].copyInto(cp.levels[p])
             cp.perks[p] = pl.perks[p]
+            pl.rewardRounds[p].copyInto(cp.rewardRounds[p])
             cp.skillNodes[p]=pl.skillMask(p)
             cp.character[p] = pl.character[p]
             cp.evolution[p] = pl.evolution[p]
@@ -427,6 +429,7 @@ class World(seed: Long = 1L) {
             pl.revived[p] = cp.revived[p]
             cp.levels[p].copyInto(pl.levels[p])
             pl.perks[p] = cp.perks[p]
+            cp.rewardRounds[p].copyInto(pl.rewardRounds[p])
             pl.setSkills(p,cp.skillNodes[p] or SkillGraph.fromLegacy(cp.perks[p]))
             pl.character[p] = cp.character[p]
             pl.evolution[p] = cp.evolution[p]
@@ -1075,9 +1078,10 @@ class World(seed: Long = 1L) {
         players.kills[owner]++
         val elite = e.elite[j] in 1 until Elite.COUNT
         players.points[owner] += Scoring.kill(e.type[j]) * (if (elite) 3 else 1)
-        if (players.has(owner, Perks.SIPHON) && players.kills[owner] % players.siphonInterval(owner) == 0 && players.hp[owner] in 1 until players.maxHp[owner]) {
+        if (players.has(owner, Perks.SIPHON) && players.kills[owner] % 25 == 0 && players.hp[owner] in 1 until players.maxHp[owner]) {
             players.hp[owner]++
         }
+        if(!duel.on&&!practice&&players.purgeDue(owner))players.clearStatus(owner)
         if (elite && rng.nextFloat() < Elite.SURGE_CHANCE) players.surge[owner] = Elite.SURGE_SECONDS * TICK_HZ
         val drops = (if (def.coinChance >= 1f || rng.nextFloat() < def.coinChance) def.coins else 0) * (if (elite) 2 else 1)
         val fling = if (def.boss) 260f else 150f
@@ -1203,6 +1207,7 @@ class World(seed: Long = 1L) {
         val pl = players
         val px = pl.x[p]
         val py = pl.y[p]
+        val capacitor=!duel.on&&Cause.isShot(cause)&&pl.capacitorReady(p)
         pl.sinceHit[p] = 0
         val protected = allowRam && !Cause.isShot(cause) && Cause.type(cause)>=0 && !duel.on && pl.evolution[p].melee && pl.shieldCooldown[p] == 0
         if(protected) pl.shieldCooldown[p]=pl.shieldTicks(p)
@@ -1210,8 +1215,9 @@ class World(seed: Long = 1L) {
             val by = Cause.type(cause)
             val base = if (by in 0 until Bestiary.size) devDamage[by] else 1
             val late=CampaignScaling.damage(stage,difficulty,by in 0 until Bestiary.size && Bestiary.of(by).boss)
-            val amount = if(loss>0) loss else (base+late-if(Cause.isShot(cause)) pl.evolution[p].projectileArmor else 0).coerceAtLeast(1)
-            if(by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
+            val rawAmount = if(loss>0) loss else (base+late-if(Cause.isShot(cause)) pl.evolution[p].projectileArmor else 0).coerceAtLeast(1)
+            val amount=(rawAmount-if(capacitor)1 else 0).coerceAtLeast(0)
+            if(amount>0&&by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
                 StatusEffect.BURN, StatusEffect.POISON -> if(pl.poisonTicks[p]==0) {pl.poisonTicks[p]=(if(Bestiary.of(by).status==StatusEffect.BURN)2 else 3)*TICK_HZ;pl.poisonSource[p]=by}
                 StatusEffect.FREEZE -> pl.stun[p]=max(pl.stun[p], (TICK_HZ*.45f).toInt())
                 else -> Unit
@@ -1220,6 +1226,7 @@ class World(seed: Long = 1L) {
                 // A hit that would down the player leaves them on one health, once a stage.
                 pl.hp[p] = 1
                 pl.windUsed[p] = true
+                if(!duel.on&&pl.combo(p,PerkCombo.LAST_LIGHT))phoenixPulse(p)
             } else {
                 pl.hp[p] -= amount
             }
@@ -1266,7 +1273,7 @@ class World(seed: Long = 1L) {
             val d2 = dx * dx + dy * dy
             if (d2 >= radius * radius || d2 < 0.0001f) continue
             val d = sqrt(d2)
-            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE*pl.shockwaveFactor(p), dx / d, dy / d, p)
+            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE, dx / d, dy / d, p)
             val force = Balance.HIT_SHOVE * (1f - d / radius) / Bestiary.of(e.type[j]).mass
             e.kx[j] += dx / d * force
             e.ky[j] += dy / d * force
@@ -1282,10 +1289,23 @@ class World(seed: Long = 1L) {
     }
 
     /** A status tick is damage, not a new collision: no knockback, extra hit grace or reapplication. */
+    private fun phoenixPulse(p:Int){
+        players.clearStatus(p)
+        val px=players.x[p];val py=players.y[p]
+        for(i in 0 until hostile.count){
+            if(hostile.life[i]<=0)continue
+            val dx=hostile.x[i]-px;val dy=hostile.y[i]-py
+            if(dx*dx+dy*dy<=120f*120f){
+                hostile.life[i]=0;droneWing.markIntercepted(hostile.id[i],tick)
+                events.add(Events.HOSTILE_GONE,hostile.id[i])
+            }
+        }
+    }
+
     private fun poisonTick(p:Int) {
         val pl=players
         if(practice || invincible || duel.on || !pl.alive(p)) return
-        if(pl.hp[p]==1 && pl.has(p,Perks.SECOND_WIND) && !pl.windUsed[p]) pl.windUsed[p]=true
+        if(pl.hp[p]==1 && pl.has(p,Perks.SECOND_WIND) && !pl.windUsed[p]) {pl.windUsed[p]=true;if(pl.combo(p,PerkCombo.LAST_LIGHT))phoenixPulse(p)}
         else pl.hp[p]--
         pl.taken[p]++;pl.hurt[p]=HURT_TICKS
         events.add(Events.PLAYER_HIT,p,pl.x[p],pl.y[p])

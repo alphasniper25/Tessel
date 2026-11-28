@@ -69,6 +69,8 @@ class ShopView(
     val frame:dev.david.tessel.core.content.TankEvolution=dev.david.tessel.core.content.TankEvolution.BASIC,
     val character:dev.david.tessel.core.content.CharacterDef=dev.david.tessel.core.content.CharacterDef.BALANCED,
     val look:dev.david.tessel.core.content.TankLook=dev.david.tessel.core.content.TankLook(),
+    val stats:dev.david.tessel.core.sim.ShopStatState?=null,
+    val rewardRounds:List<Int> = List(dev.david.tessel.core.content.RewardRounds.COUNT){-1},
 )
 
 /** One player's column in the run's statistics. */

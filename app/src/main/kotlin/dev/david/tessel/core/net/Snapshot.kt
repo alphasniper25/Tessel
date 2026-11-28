@@ -152,6 +152,10 @@ class Snapshot {
 
     // The receiving player's shop, present only while the phase is SHOP.
     var hasShop = false
+    val shopAllLevels=IntArray(dev.david.tessel.core.content.Upgrades.count)
+    var shopSinceHit=0
+    var shopMissionMask=0
+    val shopRewardRounds=IntArray(dev.david.tessel.core.content.RewardRounds.COUNT){-1}
     val shopItem = IntArray(SHOP_SLOTS)
     val shopLevel = IntArray(SHOP_SLOTS)
     val shopPrice = IntArray(SHOP_SLOTS)

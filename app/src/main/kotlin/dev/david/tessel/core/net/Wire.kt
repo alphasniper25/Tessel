@@ -9,7 +9,7 @@ import java.nio.ByteOrder
  * layout below changes; mismatched phones then refuse each other politely.
  */
 object Wire {
-    const val VERSION = 34 // alpha.16 rework: new combat/shop perk semantics
+    const val VERSION = 35 // alpha.16 rework: new combat/shop perk semantics
 
     const val HELLO = 1
     const val START = 2
