@@ -39,3 +39,33 @@ jobs:
           retention-days: 7
       # Source-only candidate: no APK assembly, signing or publication.
 
+
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
+      - name: Capture actual production Compose menus with native Android graphics
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon -Pshots testDebugUnitTest --tests '*ScreenshotsMenuGallery*' --tests '*Screenshots.aStageInFullSwing' --tests '*Screenshots.aBoss' --tests '*Screenshots.pauseAndRunOver'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TESSEL-alpha16-native-menu-screenshots
+          path: |
+            docs/menu-gallery/*.png
+            docs/stage.png
+            docs/boss.png
+            app/build/screens/*.png
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 30
