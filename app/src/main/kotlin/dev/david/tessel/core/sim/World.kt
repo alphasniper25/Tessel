@@ -130,13 +130,51 @@ class World(seed: Long = 1L) {
         for ((id, level) in levels) {
             if (id !in 0 until Upgrades.count) continue
             val n = level.coerceIn(0, Upgrades.of(id).maxLevel)
-            players.levels[0][id] = n
-            val addedHp = (n * Upgrades.amount(id, UpgradeStat.MAX_HP)).toInt()
-            if (addedHp > 0) {
-                players.maxHp[0] += addedHp
-                players.hp[0] = players.maxHp[0]
-            }
+            devSetUpgrade(id,n)
         }
+    }
+
+    /** Exact, reversible edits for an isolated developer world. No coins are created by these setters. */
+    private fun devHull(delta:Int){
+        val pl=players
+        pl.maxHp[0]=(pl.maxHp[0]+delta).coerceAtLeast(1)
+        if(pl.hp[0]>0)pl.hp[0]=(pl.hp[0]+delta).coerceIn(1,pl.maxHp[0])
+    }
+    fun devSetUpgrade(id:Int,level:Int){
+        if(id !in 0 until Upgrades.count)return
+        val pl=players
+        val old=pl.levels[0][id];val next=level.coerceIn(0,Upgrades.of(id).maxLevel)
+        pl.levels[0][id]=next
+        devHull(((next-old)*Upgrades.amount(id,UpgradeStat.MAX_HP)).toInt())
+    }
+    fun devSetPerk(id:Int,owned:Boolean){
+        if(id !in 0 until dev.david.tessel.core.content.SkillTree.ORIGINAL_PERKS)return
+        val pl=players;val before=pl.has(0,id)
+        if(before==owned)return
+        pl.perks[0]=if(owned)pl.perks[0] or (1 shl id) else pl.perks[0] and (1 shl id).inv()
+        if(id==Perks.THICK_SKIN)devHull(if(owned)2 else -2)
+        if(id==Perks.SECOND_WIND)pl.windUsed[0]=false
+    }
+    fun devSetSkillMask(mask:Long){
+        val pl=players
+        val before=pl.skill(0,dev.david.tessel.core.content.SkillBonus.HEALTH)
+        pl.setSkills(0,mask)
+        devHull(pl.skill(0,dev.david.tessel.core.content.SkillBonus.HEALTH)-before)
+    }
+    fun devSetFrame(frame:TankEvolution){
+        val pl=players
+        devHull(frame.hullBonus-pl.evolution[0].hullBonus)
+        pl.evolution[0]=frame
+        pl.shieldCooldown[0]=0
+        droneWing.clearOwner(0)
+    }
+    /** Jump into the real shop at the selected stage without awarding clear loot or progression. */
+    fun devOpenShop(){
+        require(playerCount==1&&!duel.on)
+        enemies.clear();hostile.clear();bullets.clear();coins.clear();droneWing.clear()
+        boss=-1;bossDue=-1;shownBossType=-1;core.reset();events.clear()
+        phase=Phase.SHOP
+        shop.open(this)
     }
 
     /** Developer option: perks the player starts with. */

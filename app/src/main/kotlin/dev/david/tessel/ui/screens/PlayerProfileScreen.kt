@@ -53,7 +53,7 @@ fun ProfileButton(name:String,onClick:()->Unit){
 }
 
 @Composable
-fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,onSettings:()->Unit,onStats:()->Unit,onBack:()->Unit){
+fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,onSettings:()->Unit,onStats:()->Unit,onBack:()->Unit,onDeveloper:(()->Unit)?=null){
     val c=Theme.colors
     var username by rememberSaveable(initialName){mutableStateOf(initialName)}
     var saved by rememberSaveable{mutableStateOf(false)}
@@ -102,6 +102,7 @@ fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,o
                 }
                 Text("Settings & progress",Type.headline,c.ink)
                 SecondaryButton("Settings",onSettings,Modifier.fillMaxWidth())
+                if(onDeveloper!=null)SecondaryButton("Developer Options",onDeveloper,Modifier.fillMaxWidth())
                 SecondaryButton("Statistics",onStats,Modifier.fillMaxWidth())
                 Text("${GarageCatalog.earned(ledger.totals)} lifetime garage credits earned",Type.footnote,c.ink2)
             }

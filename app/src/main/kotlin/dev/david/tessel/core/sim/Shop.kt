@@ -46,10 +46,10 @@ class Shop {
     }
 
     /** After a boss stage a player is offered a choice of perks to take. */
-    private fun offerPerks(w: World, p: Int) {
+    private fun offerPerks(w: World, p: Int, force:Boolean=false) {
         offers[p].fill(-1)
-        if (offerEvolution(w,p)) return
-        if (w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
+        if (!force && offerEvolution(w,p)) return
+        if (!force && w.stage % Bestiary.BOSS_EVERY != 0 && w.devBoss < 0) return
         var n = 0
         val free = IntArray(Perks.count)
         for (k in 0 until SkillTree.ORIGINAL_PERKS) if (!w.players.has(p, k)) free[n++] = k
@@ -131,6 +131,55 @@ class Shop {
             if(pl.hp[p]>0)pl.hp[p]=min(pl.maxHp[p],pl.hp[p]+node.amount)
         }
         return true
+    }
+
+    /** Only called by the isolated developer scenario runner. Real purchases still use canBuy(). */
+    fun devStock(w:World,requested:List<Int>){
+        require(w.playerCount==1&&w.phase==Phase.SHOP)
+        val used=mutableSetOf<Int>()
+        for(slot in 0 until SHOP_SLOTS){
+            val raw=requested.getOrElse(slot){-1}
+            val id=CardCode.item(raw)
+            if(id>=0&&used.add(id)){
+                stock[0][slot]=raw;locks[0][slot]=false;quotes[0][slot]=0
+            }
+        }
+        // Keep forced slots first; remove duplicate random draws, then refill only the empty slots.
+        for(slot in 0 until SHOP_SLOTS){
+            if(CardCode.valid(requested.getOrElse(slot){-1}))continue
+            val id=item(0,slot)
+            if(id>=0&&!used.add(id)){
+                stock[0][slot]=-1;locks[0][slot]=false;quotes[0][slot]=0
+            }
+        }
+        for(slot in 0 until SHOP_SLOTS){
+            if(item(0,slot)>=0)continue
+            val candidates=(0 until Upgrades.count).filter { id->
+                id !in used&&Upgrades.availableAt(id,w.stage)&&Upgrades.offered(id,w.players.evolution[0])&&
+                    CardMission.eligible(id,w.players.missionMask[0],CardRarity.COMMON)&&w.players.levels[0][id]<Upgrades.runCap(id)
+            }
+            if(candidates.isNotEmpty()){
+                val id=candidates[w.rng.int(0,candidates.lastIndex)]
+                stock[0][slot]=CardCode.pack(id,CardRarity.COMMON);used.add(id)
+            }
+        }
+    }
+
+    fun devReward(w:World,mode:dev.david.tessel.core.dev.DevReward){
+        require(w.playerCount==1&&w.phase==Phase.SHOP)
+        if(mode==dev.david.tessel.core.dev.DevReward.AUTO)return
+        offers[0].fill(-1);evolutions[0].fill(-1)
+        when(mode){
+            dev.david.tessel.core.dev.DevReward.PERKS->offerPerks(w,0,true)
+            dev.david.tessel.core.dev.DevReward.EVOLUTION->{
+                val frame=w.players.evolution[0]
+                val choices=TankEvolution.options(frame,w.stage)
+                for(i in choices.indices)evolutions[0][i]=TankEvolution.REWARD_BASE+choices[i].ordinal
+                if(frame==TankEvolution.BASIC&&choices.isNotEmpty()&&w.stage<TankEvolution.SECRET_STAGE&&choices.size<TankEvolution.REWARD_SLOTS)
+                    evolutions[0][choices.size]=TankEvolution.STAY_BASIC
+            }
+            else->Unit
+        }
     }
 
     fun item(p: Int, slot: Int) = CardCode.item(stock.getOrNull(p)?.getOrNull(slot) ?: -1)

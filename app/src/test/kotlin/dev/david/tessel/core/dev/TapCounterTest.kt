@@ -8,33 +8,33 @@ class TapCounterTest {
     private fun taps(c: TapCounter, n: Int) = repeat(n) { c.tap() }
 
     @Test
-    fun sevenTapsThenQuietOpensIt() {
+    fun fiveTapsThenQuietOpensIt() {
         val c = TapCounter()
-        taps(c, 7)
+        taps(c, 5)
         assertTrue(c.settle())
         assertFalse("only once", c.settle())
     }
 
     @Test
-    fun moreThanSevenDoesNotOpenIt() {
-        val c = TapCounter()
-        taps(c, 8)
-        assertFalse(c.settle())
-    }
-
-    @Test
-    fun fewerThanSevenDoesNotOpenIt() {
+    fun moreThanFiveDoesNotOpenIt() {
         val c = TapCounter()
         taps(c, 6)
         assertFalse(c.settle())
     }
 
     @Test
-    fun spammingPastSevenAndSettlingStartsOver() {
+    fun fewerThanFiveDoesNotOpenIt() {
+        val c = TapCounter()
+        taps(c, 4)
+        assertFalse(c.settle())
+    }
+
+    @Test
+    fun spammingPastFiveAndSettlingStartsOver() {
         val c = TapCounter()
         taps(c, 12)
         assertFalse(c.settle())
-        taps(c, 7)
+        taps(c, 5)
         assertTrue(c.settle())
     }
 
@@ -44,11 +44,11 @@ class TapCounterTest {
         taps(c, 4)
         assertFalse("a second of quiet ended the first run", c.settle())
         taps(c, 3)
-        assertFalse("three more are three, not seven in all", c.settle())
+        assertFalse("three more are three, not five in all", c.settle())
     }
 
     @Test
-    fun theCodeIsFiveDigits() {
+    fun theCodeIsFourDigits() {
         assertTrue(DevAccess.CODE.length == DevAccess.CODE_LENGTH)
     }
 }

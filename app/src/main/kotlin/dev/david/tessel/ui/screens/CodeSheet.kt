@@ -35,7 +35,7 @@ import dev.david.tessel.ui.theme.Type
 
 /**
  * Asks for the developer code with a number pad of its own, so no keyboard has
- * to cover the screen in landscape. The fifth digit decides: right opens the page, wrong clears.
+ * to cover the screen in landscape. The fourth digit decides: right opens the page, wrong clears.
  */
 @Composable
 fun CodePanel(onUnlock: () -> Unit, onCancel: () -> Unit) {

@@ -61,6 +61,8 @@ import dev.david.tessel.platform.input.TwinStickController
 import dev.david.tessel.platform.net.HostLink
 import dev.david.tessel.platform.net.Link
 import dev.david.tessel.platform.store.Dev
+import dev.david.tessel.core.dev.DevScenario
+import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.platform.store.LedgerStore
 import dev.david.tessel.platform.store.Settings
 import dev.david.tessel.platform.store.SoloSaves
@@ -217,6 +219,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     // Developer options for solo runs, and whether this run used any, which keeps it out of the records.
     @Volatile private var dev = Dev()
+    private var devUnlocked=false
     private var cheating = false
 
     /** The run in progress was started from the developer page; only then do the options reach it. */
@@ -259,12 +262,37 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     fun startRun(difficulty: Difficulty, character: CharacterDef = CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
 
     /** A trial run from the developer page, with its options on. */
-    fun startDevRun(difficulty: Difficulty) = onGameThread { beginSolo(difficulty, withDev = true) }
+    fun startDevRun(difficulty: Difficulty,scenario:DevScenario=DevScenario()) = onGameThread {
+        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,scenario=scenario)
+    }
+    fun startDevShop(difficulty:Difficulty,scenario:DevScenario=DevScenario())=onGameThread{
+        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,scenario=scenario,shopPreview=true)
+    }
+    private fun canEditDev()=devUnlocked&&devRun&&cheating&&playingAs==Role.SOLO&&practice==null
+    fun devRank(id:Int,level:Int)=onGameThread{
+        if(canEditDev()&&current==Mode.SHOP){world.devSetUpgrade(id,level);publishShop()}
+    }
+    fun devPerk(id:Int,owned:Boolean)=onGameThread{
+        if(canEditDev()&&current==Mode.SHOP){world.devSetPerk(id,owned);publishShop()}
+    }
+    fun devSkill(id:Int,owned:Boolean)=onGameThread{
+        if(canEditDev()&&current==Mode.SHOP&&id in 0 until SkillGraph.COUNT){
+            val mask=world.players.skillMask(0)
+            world.devSetSkillMask(if(owned)mask or SkillGraph.bit(id) else mask and SkillGraph.bit(id).inv())
+            publishShop()
+        }
+    }
+    fun devWallet(coins:Int,hp:Int)=onGameThread{
+        if(canEditDev()&&current==Mode.SHOP){
+            world.players.coins[0]=coins.coerceIn(0,100_000_000)
+            world.players.hp[0]=hp.coerceIn(1,world.players.maxHp[0]);publishShop()
+        }
+    }
 
     /** A new solo run in a free slot. With every slot taken it does not start; the menus ask for one to be freed first. */
-    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED) {
+    private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED,scenario:DevScenario=DevScenario(),shopPreview:Boolean=false) {
         // A run that uses developer options goes into no save slot and no record.
-        val cheat = withDev && dev.active
+        val cheat = withDev // Every sandbox session is isolated, even with default settings.
         val slot = if (cheat) -1 else saves?.free() ?: 0
         if (!cheat && slot < 0) return
         dropCoop()
@@ -279,11 +307,19 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             world.players.coins[0] = dev.startCoins
             world.bringDevBoss()
             world.devUpgrades(dev.upgrades)
-            world.devPerks(dev.perks)
+            world.devPerks(dev.perks.filter{it in 0 until SkillTree.ORIGINAL_PERKS}.toSet())
+            world.devSetFrame(scenario.frame)
+            world.devSetSkillMask(scenario.skillMask)
+            if(scenario.allMissions)world.players.missionMask[0]=CardMission.allMask
+            if(scenario.hp>=0)world.players.hp[0]=scenario.hp.coerceIn(1,world.players.maxHp[0])
         }
         soloSlot = slot
         markCheating(cheat)
         freshRun()
+        if(cheat&&shopPreview){
+            world.devOpenShop();world.shop.devStock(world,scenario.stock);world.shop.devReward(world,scenario.reward)
+            publishShop();enter(Mode.SHOP)
+        }
         if (!cheat) keep()
     }
 
@@ -661,7 +697,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             requestSurfaceRate()
             hud.showLink = s.showLink
             breakEvery = s.breakEvery
-            dev = s.dev
+            devUnlocked=s.devUnlocked
+            dev = if(devUnlocked)s.dev else Dev()
             applyDev(live = true)
         }
     }
@@ -1326,6 +1363,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 levels = s.levelsBought(world, me, slot),
                 rarity = s.rarity(me, slot),
                 locked = s.locked(me, slot),
+                upgradeId=u,
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
@@ -1353,6 +1391,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
+            devPreview=canEditDev(),debugLevels=if(canEditDev())pl.levels[me].toList() else emptyList(),frame=pl.evolution[me],
         )
     }
 
@@ -1410,6 +1449,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 affordable = s.shopAffordable[slot],
                 rarity = s.shopRarity[slot],
                 locked = s.shopLocked[slot],
+                upgradeId=u,
                 levels = s.shopLevels[slot],
             )
         }
@@ -1436,6 +1476,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
+            frame=s.evolution[me],
         )
     }
 

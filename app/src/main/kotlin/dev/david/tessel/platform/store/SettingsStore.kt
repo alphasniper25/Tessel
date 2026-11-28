@@ -198,7 +198,7 @@ class SettingsStore(context: Context) {
         const val KEY_LINK = "show_link"
         const val KEY_BREAK = "break_every"
         const val KEY_TUTORIAL = "tutorial_seen"
-        const val KEY_DEV_UNLOCKED = "dev_unlocked"
+        const val KEY_DEV_UNLOCKED = "dev_unlocked_pin5144_v2"
         const val KEY_DEV_OFF = "dev_off"
         const val KEY_DEV_BOSS = "dev_boss"
         const val KEY_DEV_TWEAKS = "dev_tweaks"

@@ -120,8 +120,7 @@ fun TesselApp(
     var devOpen by rememberSaveable { mutableStateOf(false) }
     var codeOpen by remember { mutableStateOf(false) }
     var minutesOpen by remember { mutableStateOf(false) }
-    var enemiesOpen by rememberSaveable { mutableStateOf(false) }
-    // Seven taps on the version line, then a second of quiet, ask for the developer code.
+    // Five taps on the version line, then a second of quiet, ask for the developer code.
     val taps = remember { TapCounter() }
     var tapSeq by remember { mutableIntStateOf(0) }
     LaunchedEffect(tapSeq) {
@@ -287,12 +286,7 @@ fun TesselApp(
                 onSettings = { game.menuSound();settingsOpen = true },
                 onProfile = { game.menuSound();profileOpen=true },
                 playerName=profileName,
-                onLogo = if (settings.devUnlocked) {
-                    {
-                        settingsOpen = true
-                        devOpen = true
-                    }
-                } else null,
+                onLogo = null,
             )
         }
 
@@ -328,8 +322,8 @@ fun TesselApp(
             )
         }
 
-        AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen && !cardsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
-            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
+        AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen && !cardsOpen && !devOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
+            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()},onDeveloper=if(settings.devUnlocked)({devOpen=true;game.menuSound()}) else null)
         }
 
         // The lobby and settings slide in from the trailing edge and leave the same way.
@@ -424,7 +418,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = settingsOpen && devOpen,
+            visible = devOpen && settings.devUnlocked,
             enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
             exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
         ) {
@@ -439,22 +433,17 @@ fun TesselApp(
                     game.breakNow()
                 },
                 onTutorial = startTutorial,
-                onEnemies = { enemiesOpen = true },
-                onStartRun = {
-                    devOpen = false
-                    settingsOpen = false
-                    game.startDevRun(settings.difficulty)
+                sandbox=shop?.devPreview==true,
+                onStartRun = { scenario ->
+                    devOpen=false;settingsOpen=false;profileOpen=false
+                    game.startDevRun(settings.difficulty,scenario)
+                },
+                onStartShop = { scenario ->
+                    devOpen=false;settingsOpen=false;profileOpen=false
+                    game.startDevShop(settings.difficulty,scenario)
                 },
                 onBack = { devOpen = false },
             )
-        }
-
-        AnimatedVisibility(
-            visible = settingsOpen && devOpen && enemiesOpen,
-            enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
-            exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
-        ) {
-            DevEnemiesScreen(settings = settings, onChange = store::update, onBack = { enemiesOpen = false })
         }
 
         Sheet(visible = minutesOpen && settingsOpen, onDismiss = { minutesOpen = false }) {
@@ -474,7 +463,7 @@ fun TesselApp(
                 onUnlock = {
                     codeOpen = false
                     store.update { it.copy(devUnlocked = true) }
-                    devOpen = true
+                    devOpen = false
                 },
                 onCancel = { codeOpen = false },
             )
@@ -501,13 +490,12 @@ fun TesselApp(
     }
 
     val treeHandlesBack=treeOpen && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
-    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
+    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || devOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false
             minutesOpen -> minutesOpen = false
-            enemiesOpen && devOpen && settingsOpen -> enemiesOpen = false
-            devOpen && settingsOpen -> devOpen = false
+            devOpen -> devOpen = false
             settingsOpen -> settingsOpen = false
             statsOpen -> statsOpen = false
             profileOpen -> profileOpen=false

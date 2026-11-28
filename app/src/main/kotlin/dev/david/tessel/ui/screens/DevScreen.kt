@@ -36,6 +36,17 @@ import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.Upgrades
+import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillTree
+import dev.david.tessel.core.content.CardCode
+import dev.david.tessel.core.content.CardRarity
+import dev.david.tessel.core.dev.DevScenario
+import dev.david.tessel.core.dev.DevReward
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.SolidColor
 import dev.david.tessel.ui.components.NavRow
 import dev.david.tessel.ui.components.PrimaryButton
 import dev.david.tessel.platform.dev.LogExport
@@ -71,8 +82,9 @@ fun DevScreen(
     onChange: ((Settings) -> Settings) -> Unit,
     onBreakNow: () -> Unit,
     onTutorial: () -> Unit,
-    onEnemies: () -> Unit,
-    onStartRun: () -> Unit,
+    onStartRun: (DevScenario) -> Unit,
+    onStartShop: (DevScenario)->Unit,
+    sandbox:Boolean=false,
     onBack: () -> Unit,
 ) {
     val c = Theme.colors
@@ -80,6 +92,13 @@ fun DevScreen(
     val dev = settings.dev
     fun change(next: (Dev) -> Dev) = onChange { it.copy(dev = next(it.dev)) }
     var exported by remember { mutableStateOf<String?>(null) }
+    var frame by remember { mutableStateOf(TankEvolution.BASIC) }
+    var skillMask by remember { mutableStateOf(0L) }
+    var health by remember { mutableStateOf("") }
+    var stock by remember { mutableStateOf(listOf(-1,-1,-1)) }
+    var reward by remember { mutableStateOf(DevReward.AUTO) }
+    var allMissions by remember { mutableStateOf(true) }
+    fun scenario()=DevScenario(frame,skillMask,health.toIntOrNull()?:-1,stock,reward,allMissions)
 
     Column(
         Modifier
@@ -91,6 +110,12 @@ fun DevScreen(
             BackButton("Settings", onBack, Modifier.align(Alignment.CenterStart))
             Text("Developer Options", Type.headline, c.ink, Modifier.align(Alignment.Center))
         }
+        if(!inRun||sandbox){
+            Row(Modifier.fillMaxWidth().padding(horizontal=Space.x4,vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                PrimaryButton("Open Shop Preview",{onStartShop(scenario())},Modifier.weight(1f))
+                SecondaryButton("Try a Run With These",{onStartRun(scenario())},Modifier.weight(1f))
+            }
+        }else Text("Leave the normal run to start a developer sandbox.",Type.footnote,c.ink2,Modifier.padding(horizontal=Space.x4))
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.x6),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -103,14 +128,6 @@ fun DevScreen(
                     "Solo Trial",
                     footer = "These only reach a run started with Try a Run With These. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
                 ) {
-                    val picked = (dev.off.size + (if (dev.boss >= 0) 1 else 0) + dev.tweaks.size)
-                    NavRow(
-                        "Enemies and Bosses",
-                        onEnemies,
-                        detail = if (picked == 0) "Pick which kinds come, a boss to fight, and change their speed, health and damage." else
-                            "${dev.off.size} off" + (if (dev.boss >= 0) ", boss: ${Bestiary.of(dev.boss).name}" else "") + ", ${dev.tweaks.size} changed",
-                    )
-                    Divider()
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.x4, vertical = Space.x2),
                         verticalAlignment = Alignment.CenterVertically,
@@ -121,19 +138,18 @@ fun DevScreen(
                         }
                         Nudge("-5") { change { it.copy(startStage = (it.startStage - 5).coerceAtLeast(1)) } }
                         Nudge("-1") { change { it.copy(startStage = (it.startStage - 1).coerceAtLeast(1)) } }
-                        Text(dev.startStage.toString(), Type.headline.merge(Type.numbers), c.ink, Modifier.width(40.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
-                        Nudge("+1") { change { it.copy(startStage = (it.startStage + 1).coerceAtMost(99)) } }
-                        Nudge("+5") { change { it.copy(startStage = (it.startStage + 5).coerceAtMost(99)) } }
+                        NumberEntry(dev.startStage.toString(),{raw->raw.toIntOrNull()?.let{v->change{it.copy(startStage=v.coerceIn(1,50))}}},Modifier.width(58.dp))
+                        Nudge("+1") { change { it.copy(startStage = (it.startStage + 1).coerceAtMost(50)) } }
+                        Nudge("+5") { change { it.copy(startStage = (it.startStage + 5).coerceAtMost(50)) } }
                     }
                     Divider()
                     Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
                         Text("Start Coins", Type.body, c.ink)
                         Spacer(Modifier.height(Space.x2))
-                        Segmented(
-                            options = COINS.map { "%,d".format(it) },
-                            selected = COINS.indexOf(dev.startCoins).coerceAtLeast(0),
-                            onSelect = { i -> change { it.copy(startCoins = COINS[i]) } },
-                        )
+                        NumberEntry(dev.startCoins.toString(),{raw->change{it.copy(startCoins=(raw.toIntOrNull()?:0).coerceIn(0,100_000_000))}},Modifier.fillMaxWidth())
+                        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                            COINS.forEach{n->SecondaryButton(n.toString(),{change{it.copy(startCoins=n)}},Modifier.weight(1f))}
+                        }
                     }
                     Divider()
                     ToggleRow("Invincible", dev.invincible, { v -> change { it.copy(invincible = v) } }, detail = "Hits still show, but cost no health.")
@@ -153,7 +169,7 @@ fun DevScreen(
 
                 Group("Elites and Perks", footer = "Elites: every enemy that comes is elite. Perks: taken at the start of a trial run.") {
                     ToggleRow("Elite Enemies", dev.elites, { v -> change { it.copy(elites = v) } })
-                    for (k in 0 until Perks.count) {
+                    for (k in 0 until SkillTree.ORIGINAL_PERKS) {
                         Divider()
                         ToggleRow(
                             Perks.of(k).name,
@@ -189,10 +205,53 @@ fun DevScreen(
                     }
                 }
 
-                if (!inRun) {
-                    PrimaryButton("Try a Run With These", onStartRun, Modifier.fillMaxWidth())
-                }
 
+
+                Group("Tank & scenario",footer="All settings on this page apply only to an unrecorded solo sandbox."){
+                    Column(Modifier.padding(Space.x3),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text("Starting frame · ${frame.label}",Type.headline,c.ink)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            for(f in TankEvolution.entries)SecondaryButton(f.label,{frame=f},tint=if(f==frame)c.accent else c.ink)
+                        }
+                        Text("Starting HP (blank = full)",Type.footnote,c.ink2)
+                        NumberEntry(health,{health=it},Modifier.fillMaxWidth())
+                    }
+                    ToggleRow("All mission cards unlocked",allMissions,{allMissions=it})
+                    Column(Modifier.padding(Space.x3),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text("Shop reward",Type.headline,c.ink)
+                        Segmented(DevReward.entries.map{it.label},reward.ordinal,{reward=DevReward.entries[it]})
+                        for(slot in 0..2){
+                            val raw=stock[slot];val id=CardCode.item(raw)
+                            var rarity by remember(slot){mutableStateOf(CardRarity.COMMON)}
+                            Text("Offer ${slot+1}: "+if(id<0)"Random" else Upgrades.of(id).name+" · "+CardCode.tier(raw).label,Type.subhead,c.ink)
+                            Segmented(CardRarity.entries.map{it.label},rarity.ordinal,{i->
+                                rarity=CardRarity.entries[i]
+                                if(id>=0)stock=stock.toMutableList().also{it[slot]=CardCode.pack(id,rarity)}
+                            })
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                                SecondaryButton("Random",{stock=stock.toMutableList().also{it[slot]=-1}})
+                                for(u in 0 until Upgrades.count)SecondaryButton(Upgrades.of(u).name,{
+                                    stock=stock.toMutableList().also{a->
+                                        for(i in a.indices)if(CardCode.item(a[i])==u)a[i]=-1
+                                        a[slot]=CardCode.pack(u,rarity)
+                                    }
+                                })
+                            }
+                        }
+                    }
+                }
+                Group("Skill ownership",footer="Choose any node for a sandbox, even if its prerequisites are not owned."){
+                    Row(Modifier.padding(Space.x3),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        SecondaryButton("All skills",{skillMask=SkillGraph.MASK},Modifier.weight(1f))
+                        SecondaryButton("Clear skills",{skillMask=0L},Modifier.weight(1f))
+                    }
+                    for(n in SkillGraph.nodes){
+                        ToggleRow(n.name,SkillGraph.owns(skillMask,n.id),{v->skillMask=if(v)skillMask or SkillGraph.bit(n.id) else skillMask and SkillGraph.bit(n.id).inv()},detail=n.description)
+                    }
+                }
+                Group("Enemies and bosses"){
+                    DevEnemyOptions(settings,onChange)
+                }
                 Group("Tools", footer = exported) {
                     ActionLine("Export Log", "Writes a text file and opens the share sheet.") {
                         exported = exportLog(context, settings, version)
@@ -207,9 +266,9 @@ fun DevScreen(
                     }
                 }
 
-                Group("Reset", footer = "Reset puts every option above back to normal. Lock hides this page until the version line is tapped seven times again.") {
+                Group("Reset", footer = "Reset puts every option above back to normal. Lock hides this page until the version line is tapped exactly five times and the PIN is entered.") {
                     Row(Modifier.padding(Space.x3), horizontalArrangement = Arrangement.spacedBy(Space.x3)) {
-                        SecondaryButton("Reset Developer Settings", { change { Dev() } }, Modifier.weight(1f), tint = c.danger)
+                        SecondaryButton("Reset Developer Settings", { change { Dev() };frame=TankEvolution.BASIC;skillMask=0L;health="";stock=listOf(-1,-1,-1);reward=DevReward.AUTO;allMissions=true }, Modifier.weight(1f), tint = c.danger)
                         SecondaryButton("Lock", { onChange { it.copy(devUnlocked = false, dev = Dev()) }; onBack() }, Modifier.width(96.dp))
                     }
                 }
@@ -261,4 +320,13 @@ private fun Nudge(label: String, onClick: () -> Unit) {
     ) {
         Text(label, Type.subhead.merge(Type.numbers), c.ink, maxLines = 1)
     }
+}
+
+/** Numeric sandbox controls are intentionally bounded by the game-thread setters. */
+@Composable
+private fun NumberEntry(value:String,onChange:(String)->Unit,modifier:Modifier=Modifier){
+    val c=Theme.colors
+    BasicTextField(value,{raw->onChange(raw.filter{it.isDigit()}.take(9))},singleLine=true,
+        textStyle=Type.body.copy(color=c.ink),cursorBrush=SolidColor(c.accent),
+        modifier=modifier.clip(RoundedCornerShape(8.dp)).background(c.track).padding(8.dp))
 }

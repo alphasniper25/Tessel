@@ -150,25 +150,27 @@ class RemindersAndDevTest {
     }
 
     @Test
-    fun sevenTapsOnTheVersionAskForTheCodeAndTheRightCodeUnlocks() {
+    fun fiveTapsOnTheVersionAskForTheCodeAndTheRightCodeUnlocks() {
         launch(seen = true)
         openSettings()
-        tapVersion(7)
+        tapVersion(5)
         settle(1500)
         compose.onNodeWithText("Enter the code.").assertExists()
-        for (d in "33155") compose.onNodeWithText(d.toString()).performClick()
+        for (d in "5144") compose.onNodeWithText(d.toString()).performClick()
         settle()
         assertTrue(store.settings.value.devUnlocked)
-        compose.onNodeWithText("Start Stage").assertExists()
+        compose.onNodeWithText("Developer Options").performScrollTo().performClick()
+        settle()
+        compose.onNodeWithText("Open Shop Preview").assertExists()
     }
 
     @Test
     fun aWrongCodeClearsAndDoesNotUnlock() {
         launch(seen = true)
         openSettings()
-        tapVersion(7)
+        tapVersion(5)
         settle(1500)
-        for (d in "11111") compose.onNodeWithText(d.toString()).performClick()
+        for (d in "1111") compose.onNodeWithText(d.toString()).performClick()
         settle()
         assertFalse(store.settings.value.devUnlocked)
         compose.onNodeWithText("That is not it.").assertExists()
@@ -261,11 +263,13 @@ class RemindersAndDevTest {
     }
 
     @Test
-    fun withDeveloperOptionsOnTheLogoOpensThem() {
+    fun unlockedDeveloperOptionsAppearUnderProfileSettings() {
         launch(seen = true)
         store.update { it.copy(devUnlocked = true) }
         settle(1000)
-        compose.onNodeWithContentDescription("Tessel logo").performClick()
+        compose.onNodeWithContentDescription("Player profile").performClick()
+        settle()
+        compose.onNodeWithText("Developer Options").performScrollTo().performClick()
         settle()
         compose.onNodeWithText("Try a Run With These").performScrollTo().assertExists()
     }
