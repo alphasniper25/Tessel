@@ -191,7 +191,7 @@ fun SettingsScreen(
 
                 Updates(updater, onVersionTap = if (settings.devUnlocked) null else onUnlockDev)
                 if (settings.devUnlocked) {
-                    Group("Developer", footer = "Solo runs only. Switched on by tapping the version line.") {
+                    Group("Developer", footer = "Isolated solo trials only. Unlock with five taps on Version and the PIN.") {
                         NavRow("Developer Options", onDev)
                     }
                 }

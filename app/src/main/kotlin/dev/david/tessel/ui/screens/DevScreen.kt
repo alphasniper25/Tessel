@@ -34,6 +34,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.Bestiary
+import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillTree
+import dev.david.tessel.core.content.PerkCombo
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import dev.david.tessel.core.content.Perks
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.ui.components.NavRow
@@ -71,8 +77,9 @@ fun DevScreen(
     onChange: ((Settings) -> Settings) -> Unit,
     onBreakNow: () -> Unit,
     onTutorial: () -> Unit,
-    onEnemies: () -> Unit,
     onStartRun: () -> Unit,
+    onStartShop: () -> Unit,
+    canLaunchTrial:Boolean,
     onBack: () -> Unit,
 ) {
     val c = Theme.colors
@@ -80,6 +87,10 @@ fun DevScreen(
     val dev = settings.dev
     fun change(next: (Dev) -> Dev) = onChange { it.copy(dev = next(it.dev)) }
     var exported by remember { mutableStateOf<String?>(null) }
+    var showSkills by remember { mutableStateOf(false) }
+    var showEnemies by remember { mutableStateOf(false) }
+    var showUpgrades by remember { mutableStateOf(true) }
+    var showFrames by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -91,8 +102,12 @@ fun DevScreen(
             BackButton("Settings", onBack, Modifier.align(Alignment.CenterStart))
             Text("Developer Options", Type.headline, c.ink, Modifier.align(Alignment.Center))
         }
+        Row(Modifier.fillMaxWidth().padding(horizontal=Space.x4,vertical=Space.x2),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            PrimaryButton("Open Shop · Stage ${dev.startStage}",onStartShop,Modifier.weight(1f),enabled=canLaunchTrial)
+            SecondaryButton("Try a Run With These",onStartRun,Modifier.weight(1f),enabled=canLaunchTrial)
+        }
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.x6),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Space.x6),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(
@@ -103,31 +118,29 @@ fun DevScreen(
                     "Solo Trial",
                     footer = "These only reach a run started with Try a Run With These. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
                 ) {
-                    val picked = (dev.off.size + (if (dev.boss >= 0) 1 else 0) + dev.tweaks.size)
-                    NavRow(
-                        "Enemies and Bosses",
-                        onEnemies,
-                        detail = if (picked == 0) "Pick which kinds come, a boss to fight, and change their speed, health and damage." else
-                            "${dev.off.size} off" + (if (dev.boss >= 0) ", boss: ${Bestiary.of(dev.boss).name}" else "") + ", ${dev.tweaks.size} changed",
-                    )
-                    Divider()
+                    Text("Test runs are isolated. Normal saves, score, missions, account rewards and multiplayer are untouched.",Type.footnote,c.ink2,Modifier.padding(Space.x3))
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.x4, vertical = Space.x2),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text("Start Stage", Type.body, c.ink)
-                            Text("Skips the shops before it. New runs.", Type.footnote, c.ink3)
+                            Text("1–50. Open Shop starts here immediately.", Type.footnote, c.ink3)
                         }
                         Nudge("-5") { change { it.copy(startStage = (it.startStage - 5).coerceAtLeast(1)) } }
                         Nudge("-1") { change { it.copy(startStage = (it.startStage - 1).coerceAtLeast(1)) } }
                         Text(dev.startStage.toString(), Type.headline.merge(Type.numbers), c.ink, Modifier.width(40.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
-                        Nudge("+1") { change { it.copy(startStage = (it.startStage + 1).coerceAtMost(99)) } }
-                        Nudge("+5") { change { it.copy(startStage = (it.startStage + 5).coerceAtMost(99)) } }
+                        Nudge("+1") { change { it.copy(startStage = (it.startStage + 1).coerceAtMost(50)) } }
+                        Nudge("+5") { change { it.copy(startStage = (it.startStage + 5).coerceAtMost(50)) } }
                     }
                     Divider()
                     Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
-                        Text("Start Coins", Type.body, c.ink)
+                        Text("Start Coins · ${dev.startCoins}", Type.body, c.ink)
+                        Row(verticalAlignment=Alignment.CenterVertically){
+                            Nudge("-1k"){change{it.copy(startCoins=(it.startCoins-1000).coerceAtLeast(0))}}
+                            Nudge("+1k"){change{it.copy(startCoins=(it.startCoins+1000).coerceAtMost(10000000))}}
+                            Nudge("+10k"){change{it.copy(startCoins=(it.startCoins+10000).coerceAtMost(10000000))}}
+                        }
                         Spacer(Modifier.height(Space.x2))
                         Segmented(
                             options = COINS.map { "%,d".format(it) },
@@ -151,9 +164,42 @@ fun DevScreen(
                     }
                 }
 
+                Group("Test fixture") {
+                    NavRow("Tank frame · ${TankEvolution.fromId(dev.frame).label}",{showFrames=!showFrames},detail="Any of the 33 frames, including secret evolutions")
+                    if(showFrames)for(frame in TankEvolution.entries){
+                        ToggleRow(frame.label,dev.frame==frame.ordinal,{v->if(v)change{it.copy(frame=frame.ordinal)}},detail=frame.detail)
+                    }
+                    Divider()
+                    ToggleRow("All mission cards",dev.allMissions,{v->change{it.copy(allMissions=v)}})
+                    Divider()
+                    Row(Modifier.fillMaxWidth().padding(Space.x3),verticalAlignment=Alignment.CenterVertically){
+                        Column(Modifier.weight(1f)){Text("Starting health",Type.body,c.ink);Text(if(dev.startHp<0)"Full hull" else "${dev.startHp} HP",Type.footnote,c.ink2)}
+                        Nudge("-1"){change{it.copy(startHp=(if(it.startHp<0)10 else it.startHp-1).coerceAtLeast(1))}}
+                        Nudge("+1"){change{it.copy(startHp=(if(it.startHp<0)10 else it.startHp+1).coerceAtMost(999))}}
+                        Nudge("Full"){change{it.copy(startHp=-1)}}
+                    }
+                }
+                Group("Enemies and bosses"){
+                    NavRow(if(showEnemies)"Collapse enemy controls" else "Show all enemy controls",{showEnemies=!showEnemies},detail="Spawn filters, boss selection, individual speed / HP / damage")
+                    if(showEnemies)DevEnemyControls(settings,onChange)
+                }
+                Group("Skills · ${SkillGraph.count(dev.skills)} / 60") {
+                    Row(Modifier.padding(Space.x3),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        SecondaryButton("All skills",{change{it.copy(skills=SkillGraph.MASK)}},Modifier.weight(1f))
+                        SecondaryButton("Clear skills",{change{it.copy(skills=0L)}},Modifier.weight(1f))
+                    }
+                    NavRow(if(showSkills)"Hide skill controls" else "Show all 60 skills",{showSkills=!showSkills})
+                    if(showSkills)for(node in SkillGraph.nodes){
+                        ToggleRow(node.name,SkillGraph.owns(dev.skills,node.id),{v->change{it.copy(skills=if(v)it.skills or SkillGraph.bit(node.id) else it.skills and SkillGraph.bit(node.id).inv())}},detail=node.description)
+                    }
+                }
                 Group("Elites and Perks", footer = "Elites: every enemy that comes is elite. Perks: taken at the start of a trial run.") {
                     ToggleRow("Elite Enemies", dev.elites, { v -> change { it.copy(elites = v) } })
-                    for (k in 0 until Perks.count) {
+                    Row(Modifier.padding(Space.x3),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        SecondaryButton("All perks",{change{it.copy(perks=(0 until SkillTree.ORIGINAL_PERKS).toSet())}},Modifier.weight(1f))
+                        SecondaryButton("Clear perks",{change{it.copy(perks=emptySet())}},Modifier.weight(1f))
+                    }
+                    for (k in 0 until SkillTree.ORIGINAL_PERKS) {
                         Divider()
                         ToggleRow(
                             Perks.of(k).name,
@@ -164,8 +210,13 @@ fun DevScreen(
                     }
                 }
 
-                Group("Starting Upgrades", footer = "Levels a trial run begins with. Only for Try a Run With These.") {
-                    for (id in 0 until Upgrades.count) {
+                Group("Starting Upgrades", footer = "Trial ranks only. All real and legacy upgrade IDs are testable.") {
+                    Row(Modifier.padding(Space.x3),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        SecondaryButton("Max all",{change{it.copy(upgrades=(0 until Upgrades.count).associateWith{u->Upgrades.of(u).maxLevel})}},Modifier.weight(1f))
+                        SecondaryButton("Clear",{change{it.copy(upgrades=emptyMap())}},Modifier.weight(1f))
+                    }
+                    NavRow(if(showUpgrades)"Hide ranks" else "Show all ranks",{showUpgrades=!showUpgrades})
+                    if(showUpgrades)for (id in 0 until Upgrades.count) {
                         val def = Upgrades.of(id)
                         val level = dev.upgrades[id] ?: 0
                         fun set(n: Int) = change {
@@ -189,9 +240,6 @@ fun DevScreen(
                     }
                 }
 
-                if (!inRun) {
-                    PrimaryButton("Try a Run With These", onStartRun, Modifier.fillMaxWidth())
-                }
 
                 Group("Tools", footer = exported) {
                     ActionLine("Export Log", "Writes a text file and opens the share sheet.") {
@@ -207,7 +255,7 @@ fun DevScreen(
                     }
                 }
 
-                Group("Reset", footer = "Reset puts every option above back to normal. Lock hides this page until the version line is tapped seven times again.") {
+                Group("Reset", footer = "Reset puts every option above back to normal. Lock hides this page until the version line is tapped exactly five times again.") {
                     Row(Modifier.padding(Space.x3), horizontalArrangement = Arrangement.spacedBy(Space.x3)) {
                         SecondaryButton("Reset Developer Settings", { change { Dev() } }, Modifier.weight(1f), tint = c.danger)
                         SecondaryButton("Lock", { onChange { it.copy(devUnlocked = false, dev = Dev()) }; onBack() }, Modifier.width(96.dp))

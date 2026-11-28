@@ -57,7 +57,7 @@ private fun label(v: Float) = if (v == v.toInt().toFloat()) "${v.toInt()}x" else
  * open a kind to change its speed, health and the damage its hits do.
  */
 @Composable
-fun DevEnemiesScreen(settings: Settings, onChange: ((Settings) -> Settings) -> Unit, onBack: () -> Unit) {
+fun DevEnemyControls(settings: Settings, onChange: ((Settings) -> Settings) -> Unit) {
     val c = Theme.colors
     val dev = settings.dev
     fun change(next: (Dev) -> Dev) = onChange { it.copy(dev = next(it.dev)) }
@@ -65,16 +65,7 @@ fun DevEnemiesScreen(settings: Settings, onChange: ((Settings) -> Settings) -> U
     val kinds = (0 until Bestiary.size).filter { Bestiary.of(it).let { d -> d.boss || d.from != 0 } }
     val regular = kinds.filter { !Bestiary.of(it).boss }
 
-    Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)) {
-        Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
-            BackButton("Developer", onBack, Modifier.align(Alignment.CenterStart))
-            Text("Enemies and Bosses", Type.headline, c.ink, Modifier.align(Alignment.Center))
-        }
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Space.x6),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = Space.x2), verticalArrangement = Arrangement.spacedBy(Space.x3)) {
+    Column(Modifier.fillMaxWidth().padding(Space.x2),verticalArrangement=Arrangement.spacedBy(Space.x2)) {
                 Text(
                     "Untick a kind and it stays out. Once any is off, only the ticked kinds come, from stage 1. A boss comes in every stage, one at a time. Tap a row's name to change its speed, health and damage.",
                     Type.footnote,
@@ -146,8 +137,5 @@ fun DevEnemiesScreen(settings: Settings, onChange: ((Settings) -> Settings) -> U
                         }
                     }
                 }
-                Spacer(Modifier.height(Space.x4))
-            }
-        }
     }
 }

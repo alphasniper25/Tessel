@@ -57,7 +57,6 @@ import dev.david.tessel.ui.components.Text
 import dev.david.tessel.ui.screens.BreakPanel
 import dev.david.tessel.ui.screens.CodePanel
 import dev.david.tessel.ui.screens.MinutesPanel
-import dev.david.tessel.ui.screens.DevEnemiesScreen
 import dev.david.tessel.ui.screens.DevScreen
 import dev.david.tessel.ui.screens.HomeScreen
 import dev.david.tessel.ui.screens.LobbyScreen
@@ -66,7 +65,7 @@ import dev.david.tessel.ui.screens.PausePanel
 import dev.david.tessel.ui.screens.PlayPanel
 import dev.david.tessel.ui.screens.RunOverCard
 import dev.david.tessel.ui.screens.SettingsScreen
-import dev.david.tessel.ui.screens.ShopPanel
+import dev.david.tessel.ui.screens.TreeShopScreen
 import dev.david.tessel.ui.screens.StatsScreen
 import dev.david.tessel.ui.screens.TutorialCard
 import kotlinx.coroutines.delay
@@ -105,6 +104,7 @@ fun TesselApp(
     val breakDue by game.breakDue.collectAsState()
     val tutorial by game.tutorial.collectAsState()
     val coop = role != Role.SOLO
+    val devTrial by game.devTrial.collectAsState()
     val duel by game.duel.collectAsState()
     val rematch by game.rematch.collectAsState()
 
@@ -120,8 +120,7 @@ fun TesselApp(
     var devOpen by rememberSaveable { mutableStateOf(false) }
     var codeOpen by remember { mutableStateOf(false) }
     var minutesOpen by remember { mutableStateOf(false) }
-    var enemiesOpen by rememberSaveable { mutableStateOf(false) }
-    // Seven taps on the version line, then a second of quiet, ask for the developer code.
+    // Five taps on the version line, then a second of quiet, ask for the developer code.
     val taps = remember { TapCounter() }
     var tapSeq by remember { mutableIntStateOf(0) }
     LaunchedEffect(tapSeq) {
@@ -229,9 +228,11 @@ fun TesselApp(
             )
         }
 
-        Sheet(visible = mode == Mode.SHOP && !treeOpen, onDismiss = null) {
-            (shop ?: lastShop)?.let {
-                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
+        if(mode==Mode.SHOP && !waitingOnSomeone && !settingsOpen && !devOpen){
+            shop?.let{
+                TreeShopScreen(it,game::buy,game::heal,game::reroll,game::nextStage,game::pickPerk,game::setCardLocked,game::buySkill,game::saveForLater,
+                    onDev=if(it.devTrial)({settingsOpen=true;devOpen=true})else null,
+                    onDevRank=game::devRank,onDevOffer=game::devOffer,onDevPerk=game::devTogglePerk,onDevSkill=game::devToggleSkill,onDevFrame=game::devFrame)
             }
         }
 
@@ -287,12 +288,7 @@ fun TesselApp(
                 onSettings = { game.menuSound();settingsOpen = true },
                 onProfile = { game.menuSound();profileOpen=true },
                 playerName=profileName,
-                onLogo = if (settings.devUnlocked) {
-                    {
-                        settingsOpen = true
-                        devOpen = true
-                    }
-                } else null,
+                onLogo = null,
             )
         }
 
@@ -329,7 +325,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen && !cardsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
-            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
+            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()},onDev=if(settings.devUnlocked)({settingsOpen=true;devOpen=true;game.menuSound()})else null)
         }
 
         // The lobby and settings slide in from the trailing edge and leave the same way.
@@ -424,7 +420,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = settingsOpen && devOpen,
+            visible = settingsOpen && devOpen && settings.devUnlocked,
             enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
             exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
         ) {
@@ -439,22 +435,17 @@ fun TesselApp(
                     game.breakNow()
                 },
                 onTutorial = startTutorial,
-                onEnemies = { enemiesOpen = true },
                 onStartRun = {
-                    devOpen = false
-                    settingsOpen = false
+                    devOpen = false;settingsOpen = false;profileOpen=false
                     game.startDevRun(settings.difficulty)
                 },
+                onStartShop = {
+                    devOpen=false;settingsOpen=false;profileOpen=false
+                    game.startDevShop(settings.difficulty)
+                },
+                canLaunchTrial=mode==Mode.HOME||devTrial,
                 onBack = { devOpen = false },
             )
-        }
-
-        AnimatedVisibility(
-            visible = settingsOpen && devOpen && enemiesOpen,
-            enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
-            exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
-        ) {
-            DevEnemiesScreen(settings = settings, onChange = store::update, onBack = { enemiesOpen = false })
         }
 
         Sheet(visible = minutesOpen && settingsOpen, onDismiss = { minutesOpen = false }) {
@@ -501,12 +492,12 @@ fun TesselApp(
     }
 
     val treeHandlesBack=treeOpen && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
-    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
+    val shopHandlesBack=mode==Mode.SHOP&&!settingsOpen&&!devOpen&&!held&&lobbyState !is LobbyState.Reconnecting
+    BackHandler(enabled = !arsenalVisible && !treeHandlesBack && !shopHandlesBack && (profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false
             minutesOpen -> minutesOpen = false
-            enemiesOpen && devOpen && settingsOpen -> enemiesOpen = false
             devOpen && settingsOpen -> devOpen = false
             settingsOpen -> settingsOpen = false
             statsOpen -> statsOpen = false
