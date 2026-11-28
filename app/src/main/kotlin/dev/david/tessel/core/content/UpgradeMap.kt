@@ -88,16 +88,25 @@ object UpgradeMap {
         val radius=catalog(includeLegacy).values.maxOf{nodes->nodes.maxOf{hypot(it.x,it.y)}}
         return maxOf(WIDTH,2f*(radius+80f))
     }
+    /** Every type starts at the tank. Short sibling links make the five
+     * families a coherent radial mesh without creating purchase prerequisites.
+     * Reject links that would pass through any other rank's circle. */
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
+        val all=positions.flatMap{p->ranks(p,positions).map{p.id to it}}
+        for(root in positions)add(MapLink(HUB_ID,root.id))
         for(group in groups){
             val row=positions.filter{it.family==group}
-            if(row.isNotEmpty()){
-                val middle=row.size/2
-                add(MapLink(HUB_ID,row[middle].id))
-                // Orient both arms outward from their shared root. Connections
-                // remain visual only, but every track is reachable from the hub.
-                for(i in middle downTo 1)add(MapLink(row[i].id,row[i-1].id))
-                for(i in middle until row.lastIndex)add(MapLink(row[i].id,row[i+1].id))
+            for((a,b) in row.zipWithNext()){
+                val dx=b.x-a.x;val dy=b.y-a.y
+                val len2=dx*dx+dy*dy
+                if(len2<=0f||sqrt(len2)>300f)continue
+                val clear=all.none{(id,node)->
+                    if(node.rank==1&&(id==a.id||id==b.id))false else {
+                        val t=(((node.x-a.x)*dx+(node.y-a.y)*dy)/len2).coerceIn(0f,1f)
+                        hypot(node.x-a.x-t*dx,node.y-a.y-t*dy)<NODE_RADIUS+5f
+                    }
+                }
+                if(clear)add(MapLink(a.id,b.id))
             }
         }
     }

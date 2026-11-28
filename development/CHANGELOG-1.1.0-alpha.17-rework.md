@@ -1,0 +1,3 @@
+# TESSEL alpha.17 — approved alpha.16 rework build
+
+Based on the alpha.16 rework, not the archived alpha.17 or alpha.18. Version code 41. All upgrade chains connect to the tank; short unobstructed related-type root links complete the circular mesh. Rank slots fill sequentially, with rarity determining the consecutive ranks purchased. All normal upgrade types remain visible, rolled offers highlight and rerolling does not move or erase acquired ranks. Skill and perk maps remain unchanged. No economy, combat or serialized-state changes. Source and screenshot validation plus locally signed test APK. Physical-device testing remains required.

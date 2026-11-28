@@ -132,6 +132,7 @@ internal fun upgradeExtent(shop:ShopView):Float{
 private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->Unit,onDevRank:(Int,Int)->Unit,rerollRequest:Int){
     val c=Theme.colors
     val positions=remember(shop.devPreview){UpgradeMap.positions(shop.devPreview)}
+    val rootLinks=remember(positions){UpgradeMap.links(positions)}
     val offers=shop.offers.filter{!it.empty&&it.upgradeId>=0}.groupBy{it.upgradeId}
     val totalOffers=offers.values.sumOf{it.size}
     var selected by rememberSaveable{mutableIntStateOf(-1)}
@@ -153,7 +154,7 @@ private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->
     }
     BoxWithConstraints(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(c.surface)){
         MarketCanvas(items,selected,{id->selected=id;selectedSlot=-1},tag="upgrade-map",
-            footer="$totalOffers / 3 offers · $affordable affordable · ${UpgradeMap.rankCount(shop.devPreview)} ranks",frame=shop.frame,character=shop.character,look=shop.look,extent=mapExtent)
+            footer="$totalOffers / 3 offers · $affordable affordable · ${UpgradeMap.rankCount(shop.devPreview)} ranks",frame=shop.frame,character=shop.character,look=shop.look,extent=mapExtent,rootLinks=rootLinks)
         val id=selected.takeIf{candidate->positions.any{it.id==candidate}}
         if(id!=null){
             val wide=maxWidth>=720.dp
@@ -378,7 +379,7 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
 }
 
 @Composable
-private fun MarketCanvas(items:List<MarketItem>,selected:Int,inspect:(Int)->Unit,tag:String,footer:String,frame:TankEvolution,character:CharacterDef,look:TankLook,extent:Float=UpgradeMap.WIDTH,revealing:Set<Int> = emptySet(),revealProgress:Float=1f){
+private fun MarketCanvas(items:List<MarketItem>,selected:Int,inspect:(Int)->Unit,tag:String,footer:String,frame:TankEvolution,character:CharacterDef,look:TankLook,extent:Float=UpgradeMap.WIDTH,revealing:Set<Int> = emptySet(),revealProgress:Float=1f,rootLinks:List<MapLink> = emptyList()){
     val c=Theme.colors;var zoom by rememberSaveable(tag){mutableFloatStateOf(1f)}
     var px by rememberSaveable(tag){mutableFloatStateOf(0f)};var py by rememberSaveable(tag){mutableFloatStateOf(0f)}
     var viewport by remember{mutableStateOf(IntSize.Zero)}
@@ -413,8 +414,21 @@ private fun MarketCanvas(items:List<MarketItem>,selected:Int,inspect:(Int)->Unit
             val w=size.width;val h=size.height;val scale=camera.scale(w,h)
             fun pos(n:MarketItem)=Offset(camera.sx(n.x,w,h),camera.sy(n.y,w,h))
             val center=Offset(camera.sx(0f,w,h),camera.sy(0f,w,h))
-            // No floating text or decorative grid. Only same-type upgrade
-            // rank paths have links; skills and perks remain line-free.
+            // Hub spokes and unobtrusive sibling edges are visual only.
+            // Draw behind all circles. Skills and perks pass an empty edge list.
+            val byId=items.associateBy{it.id}
+            for(edge in rootLinks){
+                val end=byId[edge.b]?:continue
+                val start=byId[edge.a]
+                if(edge.a==UpgradeMap.HUB_ID){
+                    val ready=end.rolls.filter{it.affordable}.maxByOrNull{it.rarity.ordinal}
+                    val active=end.rankOwned>0||ready!=null
+                    drawLine((if(end.rankOwned>0)end.tint else ready?.tint?:end.tint).copy(alpha=if(active).82f else .32f),
+                        center,pos(end),strokeWidth=if(active)2.dp.toPx() else 1.dp.toPx())
+                }else if(start!=null){
+                    drawLine(end.tint.copy(alpha=.24f),pos(start),pos(end),strokeWidth=.85.dp.toPx())
+                }
+            }
             treeTank(art,center,(78f*scale).coerceIn(13.dp.toPx(),48.dp.toPx()),character,look,frame,c.ink,c.ground,c.accent)
             for(n in items){
                 val at=pos(n)

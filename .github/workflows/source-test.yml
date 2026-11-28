@@ -1,9 +1,9 @@
-name: TESSEL alpha.16.1 source checks
+name: TESSEL alpha.17 rework source checks
 on:
   push:
-    branches: [test/alpha16-rework]
+    branches: [test/alpha17-rework]
 concurrency:
-  group: alpha16-rework-${{ github.ref }}
+  group: alpha17-rework-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,11 +33,31 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha16-rework-unit-tests
+          name: TESSEL-alpha17-rework-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7
-      # Source-only candidate: no APK assembly, signing or publication.
+      - name: Assemble authorized alpha.17 test APK
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TESSEL-alpha17-rework-debug-intermediate
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stage SDK verification tools
+        run: |
+          mkdir -p build/signing-tools
+          cp "$ANDROID_HOME/build-tools/37.0.0/lib/apksigner.jar" build/signing-tools/
+          cp "$ANDROID_HOME/build-tools/37.0.0/zipalign" build/signing-tools/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TESSEL-alpha17-sdk-signing-tools
+          path: build/signing-tools/
+          if-no-files-found: error
+          retention-days: 7
+      # Original private signing key remains outside GitHub; sign locally.
+
 
 
   screenshots:
@@ -60,7 +80,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha16-native-menu-screenshots
+          name: TESSEL-alpha17-rework-native-menu-screenshots
           path: |
             docs/menu-gallery/*.png
             docs/stage.png

@@ -113,3 +113,7 @@
 
 ## Sequential upgrade path refinement
 - Supersedes the no-line rule for Upgrades ONLY: draw subtle adjacent rank connectors within the same upgrade type, never cross-type links or floating labels. 25 distinct fixed angular sectors, equal full-size rank circles with contiguous prefix progression. All ranks visible, current rolls light next consecutive ranks; no changes to rarity bundles, economy, skill or perk mechanics, save or wire. Native captures of real common-offer transactions. No APK.
+
+## Alpha.17 — approved rework test build
+- Branch test/alpha17-rework from exact alpha.16.1 sequential-path commit 12f33edf2355a19f64d9362031888d2135de0fdd, not the discarded old alpha.17/.18 branches. Version name 1.1.0-alpha.17, version code 41; original application ID and private test certificate unchanged. Explicit APK approval received. Keep all earlier branches intact.
+- All 25 active upgrade rank paths now connect directly to the central tank. Add short clear sibling root connections within each family, purely visual. Keep full-size sequential rank nodes, purchase/reroll semantics and forecasts. Skills and perks unchanged; no new gameplay, save-format or wire changes. Run unit regression and native screenshot checks, assemble debug APK, then sign with the original private key locally. Never upload the key to GitHub.

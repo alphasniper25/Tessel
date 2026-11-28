@@ -151,7 +151,7 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
     }
     @Test fun developerOptions(){
         var settings by mutableStateOf(Settings(devUnlocked=true,dev=Dev(startStage=17,startCoins=500)))
-        show{DevScreen(settings,"1.1.0-alpha.16.1",false,{settings=it(settings)}, {}, {}, {_,_->}, {_,_->},{_,_,_->},{},{},onBack={})}
+        show{DevScreen(settings,"1.1.0-alpha.17",false,{settings=it(settings)}, {}, {}, {_,_->}, {_,_->},{_,_,_->},{},{},onBack={})}
         capture("11-developer-overview")
         for((label,name) in listOf("Start Coins" to "12-developer-wallet","Elite Enemies" to "13-developer-perks","Starting Upgrades" to "14-developer-upgrade-ranks","Starting frame · Basic" to "15-developer-tank","Shop reward" to "16-developer-shop-offers","All skills" to "17-developer-skills","Enemies and bosses" to "18-developer-enemies","Victory screen" to "19-developer-screen-tests","Audio cues" to "20-developer-sounds","Reset Developer Settings" to "21-developer-reset")){
             scroll(label);capture(name)

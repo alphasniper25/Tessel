@@ -10,6 +10,10 @@ class RadialUpgradeMapTest {
             assertEquals(if(dev)Upgrades.count else Upgrades.count-2,nodes.size)
             assertEquals(nodes.size,nodes.map{it.id}.toSet().size)
             val edges=UpgradeMap.links(nodes)
+            assertEquals(nodes.map{it.id}.toSet(),edges.filter{it.a==UpgradeMap.HUB_ID}.map{it.b}.toSet())
+            assertEquals(nodes.size,edges.count{it.a==UpgradeMap.HUB_ID})
+            assertTrue(edges.any{it.a!=UpgradeMap.HUB_ID})
+            assertEquals(edges.size,edges.distinct().size)
             val seen=mutableSetOf(UpgradeMap.HUB_ID)
             repeat(nodes.size){for(e in edges)if(e.a in seen)seen.add(e.b)}
             assertEquals(nodes.map{it.id}.toSet(),seen-UpgradeMap.HUB_ID)
