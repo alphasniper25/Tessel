@@ -1219,7 +1219,6 @@ class World(seed: Long = 1L) {
             val late=CampaignScaling.damage(stage,difficulty,by in 0 until Bestiary.size && Bestiary.of(by).boss)
             val rawAmount = if(loss>0) loss else (base+late-if(Cause.isShot(cause)) pl.evolution[p].projectileArmor else 0).coerceAtLeast(1)
             val amount=(rawAmount-if(capacitor)1 else 0).coerceAtLeast(0)
-            if(capacitor&&pl.combo(p,PerkCombo.STORM_CELL))pl.surge[p]=max(pl.surge[p],3*TICK_HZ)
             if(amount>0&&by in 0 until Bestiary.size && !duel.on) when(Bestiary.of(by).status) {
                 StatusEffect.BURN, StatusEffect.POISON -> if(pl.poisonTicks[p]==0) {pl.poisonTicks[p]=(if(Bestiary.of(by).status==StatusEffect.BURN)2 else 3)*TICK_HZ;pl.poisonSource[p]=by}
                 StatusEffect.FREEZE -> pl.stun[p]=max(pl.stun[p], (TICK_HZ*.45f).toInt())
@@ -1294,9 +1293,7 @@ class World(seed: Long = 1L) {
     /** A status tick is damage, not a new collision: no knockback, extra hit grace or reapplication. */
     private fun phoenixPulse(p:Int){
         players.clearStatus(p)
-        val solar=players.combo(p,PerkCombo.SOLAR_REBIRTH)
-        if(solar)players.hp[p]=minOf(3,players.maxHp[p])
-        val radius=if(solar)180f else 120f
+        val radius=120f
         val px=players.x[p];val py=players.y[p]
         for(i in 0 until hostile.count){
             if(hostile.life[i]<=0)continue

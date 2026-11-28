@@ -106,7 +106,7 @@ class PlayerState {
     fun has(p: Int, perk: Int) = perks[p] shr perk and 1 != 0
     fun combo(p:Int,combo:PerkCombo)=combo.active(perks[p])
     fun capacitorReady(p:Int)=combo(p,PerkCombo.REACTOR_SYNC)&&sinceHit[p]>=OVERCLOCK_TICKS
-    fun purgeDue(p:Int)=combo(p,PerkCombo.FIELD_RUNNER)&&kills[p]>0&&kills[p]%10==0
+    fun purgeDue(p:Int)=combo(p,PerkCombo.PHASE_ESCAPE)&&kills[p]>0&&kills[p]%10==0
     fun clearStatus(p:Int){poisonTicks[p]=0;poisonSource[p]=-1;stun[p]=0}
 
     fun damage(p: Int): Float {
@@ -132,18 +132,18 @@ class PlayerState {
     private fun perkDamageFactor(p:Int)=(if(has(p,Perks.HARDPOINT))1.1f else 1f)*(if(has(p,Perks.DEADEYE))1.12f else 1f)
     fun perkRangeFactor(p:Int)=(if(has(p,Perks.RANGEFINDER))1.1f else 1f)*(if(has(p,Perks.LONGSHOT))1.15f else 1f)
     fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)*perkRangeFactor(p)
-    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * (if (has(p, Perks.QUICK_FEET)) 1.15f else 1f) * (if(has(p,Perks.AFTERBURNER))1.1f else 1f) * (if(combo(p,PerkCombo.HORIZON)&&hp[p]==maxHp[p])1.15f else 1f)
+    fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * (if (has(p, Perks.QUICK_FEET)) 1.15f else 1f) * (if(has(p,Perks.AFTERBURNER))1.1f else 1f)
     fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)*perkDamageFactor(p)
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)
         val level=Upgrades.delta(levels[p],UpgradeStat.REGEN).toInt()
         val normal=if(level==0) base else if(base==0) 28-4*level else (base-2*level).coerceAtLeast(if(evolution[p].melee) 2 else 4)
-        return if(combo(p,PerkCombo.REACTIVE_PLATING)&&hp[p]>0&&hp[p]*2<=maxHp[p])if(normal==0)8 else minOf(normal,8) else normal
+        return normal
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
-    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * (if (has(p, Perks.MAGNET_CORE)) 2f else 1f) * (if(has(p,Perks.VACUUM))1.25f else 1f) * (if(combo(p,PerkCombo.SURVEYOR))1.2f else 1f)
+    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * (if (has(p, Perks.MAGNET_CORE)) 2f else 1f) * (if(has(p,Perks.VACUUM))1.25f else 1f)
     fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
 
     private fun scaled(p: Int, stat: UpgradeStat, base: Float) = base * (1f + Upgrades.delta(levels[p], stat))

@@ -26,9 +26,9 @@ object UpgradeMap {
         val a=degrees*PI.toFloat()/180f
         return radius*cos(a) to radius*sin(a)
     }
-    const val NODE_RADIUS=30f
+    const val NODE_RADIUS=37f
     const val FIRST_RADIUS=365f
-    const val RANK_STEP=85f
+    const val RANK_STEP=98f
     // A type has its own radial track. Every rank is the same size, not a satellite.
     fun positions(includeLegacy:Boolean=false):List<UpgradePosition>{
         val ids=groups.flatMap{group->(0 until Upgrades.count).filter{(includeLegacy||!legacy(it))&&Upgrades.of(it).family==group}}
@@ -46,7 +46,7 @@ object UpgradeMap {
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
         for(group in groups){
             val row=positions.filter{it.family==group}
-            for(n in row)add(MapLink(HUB_ID,n.id))
+            if(row.isNotEmpty())add(MapLink(HUB_ID,row[row.size/2].id))
             row.zipWithNext().forEach{(a,b)->add(MapLink(a.id,b.id))}
         }
     }

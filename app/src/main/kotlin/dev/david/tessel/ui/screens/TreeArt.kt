@@ -30,26 +30,6 @@ internal fun DrawScope.treeTank(art:TankArt,at:Offset,r:Float,character:Characte
         ink.toArgb(),ink.copy(alpha=.8f).toArgb(),ground.toArgb(),evolution=frame)
 }
 
-/** Matching fictional sigils, not random characters. The same three glyphs appear
- * behind both component perks and their combo, and do not require a font asset. */
-internal fun DrawScope.perkSigil(code:Int,at:Offset,unit:Float,color:Color){
-    val width=(unit*.12f).coerceAtLeast(.75f)
-    for(k in 0..2){
-        val x=at.x+(k-1)*unit*2.7f
-        fun p(a:Float,b:Float)=Offset(x+a*unit,at.y+b*unit)
-        fun l(a:Float,b:Float,c:Float,d:Float)=drawLine(color,p(a,b),p(c,d),width,StrokeCap.Round)
-        when((code/(if(k==0)1 else if(k==1)7 else 49)+k*2)%7){
-            0->{l(-.8f,1f,0f,-1f);l(0f,-1f,.8f,1f);l(-.45f,.1f,.45f,.1f)}
-            1->{l(0f,-1f,0f,1f);l(0f,-1f,.85f,-.4f);l(.85f,-.4f,0f,.2f);l(0f,.2f,-.7f,.8f)}
-            2->{l(-.8f,-1f,.8f,-1f);l(.8f,-1f,-.8f,1f);l(-.8f,1f,.8f,1f);l(0f,-.35f,0f,.35f)}
-            3->{l(-.8f,0f,0f,-1f);l(0f,-1f,.8f,0f);l(.8f,0f,0f,1f);l(0f,1f,-.8f,0f);l(0f,-1f,0f,1f)}
-            4->{l(-.7f,-1f,-.7f,1f);l(-.7f,-1f,.8f,0f);l(.8f,0f,-.7f,1f);l(-.7f,0f,.3f,0f)}
-            5->{l(-.9f,-.7f,.9f,.7f);l(-.9f,.7f,.9f,-.7f);l(0f,-1f,0f,1f)}
-            else->{l(-.85f,-1f,.85f,-1f);l(0f,-1f,0f,1f);l(-.8f,.3f,.8f,.3f);drawCircle(color,unit*.12f,p(.65f,.7f))}
-        }
-    }
-}
-
 @Composable
 internal fun StageGateNotice(title:String,detail:String,modifier:Modifier=Modifier){
     val c=Theme.colors

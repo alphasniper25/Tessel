@@ -266,10 +266,7 @@ class Shop {
         if (!canReroll(w, p)) return false
         val price=rerollPrice(w,p)
         w.players.coins[p]-=price
-        if(price==0){freeUsed[p]++
-            val pl=w.players
-            if(pl.combo(p,PerkCombo.RECLAMATION)&&pl.hp[p] in 1 until pl.maxHp[p])pl.hp[p]++
-        }else rerolls[p]++
+        if(price==0)freeUsed[p]++ else rerolls[p]++
         restock(w, p)
         return true
     }
