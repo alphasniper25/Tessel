@@ -12,20 +12,20 @@ fun main() {
     }
     val totals = Totals().apply { coins=500; deepest=15; bosses=20; completed=1; seconds=600; kills=100 }
     pass("four independent mission thresholds and XP curve") {
-        check(CardMission.mask(totals)==CardMission.allMask); check(AccountProgress.xp(totals)==1760L)
+        check(CardMission.mask(totals)==15); check(AccountProgress.xp(totals)==1760L)
         check(AccountProgress.level(99)==1); check(AccountProgress.level(100)==2); check(AccountProgress.level(300)==3)
         val almost = Totals().apply { coins=499; deepest=14; bosses=19 }; check(CardMission.mask(almost)==0)
         val individual = Totals().apply { coins=500 }; check(CardMission.mask(individual)==CardMission.FIELD_MEDIC.bit)
     }
     pass("ledger roundtrip retains progression and unlocks") {
         val l=Ledger(); l.record(RunEntry(1,Difficulty.NORMAL,15,600,1000,100,500,20,1,-1,false,10,20,0,0,0,2,true))
-        val loaded=checkNotNull(Ledger.read(l.write())); check(CardMission.mask(loaded.totals)==CardMission.allMask); check(AccountProgress.xp(loaded.totals)==1760L)
+        val loaded=checkNotNull(Ledger.read(l.write())); check(CardMission.mask(loaded.totals)==15); check(AccountProgress.xp(loaded.totals)==1760L)
     }
     pass("locked mission cards never appear in 30,000 slots") {
         val w=world(); repeat(10000) { w.shop.open(w); for (s in 0 until SHOP_SLOTS) check(CardMission.forUpgrade(w.shop.item(0,s))==null) }
     }
     pass("unlocked mission cards appear only at their declared rarity") {
-        val w=world(CardMission.allMask); val seen=mutableSetOf<Int>()
+        val w=world(CardMission.allMask); w.players.evolution[0]=TankEvolution.OVERSEER; val seen=mutableSetOf<Int>()
         repeat(30000) { w.shop.open(w); for(s in 0 until SHOP_SLOTS) CardMission.forUpgrade(w.shop.item(0,s))?.let { check(w.shop.rarity(0,s)==it.rarity); seen+=it.upgrade } }; check(seen.size==CardMission.entries.size)
     }
     pass("partially unlocked player only draws eligible mission cards") {
@@ -39,6 +39,7 @@ fun main() {
     pass("mission card purchases apply actual effects once and cost coins") {
         val w=world(CardMission.allMask); val s=w.shop
         for (m in CardMission.entries) {
+            w.players.evolution[0]=if(m==CardMission.DRONE_RELAY)TankEvolution.OVERSEER else TankEvolution.BASIC
             var slot=-1
             var attempts=0
             while(slot<0 && attempts++<200000) { s.open(w); slot=(0 until SHOP_SLOTS).firstOrNull { s.item(0,it)==m.upgrade } ?: -1 }; check(slot>=0)
@@ -50,6 +51,10 @@ fun main() {
                 CardMission.AFTERBURNER -> check(abs(w.players.moveSpeed(0)-speed*1.18f)<0.001f)
                 CardMission.TITAN_PLATING -> { check(w.players.maxHp[0]==hp+4); check(w.players.ramDamage(0)==ram+3f) }
                 CardMission.CORE_BREAKER -> check(abs(w.players.damage(0)-dmg*1.8f)<0.001f)
+                CardMission.SCAVENGER -> check(w.players.wealth(0)>=.10f)
+                CardMission.PHASE_CAPACITOR -> check(Upgrades.delta(w.players.levels[0],UpgradeStat.FIRE_RATE)>=.12f)
+                CardMission.GUARDIAN_KIT -> {check(w.players.maxHp[0]==hp+2);check(s.healAmount(w,0)==heal+1)}
+                CardMission.DRONE_RELAY -> check(abs(w.players.damage(0)-dmg*1.25f)<.001f)
             }
         }
     }

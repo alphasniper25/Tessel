@@ -1,9 +1,9 @@
-name: TESSEL alpha.13 source checks
+name: TESSEL alpha.14 source checks
 on:
   push:
-    branches: [test/alpha13]
+    branches: [test/alpha14]
 concurrency:
-  group: alpha13-${{ github.ref }}
+  group: alpha14-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha13-unit-tests
+          name: TESSEL-alpha14-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7

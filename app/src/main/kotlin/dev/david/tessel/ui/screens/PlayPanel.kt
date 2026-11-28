@@ -78,23 +78,22 @@ fun PlayPanel(
             Spacer(Modifier.weight(1f))
             Text("Start a run",Type.title2,c.ink)
             Spacer(Modifier.weight(1f))
-            Text("${saves.size} / ${SoloSaves.SLOTS} slots",Type.caption.merge(Type.numbers),c.ink2)
+            Text("SOLO",Type.caption,c.ink2)
         }
         Divider()
         Row(Modifier.weight(1f).fillMaxWidth().padding(vertical=Space.x2),horizontalArrangement=Arrangement.spacedBy(Space.x4)){
             Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState()),
                 verticalArrangement=Arrangement.spacedBy(5.dp)){
-                Text("01  /  DIFFICULTY",Type.caption,c.ink2)
+                Text("Difficulty",Type.footnote,c.ink2)
                 Segmented(Difficulty.entries.map { it.label },difficulty.ordinal,{onDifficulty(Difficulty.entries[it])})
                 if(onNewCharacter!=null){
                     Spacer(Modifier.height(2.dp))
-                    Text("02  /  STARTING TANK",Type.caption,c.ink2)
+                    Text("Starting tank",Type.footnote,c.ink2)
                     Segmented(CharacterDef.entries.map{it.label},selected,{selected=it})
-                    Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(10.dp)).padding(8.dp),
+                    Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(8.dp)).padding(horizontal=8.dp,vertical=4.dp),
                         verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                        TankPreview(frame,look,Modifier.size(52.dp))
+                        TankPreview(frame,look,Modifier.size(40.dp))
                         Column(Modifier.weight(1f)){
-                            Text(frame.label,Type.headline,c.ink)
                             Text("HP ${(Balance.PLAYER_HP+difficulty.bonusHp+frame.extraHp).coerceAtLeast(1)}  ·  DMG ${(frame.damageScale*100).toInt()}%",Type.footnote.merge(Type.numbers),c.ink)
                             Text("Speed ${(frame.speedScale*100).toInt()}%  ·  Fire ${(frame.fireScale*100).toInt()}%",Type.footnote.merge(Type.numbers),c.ink2)
                         }

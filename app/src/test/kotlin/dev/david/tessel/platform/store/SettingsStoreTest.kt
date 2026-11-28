@@ -39,4 +39,16 @@ class SettingsStoreTest {
         assertFalse(SettingsStore(context).settings.value.dev.active)
         assertTrue("reset leaves the page unlocked", SettingsStore(context).settings.value.devUnlocked)
     }
+
+    @Test fun performancePresetAndIndividualOverridesSurviveRestart(){
+        val store=SettingsStore(context)
+        store.update{PerformancePreset.SAVER.apply(it)}
+        val low=SettingsStore(context).settings.value
+        assertTrue(PerformancePreset.SAVER.matches(low))
+        assertEquals(FpsLimit.THIRTY,low.fpsLimit);assertFalse(low.vibration);assertFalse(low.menuSounds)
+        store.update{it.copy(fpsLimit=FpsLimit.NATIVE,vibration=true)}
+        val custom=SettingsStore(context).settings.value
+        assertEquals(FpsLimit.NATIVE,custom.fpsLimit);assertEquals(EffectsQuality.LOW,custom.effectsQuality)
+        assertTrue(custom.vibration);assertTrue(PerformancePreset.entries.none{it.matches(custom)})
+    }
 }

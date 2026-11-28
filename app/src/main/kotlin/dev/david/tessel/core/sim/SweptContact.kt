@@ -7,6 +7,7 @@ import kotlin.math.sqrt
 internal fun contactTime(ax:Float,ay:Float,bx:Float,by:Float,cx:Float,cy:Float,dx:Float,dy:Float,r:Float):Float {
     val ox=ax-cx;val oy=ay-cy
     val vx=(bx-ax)-(dx-cx);val vy=(by-ay)-(dy-cy)
+    if(kotlin.math.abs(ox)>r+kotlin.math.abs(vx)||kotlin.math.abs(oy)>r+kotlin.math.abs(vy))return Float.POSITIVE_INFINITY
     val c=ox*ox+oy*oy-r*r
     if(c<=0f)return 0f
     val a=vx*vx+vy*vy
