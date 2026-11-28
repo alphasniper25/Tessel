@@ -58,9 +58,9 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
     BackHandler(onBack=back)
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)){
         Row(Modifier.fillMaxWidth().height(52.dp),verticalAlignment=Alignment.CenterVertically){
-            BackButton(if(detail)"Codex" else "Home",back)
+            BackButton(if(detail)"Arsenal" else "Home",back)
             Spacer(Modifier.weight(1f))
-            Text(if(frameId>=0)TankEvolution.fromId(frameId).label else if(cardId>=0)Upgrades.of(cardId).name else "Tank & Card Codex",Type.title2,c.ink)
+            Text(if(frameId>=0)TankEvolution.fromId(frameId).label else if(cardId>=0)Upgrades.of(cardId).name else "Arsenal · Tanks & Cards",Type.title2,c.ink)
             Spacer(Modifier.weight(1f))
             Text("LV $level",Type.caption,c.accent)
         }

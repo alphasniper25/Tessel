@@ -136,11 +136,8 @@ fun TesselApp(
 
     LaunchedEffect(settings) { game.applySettings(settings) }
     LaunchedEffect(shop) { shop?.let { lastShop = it } }
-    val skillDue=shop?.perkOffers?.any { it.skill }==true
-    LaunchedEffect(mode,shop?.stage,skillDue) {
-        if(mode==Mode.SHOP && skillDue) treeOpen=true
-        if(mode==Mode.PLAYING || mode==Mode.OVER) treeOpen=false
-    }
+    // Opening the tree is always a deliberate player action.
+    LaunchedEffect(mode) { treeOpen=false }
     LaunchedEffect(summary) { summary?.let { lastSummary = it } }
     LaunchedEffect(Unit) { onStart?.invoke() }
     // Once the host presses Start, every phone leaves the lobby for the arena.
@@ -463,17 +460,12 @@ fun TesselApp(
         if(treeOpen && !waitingOnSomeone && (mode==Mode.HOME || mode==Mode.SHOP || mode==Mode.PAUSED)) {
             val currentShop=shop.takeIf { mode==Mode.SHOP }
             val run=runStats.takeIf { mode==Mode.PAUSED }
-            val mask=currentShop?.perkMask ?: run?.let { summary ->
-                (0 until dev.david.tessel.core.content.Perks.count).fold(0){acc,id ->
-                    if(dev.david.tessel.core.content.Perks.of(id).name in summary.perks) acc or (1 shl id) else acc
-                }
-            } ?: 0
             dev.david.tessel.ui.screens.SkillTreeScreen(
                 clearedStage=currentShop?.stage ?: ((run?.stage ?: 1)-1).coerceAtLeast(0),
-                mask=mask,
-                available=currentShop?.perkOffers?.filter { it.skill }.orEmpty(),
-                canSpend=currentShop!=null && !currentShop.selfReady,
-                onSpend=game::pickPerk,
+                mask=currentShop?.skillNodes ?: run?.skillNodes ?: 0L,
+                coins=currentShop?.coins ?: run?.coinsInHand ?: 0,
+                canSpend=currentShop!=null && !currentShop.selfReady && currentShop.perkOffers.isEmpty(),
+                onSpend=game::buySkill,
                 onBack={treeOpen=false;game.menuSound()},
                 backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home"
             )

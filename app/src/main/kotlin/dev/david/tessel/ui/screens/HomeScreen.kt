@@ -67,7 +67,7 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(Space.x2))
             Text("TESSEL", Type.largeTitle, c.ink)
-            Text("ARENA SURVIVAL  /  ALPHA 12",Type.caption,c.accent)
+            Text("ARENA SURVIVAL  /  ALPHA 13",Type.caption,c.accent)
             Spacer(Modifier.height(Space.x2))
             val best = ledger.bestOverall()
             val line = if (best == null) {
@@ -88,14 +88,14 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(Space.x2)) {
                 SecondaryButton("Play Together", onTogether, Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
-                    SecondaryButton("Codex", onCards, Modifier.weight(1f))
+                    SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
                     SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
                 }
+                SecondaryButton("Arsenal", onCards, Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
-                    SecondaryButton("Tank Garage", onGarage, Modifier.weight(1f))
                     SecondaryButton("Statistics", onStats, Modifier.weight(1f))
+                    SecondaryButton("Settings",onSettings,Modifier.weight(1f))
                 }
-                SecondaryButton("Settings",onSettings,Modifier.fillMaxWidth())
             }
         }
     }

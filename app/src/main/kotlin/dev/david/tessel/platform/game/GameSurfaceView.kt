@@ -536,6 +536,12 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         else if (world.shop.buy(world, HOST_PLAYER, slot)) { shopSound(Sound.BUY);publishShop(); keep() }
     }
 
+    fun buySkill(id:Int) = onGameThread {
+        if(current!=Mode.SHOP || shopFlow.value?.selfReady==true || (host?.ready ?: 0) and (1 shl HOST_PLAYER)!=0) return@onGameThread
+        if(playingAs==Role.CLIENT) { pendingShopSound(Sound.SKILL);client?.action(Wire.BUY_SKILL,id) }
+        else if(world.shop.buySkill(world,HOST_PLAYER,id)) { shopSound(Sound.SKILL);publishShop();keep() }
+    }
+
     fun setCardLocked(slot: Int, locked: Boolean) = onGameThread {
         if (current != Mode.SHOP || (host?.ready ?: 0) and (1 shl HOST_PLAYER) != 0) return@onGameThread
         if (playingAs == Role.CLIENT) { pendingShopSound(if(locked)Sound.LOCK else Sound.UNLOCK);client?.action(if (locked) Wire.LOCK_CARD else Wire.UNLOCK_CARD, slot) }
@@ -957,7 +963,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             return RunSummary(
                 s.tick / TICK_HZ, s.stage, s.kills[me], s.earned[me], s.difficulty, Integer.bitCount(s.present), s.bossesDown, team,
                 score = breakdown.total, breakdown = breakdown, killedBy = s.killedBy[me],
-                perks = perkNames(s.perks[me]), won = s.victory,
+                perks = perkNames(s.perks[me]), won = s.victory, skillNodes=s.skillNodes[me], coinsInHand=s.coins[me],
             )
         }
         val pl = world.players
@@ -987,7 +993,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         return RunSummary(
             world.tick / TICK_HZ, world.stage, pl.kills[me], pl.earned[me], world.difficulty, world.presentCount(), world.bossesDown, team,
             score = breakdown.total, breakdown = breakdown, killedBy = pl.killedBy[me],
-            perks = perkNames(pl.perks[me]), won = world.victory,
+            perks = perkNames(pl.perks[me]), won = world.victory, skillNodes=pl.skillMask(me), coinsInHand=pl.coins[me],
         )
     }
 
@@ -1305,7 +1311,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             hp = pl.hp[me],
             maxHp = pl.maxHp[me],
             offers = offers,
-            healPrice = s.healPrice(world),
+            healPrice = s.healPrice(world,me),
             healAmount = s.healAmount(world, me),
             healsLeft = s.healsLeft(me),
             canHeal = s.canHeal(world, me),
@@ -1317,6 +1323,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             teamSize = world.presentCount(),
             perkOffers = perkOffers,
             perkMask = pl.perks[me],
+            skillNodes = pl.skillMask(me),
+            freeRefreshesLeft = s.freeRefreshesLeft(world,me),
         )
     }
 
@@ -1330,6 +1338,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         key = key * 31 + s.rerollPrice
         key = key * 31 + s.stage
         key = key * 31 + s.perks[me]
+        key = key * 31 + s.skillNodes[me].hashCode()
+        key = key * 31 + s.freeRefreshesLeft
+        key = key * 31 + s.healPrice
         for (slot in 0 until SHOP_SLOTS) {
             key = key * 31 + s.shopItem[slot]
             key = key * 31 + s.shopLevel[slot]
@@ -1348,7 +1359,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 Sound.HEAL -> s.healsLeft<prior.healsLeft
                 Sound.REROLL -> s.rerollPrice!=prior.rerollPrice || prior.offers.any{ s.shopItem[it.slot]>=0 && (Upgrades.of(s.shopItem[it.slot]).name!=it.name || s.shopRarity[it.slot]!=it.rarity) }
                 Sound.LOCK,Sound.UNLOCK -> prior.offers.any{it.locked!=s.shopLocked[it.slot]}
-                Sound.SKILL,Sound.EVOLVE -> s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
+                Sound.SKILL,Sound.EVOLVE -> s.skillNodes[me]!=prior.skillNodes || s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
                 else -> false
             }
             if(changed && SystemClock.uptimeMillis()-shopSoundAt<2000L) shopSound(sound)
@@ -1395,6 +1406,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             teamSize = Integer.bitCount(s.present),
             perkOffers = perkOffers,
             perkMask = s.perks[me],
+            skillNodes = s.skillNodes[me],
+            freeRefreshesLeft = s.freeRefreshesLeft,
         )
     }
 

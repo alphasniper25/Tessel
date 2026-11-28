@@ -355,6 +355,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
             pl.hurt[p] = if (top.hurt[p]) 1 else 0
             pl.invuln[p] = if (top.invuln[p]) 1 else 0
             pl.revive[p] = (top.revive[p] * REVIVE_TICKS).toInt()
+            if(pl.skillMask(p)!=top.skillNodes[p])pl.setSkills(p,top.skillNodes[p])
             pl.coins[p] = top.coins[p]
             pl.earned[p] = top.earned[p]
             pl.kills[p] = top.kills[p]

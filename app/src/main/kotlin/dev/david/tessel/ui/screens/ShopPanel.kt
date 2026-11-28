@@ -29,7 +29,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.CardRarity
-import dev.david.tessel.core.content.SkillTree
+import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.platform.game.ShopOffer
 import dev.david.tessel.platform.game.ShopView
 import dev.david.tessel.ui.components.CoinAmount
@@ -87,22 +87,27 @@ fun ShopPanel(
         }
 
         Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
-        val skills = shop.perkOffers.any { it.skill }
-        val points=SkillTree.unspent(shop.stage,shop.perkMask)
         if(onTree!=null) {
+            val available=SkillGraph.nodes.count{SkillGraph.canBuy(shop.skillNodes,it.id,shop.stage,shop.coins)}
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text("Run skill tree",Type.headline,c.ink)
-                    Text(if(points>0) "$points point(s) available" else SkillTree.nextMilestone(shop.stage)?.let{"Next point: stage $it"} ?: "All milestones reached",Type.footnote,c.ink2)
+                    Text(when {
+                        shop.stage<SkillGraph.FIRST_STAGE -> "Unlocks after stage 3"
+                        shop.perkOffers.isNotEmpty() -> "Choose your boss reward first"
+                        shop.selfReady -> "Waiting for team"
+                        available>0 -> "$available affordable nodes · ${SkillGraph.count(shop.skillNodes)}/60 owned"
+                        else -> "${SkillGraph.count(shop.skillNodes)}/60 owned · Save coins to unlock more"
+                    },Type.footnote,c.ink2)
                 }
-                dev.david.tessel.ui.components.SecondaryButton(if(points>0)"Spend Points" else "View Tree",onTree,Modifier.weight(1f),tint=c.accent)
+                dev.david.tessel.ui.components.SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
             }
             Spacer(Modifier.height(Space.x2))
         }
-        // A milestone or boss reward must be chosen before shopping.
-        if (shop.perkOffers.isNotEmpty() && (!skills || onTree==null)) {
-            Text(if(shop.perkOffers.any { it.evolution!=null }) "Choose a Tank Evolution" else if(skills) "Spend 1 skill point" else "Choose a Perk", Type.headline, c.ink)
-            Text(if(skills) "Choose the next rank in one branch. Resets on a new run." else "It stays for the rest of the run.", Type.footnote, c.ink3)
+        // Only boss perks and evolution choices remain mandatory.
+        if (shop.perkOffers.isNotEmpty()) {
+            Text(if(shop.perkOffers.any { it.evolution!=null }) "Choose a Tank Evolution" else "Choose a Perk", Type.headline, c.ink)
+            Text("It stays for the rest of the run.", Type.footnote, c.ink3)
             Spacer(Modifier.height(Space.x2))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 for (offer in shop.perkOffers.filter { it.name != "Stay Basic" }) {
@@ -128,7 +133,6 @@ fun ShopPanel(
             Spacer(Modifier.height(Space.x4))
         }
 
-        if (skills && onTree!=null) Text("Unlock a skill to continue to the shop.",Type.subhead,c.ink2)
         if (shop.perkOffers.isEmpty()) {
             if (shop.offers.all { it.empty || it.maxed } && !shop.canReroll)
                 Text("No cards available right now. Heal, refresh when affordable, or continue.", Type.footnote, c.ink3)
@@ -150,7 +154,7 @@ fun ShopPanel(
         Spacer(Modifier.height(Space.x2))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if(shop.perkOffers.isEmpty()) CompactAction("Heal +${shop.healAmount} · ${shop.healPrice} coins · ${shop.healsLeft} left", Modifier.weight(1.5f), shop.canHeal && !shop.selfReady, false) { tap(); onHeal() }
-            if(shop.perkOffers.isEmpty()) CompactAction(if (shop.rerollPrice == 0) "Refresh · FREE" else "Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }
+            if(shop.perkOffers.isEmpty()) CompactAction(if (shop.rerollPrice == 0) "Refresh · FREE (${shop.freeRefreshesLeft})" else "Refresh · ${shop.rerollPrice}", Modifier.weight(1f), shop.canReroll && !shop.selfReady && shop.perkOffers.isEmpty(), false) { tap(); onReroll() }
             val skip = shop.perkOffers.firstOrNull { it.name == "Stay Basic" }
             if(skip!=null) CompactAction("Stay Basic", Modifier.weight(1f), !shop.selfReady, false) { tap(); onPerk(skip.slot) }
             val choosing = shop.perkOffers.isNotEmpty()
