@@ -136,21 +136,18 @@ class Shop {
     /** Only called by the isolated developer scenario runner. Real purchases still use canBuy(). */
     fun devStock(w:World,requested:List<Int>){
         require(w.playerCount==1&&w.phase==Phase.SHOP)
+        val original=stock[0].copyOf()
+        stock[0].fill(-1);locks[0].fill(false);quotes[0].fill(0)
         val used=mutableSetOf<Int>()
         for(slot in 0 until SHOP_SLOTS){
-            val raw=requested.getOrElse(slot){-1}
-            val id=CardCode.item(raw)
-            if(id>=0&&used.add(id)){
-                stock[0][slot]=raw;locks[0][slot]=false;quotes[0][slot]=0
-            }
+            val raw=requested.getOrElse(slot){-1};val id=CardCode.item(raw)
+            if(id>=0&&used.add(id))stock[0][slot]=raw
         }
-        // Keep forced slots first; remove duplicate random draws, then refill only the empty slots.
+        // Preserve the original random choices where they do not conflict with a forced node.
         for(slot in 0 until SHOP_SLOTS){
-            if(CardCode.valid(requested.getOrElse(slot){-1}))continue
-            val id=item(0,slot)
-            if(id>=0&&!used.add(id)){
-                stock[0][slot]=-1;locks[0][slot]=false;quotes[0][slot]=0
-            }
+            if(stock[0][slot]>=0)continue
+            val id=CardCode.item(original[slot])
+            if(id>=0&&used.add(id))stock[0][slot]=original[slot]
         }
         for(slot in 0 until SHOP_SLOTS){
             if(item(0,slot)>=0)continue

@@ -142,7 +142,7 @@ class Checkpoint(
             return try {
                 if (buf.get() != 'T'.code.toByte() || buf.get() != 'C'.code.toByte()) return null
                 val format = buf.get().toInt()
-                if (format !in OLDEST..FORMAT) return null
+                if (format !in OLDEST..9) return null // Read the discarded rework's format 9; write original format 8.
                 val difficulty = Difficulty.entries.getOrNull(buf.get().toInt()) ?: return null
                 val stage = buf.short.toInt()
                 val tick = buf.int
@@ -185,6 +185,11 @@ class Checkpoint(
                     cp.heals[p] = (buf.get().toInt() and 0xFF).coerceIn(0, Upgrades.HEALS_PER_SHOP)
                     if (format >= 3) {
                         cp.perks[p] = buf.int
+                        if(format==9){
+                            // New-only Vital Core (bit 24) no longer exists in alpha.16.
+                            if(cp.perks[p] and (1 shl 24)!=0){cp.maxHp[p]=(cp.maxHp[p]-2).coerceAtLeast(1);cp.hp[p]=cp.hp[p].coerceIn(0,cp.maxHp[p])}
+                            cp.perks[p]=cp.perks[p] and ((1 shl Perks.count)-1)
+                        }
                         for (k in 0 until Perks.OFFERED) {
                             val id = buf.get().toInt()
                             cp.perkOffer[p][k] = if (id in 0 until Perks.count) id else -1
@@ -211,6 +216,7 @@ class Checkpoint(
                     if(format>=8){
                         cp.skillNodes[p]=(buf.long and SkillGraph.MASK) or SkillGraph.fromLegacy(cp.perks[p])
                         cp.freeRerollsUsed[p]=(buf.get().toInt() and 255).coerceIn(0,3)
+                        if(format==9)repeat(9){buf.get()} // Discard incompatible reward-round history, per seat.
                     }else{
                         cp.skillNodes[p]=SkillGraph.fromLegacy(cp.perks[p])
                         val free=minOf(cp.rerolls[p],SkillTree.freeRefreshes(cp.perks[p]))

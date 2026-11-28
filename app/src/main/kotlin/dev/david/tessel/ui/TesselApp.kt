@@ -97,6 +97,7 @@ fun TesselApp(
     val mode by game.mode.collectAsState()
     val role by game.role.collectAsState()
     val shop by game.shop.collectAsState()
+    val sandbox by game.sandbox.collectAsState()
     val summary by game.summary.collectAsState()
     val runStats by game.runStats.collectAsState()
     val saved by lobby.save.saved.collectAsState()
@@ -123,7 +124,8 @@ fun TesselApp(
     // Five taps on the version line, then a second of quiet, ask for the developer code.
     val taps = remember { TapCounter() }
     var tapSeq by remember { mutableIntStateOf(0) }
-    LaunchedEffect(tapSeq) {
+    LaunchedEffect(settingsOpen,tapSeq) {
+        if(!settingsOpen){taps.reset();codeOpen=false;return@LaunchedEffect}
         if (tapSeq == 0) return@LaunchedEffect
         delay(DevAccess.QUIET_MS)
         if (taps.settle()) codeOpen = true
@@ -228,9 +230,9 @@ fun TesselApp(
             )
         }
 
-        Sheet(visible = mode == Mode.SHOP && !treeOpen, onDismiss = null) {
+        Sheet(visible = mode == Mode.SHOP && !treeOpen && !devOpen, onDismiss = null) {
             (shop ?: lastShop)?.let {
-                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
+                ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=if(it.devPreview)game::leaveRun else game::saveForLater, onDevOptions=if(it.devPreview&&settings.devUnlocked)({devOpen=true;game.menuSound()}) else null)
             }
         }
 
@@ -433,14 +435,22 @@ fun TesselApp(
                     game.breakNow()
                 },
                 onTutorial = startTutorial,
-                sandbox=shop?.devPreview==true,
-                onStartRun = { scenario ->
+                sandbox=sandbox,
+                liveShop=shop.takeIf{mode==Mode.SHOP&&it?.devPreview==true},
+                onWallet=game::devWallet,
+                backLabel=if(settingsOpen)"Settings" else if(mode==Mode.SHOP)"Shop" else "Profile",
+                onSound=game::devSound,onHaptic=game::devHaptic,
+                onResult={ difficulty,scenario,won->
                     devOpen=false;settingsOpen=false;profileOpen=false
-                    game.startDevRun(settings.difficulty,scenario)
+                    game.startDevResult(difficulty,scenario,won)
                 },
-                onStartShop = { scenario ->
+                onStartRun = { difficulty,scenario ->
                     devOpen=false;settingsOpen=false;profileOpen=false
-                    game.startDevShop(settings.difficulty,scenario)
+                    game.startDevRun(difficulty,scenario)
+                },
+                onStartShop = { difficulty,scenario ->
+                    devOpen=false;settingsOpen=false;profileOpen=false
+                    game.startDevShop(difficulty,scenario)
                 },
                 onBack = { devOpen = false },
             )

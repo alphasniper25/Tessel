@@ -221,6 +221,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     @Volatile private var dev = Dev()
     private var devUnlocked=false
     private var cheating = false
+    private val sandboxFlow=MutableStateFlow(false)
+    val sandbox:StateFlow<Boolean> = sandboxFlow
+    private var lastDevScenario=DevScenario()
 
     /** The run in progress was started from the developer page; only then do the options reach it. */
     private var devRun = false
@@ -263,11 +266,19 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     /** A trial run from the developer page, with its options on. */
     fun startDevRun(difficulty: Difficulty,scenario:DevScenario=DevScenario()) = onGameThread {
-        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,scenario=scenario)
+        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,character=scenario.character,scenario=scenario)
     }
     fun startDevShop(difficulty:Difficulty,scenario:DevScenario=DevScenario())=onGameThread{
-        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,scenario=scenario,shopPreview=true)
+        if(devUnlocked&&(current==Mode.HOME||canEditDev()))beginSolo(difficulty,withDev=true,character=scenario.character,scenario=scenario,shopPreview=true)
     }
+    fun startDevResult(difficulty:Difficulty,scenario:DevScenario,won:Boolean)=onGameThread{
+        if(devUnlocked&&(current==Mode.HOME||canEditDev())){
+            beginSolo(difficulty,withDev=true,character=scenario.character,scenario=scenario)
+            world.devFinish(won);summarize()?.let(::finishRun);enter(Mode.OVER)
+        }
+    }
+    fun devSound(sound:Sound)=onGameThread{if(devUnlocked)sfx.play(sound,SystemClock.uptimeMillis())}
+    fun devHaptic(kind:Int)=onGameThread{if(devUnlocked)when(kind){0->haptics.shot(SystemClock.uptimeMillis());1->haptics.hurt();2->haptics.down()}}
     private fun canEditDev()=devUnlocked&&devRun&&cheating&&playingAs==Role.SOLO&&practice==null
     fun devRank(id:Int,level:Int)=onGameThread{
         if(canEditDev()&&current==Mode.SHOP){world.devSetUpgrade(id,level);publishShop()}
@@ -303,7 +314,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         world.players.appearance[0] = preferredLook
         world.players.missionMask[0] = cardUnlockMask()
         if (cheat) {
-            if (dev.startStage > 1) world.skipTo(dev.startStage)
+            lastDevScenario=scenario
+            if (dev.startStage > 1) world.skipTo(dev.startStage.coerceIn(1,50))
             world.players.coins[0] = dev.startCoins
             world.bringDevBoss()
             world.devUpgrades(dev.upgrades)
@@ -325,6 +337,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     private fun markCheating(on: Boolean) {
         cheating = on
+        sandboxFlow.value=on
         hud.tag = if (on) "Developer run, not counted" else null
     }
 
@@ -540,7 +553,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     fun playAgain(difficulty: Difficulty) = onGameThread {
         when (playingAs) {
-            Role.SOLO -> beginSolo(difficulty, character = world.players.character[0])
+            Role.SOLO -> if(devRun){if(devUnlocked)beginSolo(difficulty,withDev=true,character=lastDevScenario.character,scenario=lastDevScenario) else {dropCoop();enter(Mode.HOME)}} else beginSolo(difficulty, character = world.players.character[0])
             Role.HOST -> if (current == Mode.OVER) host?.markRematchReady(0, cardUnlockMask())
             Role.CLIENT -> if (current == Mode.OVER) client?.action(Wire.RESTART, cardUnlockMask())
         }
@@ -700,6 +713,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             devUnlocked=s.devUnlocked
             dev = if(devUnlocked)s.dev else Dev()
             applyDev(live = true)
+            if(current==Mode.SHOP&&devRun&&playingAs==Role.SOLO)publishShop()
         }
     }
 
@@ -1317,6 +1331,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     }
 
     private fun dropCoop() {
+        // Clear sandbox/practice discoveries before resetting the isolation flags.
+        if(cheating||practice!=null)tally.clear()
         checkpoint = null
         duelSetup = null
         duelFlow.value = false

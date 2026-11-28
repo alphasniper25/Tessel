@@ -271,6 +271,54 @@ class RemindersAndDevTest {
         settle()
         compose.onNodeWithText("Developer Options").performScrollTo().performClick()
         settle()
-        compose.onNodeWithText("Try a Run With These").performScrollTo().assertExists()
+        compose.onNodeWithText("Try a Run With These").assertExists()
+    }
+
+    @Test
+    fun directShopPreviewIsIsolatedEvenWithoutCheats(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true,dev=Dev(startStage=17,startCoins=500))}
+        settle(400)
+        game.startDevShop(Difficulty.NORMAL,dev.david.tessel.core.dev.DevScenario(reward=dev.david.tessel.core.dev.DevReward.NONE))
+        waitForMode(Mode.SHOP)
+        assertEquals(17,game.shop.value?.stage)
+        assertEquals(500,game.shop.value?.coins)
+        assertTrue(game.shop.value?.devPreview==true)
+        assertTrue(saves.saves.value.isEmpty())
+        game.leaveRun()
+        waitForMode(Mode.HOME)
+        assertTrue(saves.saves.value.isEmpty())
+    }
+
+    @Test
+    fun lockedDeveloperCannotStartPreview(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=false)}
+        settle(400)
+        game.startDevShop(Difficulty.NORMAL)
+        settle(400)
+        assertEquals(Mode.HOME,game.mode.value)
+        assertEquals(null,game.shop.value)
+    }
+
+    @Test
+    fun leavingADeveloperTrialCannotLeakEnemyLogbookEntries(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true)}
+        settle(400)
+        game.startDevRun(Difficulty.NORMAL)
+        waitForMode(Mode.PLAYING)
+        assertTrue(game.sandbox.value)
+        // Simulate pending enemy discovery from the current frame before leaving.
+        val field=GameSurfaceView::class.java.getDeclaredField("tally").apply{isAccessible=true}
+        val tally=field.get(game) as dev.david.tessel.core.stats.Tally
+        tally.defeat(0,17)
+        game.leaveRun()
+        waitForMode(Mode.HOME)
+        assertFalse(game.sandbox.value)
+        assertFalse(game.ledger!!.state.value.seen[0])
+        assertEquals(0,game.ledger!!.state.value.defeated[0])
+        assertEquals(0,game.ledger!!.state.value.totals.runs)
+        assertTrue(saves.saves.value.isEmpty())
     }
 }

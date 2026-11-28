@@ -57,6 +57,7 @@ fun ShopPanel(
     onLock: (Int, Boolean) -> Unit = { _, _ -> },
     onTree: (() -> Unit)? = null,
     onSave: (() -> Unit)? = null,
+    onDevOptions: (() -> Unit)? = null,
 ) {
     val c = Theme.colors
     val view = LocalView.current
@@ -76,12 +77,13 @@ fun ShopPanel(
             CoinAmount(shop.coins, style = Type.title3)
             if(onSave!=null) dev.david.tessel.ui.components.BackButton("Exit", { confirmExit=true })
         }
+        if(onDevOptions!=null) dev.david.tessel.ui.components.SecondaryButton("Developer Options",onDevOptions,Modifier.fillMaxWidth())
         Spacer(Modifier.height(Space.x2))
         if(confirmExit) {
-            Text(if(shop.coop) "Save and stop for everyone?" else "Save this shop and return home?",Type.subhead,c.ink)
+            Text(if(shop.devPreview) "Leave this developer trial? Nothing is saved." else if(shop.coop) "Save and stop for everyone?" else "Save this shop and return home?",Type.subhead,c.ink)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 dev.david.tessel.ui.components.SecondaryButton("Cancel",{confirmExit=false},Modifier.weight(1f))
-                PrimaryButton("Save & Exit",{confirmExit=false;onSave?.invoke()},Modifier.weight(1f))
+                PrimaryButton(if(shop.devPreview) "Exit trial" else "Save & Exit",{confirmExit=false;onSave?.invoke()},Modifier.weight(1f))
             }
             return@Column
         }
