@@ -77,5 +77,7 @@ class Events(private val capacity: Int = 512) {
 
         /** The Core went from its first form to its second. */
         const val CORE_CHANGE = 19
+        /** A physical friendly drone absorbed one hostile projectile. */
+        const val DRONE_BLOCK = 20
     }
 }

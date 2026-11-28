@@ -524,7 +524,8 @@ class World(seed: Long = 1L) {
         if (phase != Phase.FIGHT && phase != Phase.CLEAR) return
         var cause = Cause.NONE
         if (shot16 >= 0) {
-            if(droneWing.interceptedRecently(shot16,tick)) return
+            // Drone pilots' hostile-shot collisions are decided by the same host as the wing.
+            if(players.evolution[p].drones || droneWing.interceptedRecently(shot16,tick)) return
             val h = hostile
             for (i in 0 until h.count) {
                 if (h.id[i] and 0xFFFF != shot16 || h.life[i] <= 0) continue
@@ -1070,18 +1071,28 @@ class World(seed: Long = 1L) {
                 h.life[i] = 0
                 continue
             }
-            if(droneWing.intercept(h.x[i],h.y[i],h.radius[i])) { droneWing.markIntercepted(h.id[i],tick);h.life[i]=0;events.add(Events.HOSTILE_GONE,h.id[i]);continue }
-            for (p in 0 until playerCount) {
-                if (!pl.alive(p) || pl.invuln[p] > 0 || remote[p]) continue
-                val reach = h.radius[i] + Balance.PLAYER_RADIUS * GRAZE
-                val dx = pl.x[p] - h.x[i]
-                val dy = pl.y[p] - h.y[i]
-                if (dx * dx + dy * dy < reach * reach) {
-                    h.life[i] = 0
-                    events.add(Events.HOSTILE_GONE, h.id[i])
-                    hurtPlayer(p, Cause.shot(h.source[i]))
-                    break
-                }
+            // Compare first contacts so a drone behind a tank cannot block a shot that
+            // already hit that tank. Ordinary remote pilots keep their existing local hit reports.
+            var player=-1;var first=Float.POSITIVE_INFINITY
+            val ax=h.prevX[i];val ay=h.prevY[i];val bx=h.x[i];val by=h.y[i]
+            for(p in 0 until playerCount){
+                if(!pl.alive(p)||pl.invuln[p]>0||(remote[p]&&!pl.evolution[p].drones))continue
+                val reach=h.radius[i]+Balance.PLAYER_RADIUS*GRAZE
+                val t=contactTime(ax,ay,bx,by,pl.prevX[p],pl.prevY[p],pl.x[p],pl.y[p],reach)
+                if(t<first){first=t;player=p}
+            }
+            val drone=droneWing.interceptSwept(ax,ay,bx,by,h.radius[i],first)
+            if(drone>=0){
+                droneWing.markIntercepted(h.id[i],tick)
+                h.life[i]=0
+                events.add(Events.HOSTILE_GONE,h.id[i])
+                events.add(Events.DRONE_BLOCK,drone/DroneWing.LIMIT,droneWing.x[drone],droneWing.y[drone])
+                continue
+            }
+            if(player>=0){
+                h.life[i]=0
+                events.add(Events.HOSTILE_GONE,h.id[i])
+                hurtPlayer(player,Cause.shot(h.source[i]),allowRam=false)
             }
         }
     }
@@ -1166,7 +1177,7 @@ class World(seed: Long = 1L) {
         }
         if(!protected) pl.taken[p]++
         pl.invuln[p] = if(protected) (0.25f*TICK_HZ).toInt() else INVULN_TICKS
-        if(!protected) { pl.hurt[p] = HURT_TICKS; events.add(Events.PLAYER_HIT, p, px, py) }
+        if(!protected) { pl.hurt[p] = HURT_TICKS; events.add(Events.PLAYER_HIT, p, px, py, ref=if(!allowRam)1 else 0) }
 
         // Ram damage is a trade: it triggers only on an accepted contact hit, not a projectile or PvP hit.
         if (allowRam && !practice && !duel.on && !Cause.isShot(cause) && Cause.type(cause) >= 0 && pl.ramDamage(p) > 0f) {

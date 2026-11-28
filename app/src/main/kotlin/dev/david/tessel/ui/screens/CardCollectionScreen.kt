@@ -162,6 +162,8 @@ private fun TankDetails(frame:TankEvolution,modifier:Modifier) {
                 DetailStat("Impact damage",f(Balance.BULLET_DAMAGE*frame.damage*drone.impact))
                 DetailStat("Replacement","${f(drone.respawn)} s")
                 DetailStat("Command range",f(drone.reach))
+                DetailStat("Defense","Absorb hostile shots; each block costs 1 drone HP")
+                DetailStat("Control","Aim to command the wing; release to guard")
                 DetailStat("Limitation","Destroyable units; serial replacement")
             }else if(frame.melee){
                 DetailStat("Base impact",f(frame.ram))

@@ -441,7 +441,7 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
                     // Another player fired: fly a copy of their volley here.
                     ev.kind[n] == Events.SHOT -> ghostVolley(top, ev.who[n], ev.x[n], ev.y[n], ev.dx[n], ev.dy[n])
                     // This phone already knew it was hit, and buzzed then.
-                    ev.kind[n] == Events.PLAYER_HIT && ev.who[n] == me -> Unit
+                    ev.kind[n] == Events.PLAYER_HIT && ev.who[n] == me && !(top.evolution[me].drones && ev.ref[n]==1) -> Unit
                     // Already shown breaking here, the moment this phone's shot finished it.
                     (ev.kind[n] == Events.ENEMY_KILLED || ev.kind[n] == Events.ENEMY_GONE) && settle(ev.ref[n]) -> Unit
                     else -> v.events.add(ev.kind[n], ev.who[n], ev.x[n], ev.y[n], ev.dx[n], ev.dy[n], ev.angle[n], ev.ref[n])
@@ -456,7 +456,9 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         val px = pilot.x
         val py = pilot.y
         val shotReach = Balance.HOSTILE_RADIUS + Balance.PLAYER_RADIUS * GRAZE
-        for (i in 0 until drift.count) {
+        // A drone pilot's projectile damage is host-authoritative so delayed
+        // drone snapshots cannot produce a false local hit before interception.
+        if(latest?.evolution?.get(me)?.drones!=true) for (i in 0 until drift.count) {
             if (renderTick < drift.born[i]) continue
             val dx = drift.x(i, renderTick) - px
             val dy = drift.y(i, renderTick) - py

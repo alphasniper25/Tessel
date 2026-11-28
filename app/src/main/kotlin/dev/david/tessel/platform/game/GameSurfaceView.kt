@@ -1075,11 +1075,15 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                     if (type !in 0 until Bestiary.size) continue
                     val def = Bestiary.of(type)
                     if(ev.kind[i]==Events.ENEMY_KILLED && !def.boss) sfx.play(Sound.KILL, now, 65L, .65f)
-                    tally.defeat(type, stageNow)
+                    if(ev.kind[i]==Events.ENEMY_KILLED)tally.defeat(type, stageNow)
                     shards.burst(
                         def.shape, ev.x[i], ev.y[i], def.radius, ev.angle[i], ev.dx[i], ev.dy[i],
                         renderer.bodyOf(type), renderer.facetOf(type),
                     )
+                }
+                Events.DRONE_BLOCK -> {
+                    if(ev.who[i]==me)sfx.play(Sound.DRONE,now,90L,.55f)
+                    shards.burst(dev.david.tessel.core.content.Shape.CIRCLE,ev.x[i],ev.y[i],7f,0f,0f,0f,renderer.palette.ink,renderer.palette.coin)
                 }
                 Events.BOSS_IN -> {
                     sfx.play(Sound.BOSS, now)
