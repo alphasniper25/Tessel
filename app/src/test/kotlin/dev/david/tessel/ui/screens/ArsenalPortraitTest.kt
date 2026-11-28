@@ -25,7 +25,7 @@ class ArsenalPortraitTest {
         compose.setContent{TesselTheme{CardCollectionScreen(Ledger(),onBack={})}}
         compose.onNodeWithText("Machine Gun").assertIsDisplayed()
         val a=compose.onNodeWithText("Machine Gun").getUnclippedBoundsInRoot()
-        val b=compose.onNodeWithText("Sniper").getUnclippedBoundsInRoot()
+        val b=compose.onNodeWithText("Triplet").getUnclippedBoundsInRoot()
         assertTrue(b.top>a.bottom)
         compose.onNodeWithText("Cards").performClick()
         compose.onNodeWithText("Damage").performClick()
