@@ -41,6 +41,7 @@ import dev.david.tessel.ui.components.Divider
 import dev.david.tessel.ui.components.Group
 import dev.david.tessel.ui.components.NavRow
 import dev.david.tessel.ui.components.Segmented
+import dev.david.tessel.ui.components.SecondaryButton
 import dev.david.tessel.ui.components.Text
 import dev.david.tessel.ui.components.ToggleRow
 import dev.david.tessel.ui.components.focusRing
@@ -91,8 +92,11 @@ fun SettingsScreen(
                     Column(Modifier.padding(horizontal=Space.x4,vertical=Space.x3),verticalArrangement=Arrangement.spacedBy(Space.x2)){
                         Text("Quick preset",Type.body,c.ink)
                         val selected=PerformancePreset.entries.indexOfFirst{it.matches(settings)}
-                        // Custom settings remain editable; the selection indicates an exact match.
-                        Segmented(PerformancePreset.entries.map{it.label} + "Custom",if(selected<0)3 else selected,{i->PerformancePreset.entries.getOrNull(i)?.let{p->onChange{p.apply(it)}}})
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            for(preset in PerformancePreset.entries)
+                                SecondaryButton(preset.label,{onChange{preset.apply(it)}},Modifier.weight(1f),tint=if(preset.ordinal==selected)c.accent else c.ink)
+                        }
+                        if(selected<0)Text("Custom settings",Type.caption,c.accent)
                         Text(when(selected){0->"30 FPS target, light effects, no vibration or menu audio.";1->"60 FPS target, reduced debris and shot vibration off.";2->"Display-native frame rate, full effects and feedback.";else->"Your own combination of graphics and feedback."},Type.footnote,c.ink2)
                         Text("Frame-rate target",Type.body,c.ink)
                         Segmented(FpsLimit.entries.map{it.label},settings.fpsLimit.ordinal,{i->onChange{it.copy(fpsLimit=FpsLimit.entries[i])}})

@@ -19,6 +19,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.Bestiary
+import dev.david.tessel.core.content.Shape
 import dev.david.tessel.core.content.CardMission
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.TankLook
@@ -1083,7 +1084,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 }
                 Events.DRONE_BLOCK -> {
                     if(ev.who[i]==me)sfx.play(Sound.DRONE,now,90L,.55f)
-                    shards.burst(dev.david.tessel.core.content.Shape.CIRCLE,ev.x[i],ev.y[i],7f,0f,0f,0f,renderer.palette.ink,renderer.palette.coin)
+                    shards.burst(Shape.CIRCLE,ev.x[i],ev.y[i],7f,0f,0f,0f,renderer.palette.ink,renderer.palette.coin)
                 }
                 Events.BOSS_IN -> {
                     sfx.play(Sound.BOSS, now)
