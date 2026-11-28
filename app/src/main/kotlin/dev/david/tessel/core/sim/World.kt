@@ -1066,7 +1066,7 @@ class World(seed: Long = 1L) {
         players.kills[owner]++
         val elite = e.elite[j] in 1 until Elite.COUNT
         players.points[owner] += Scoring.kill(e.type[j]) * (if (elite) 3 else 1)
-        if (players.has(owner, Perks.SIPHON) && players.kills[owner] % 25 == 0 && players.hp[owner] in 1 until players.maxHp[owner]) {
+        if (players.has(owner, Perks.SIPHON) && players.kills[owner] % players.siphonInterval(owner) == 0 && players.hp[owner] in 1 until players.maxHp[owner]) {
             players.hp[owner]++
         }
         if (elite && rng.nextFloat() < Elite.SURGE_CHANCE) players.surge[owner] = Elite.SURGE_SECONDS * TICK_HZ
@@ -1257,7 +1257,7 @@ class World(seed: Long = 1L) {
             val d2 = dx * dx + dy * dy
             if (d2 >= radius * radius || d2 < 0.0001f) continue
             val d = sqrt(d2)
-            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE, dx / d, dy / d, p)
+            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE*pl.shockwaveFactor(p), dx / d, dy / d, p)
             val force = Balance.HIT_SHOVE * (1f - d / radius) / Bestiary.of(e.type[j]).mass
             e.kx[j] += dx / d * force
             e.ky[j] += dy / d * force

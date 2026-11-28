@@ -5,6 +5,7 @@ import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
 import dev.david.tessel.core.content.SkillGraph
@@ -101,19 +102,23 @@ class PlayerState {
     val poisonSource = IntArray(MAX_PLAYERS) { -1 }
 
     fun has(p: Int, perk: Int) = perks[p] shr perk and 1 != 0
+    fun combo(p:Int,combo:PerkCombo)=combo.active(perks[p])
+    fun siphonInterval(p:Int)=if(combo(p,PerkCombo.FIELD_RUNNER))20 else 25
+    fun shockwaveFactor(p:Int)=if(combo(p,PerkCombo.REACTIVE_PLATING))1.4f else 1f
+    private fun lastLightFactor(p:Int)=if(hp[p] in 1..2&&combo(p,PerkCombo.LAST_LIGHT))1.15f else 1f
 
     fun damage(p: Int): Float {
         var d = scaled(p, UpgradeStat.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE_BONUS))
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
         if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
-        return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
+        return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * lastLightFactor(p) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
     }
 
     fun fireRate(p: Int): Float {
         var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE) * character[p].fireScale
         if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
-        if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
+        if (has(p, Perks.HEAVY_ROUNDS)) r *= if(combo(p,PerkCombo.REACTOR_SYNC)&&sinceHit[p]>=OVERCLOCK_TICKS).93f else .85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
         return r * evolution[p].rate * skillFactor(p,SkillBonus.FIRE_RATE)
     }
@@ -122,7 +127,7 @@ class PlayerState {
     fun pierce(p: Int) = evolution[p].extraPierce + Upgrades.delta(levels[p], UpgradeStat.PIERCE).toInt() + if (has(p, Perks.HEAVY_ROUNDS)) 1 else 0
     fun range(p: Int) = scaled(p, UpgradeStat.RANGE, Balance.BULLET_RANGE) * evolution[p].reach * skillFactor(p,SkillBonus.RANGE)
     fun moveSpeed(p: Int) = scaled(p, UpgradeStat.SPEED, Balance.PLAYER_SPEED) * character[p].speedScale * evolution[p].move * (1f + Upgrades.delta(levels[p], UpgradeStat.SPEED_BONUS)) * skillFactor(p,SkillBonus.SPEED) * if (has(p, Perks.QUICK_FEET)) 1.15f else 1f
-    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE)
+    fun ramDamage(p: Int) = (character[p].ramBase + Upgrades.delta(levels[p], UpgradeStat.RAM) + evolution[p].ram * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE) + .075f * Upgrades.delta(levels[p], UpgradeStat.RAM))) * skillFactor(p,SkillBonus.DAMAGE) * lastLightFactor(p)
     fun regenSeconds(p: Int): Int {
         val a=character[p].regenSeconds; val b=evolution[p].regenSeconds
         val base=if(a==0) b else if(b==0) a else minOf(a,b)

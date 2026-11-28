@@ -49,7 +49,8 @@ private fun sectorTint(sector:SkillSector,dark:Boolean):Color {
  * names or effects. Ownership is the only source of discovery. */
 @Composable
 fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
-    onSpend:(Int)->Unit,onBack:()->Unit,backLabel:String="Home") {
+    onSpend:(Int)->Unit,onBack:()->Unit,backLabel:String="Home",
+    embedded:Boolean=false,onDevSkill:((Int,Boolean)->Unit)?=null) {
     val c=Theme.colors
     var selected by rememberSaveable { mutableIntStateOf(-1) }
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
@@ -59,7 +60,11 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
     var pending by remember { mutableStateOf<Long?>(null) }
     val currentMask by rememberUpdatedState(mask)
     val camera=SkillMapCamera(zoom,px,py)
-    val states=remember(mask){Array(SkillGraph.COUNT){SkillGraph.visibility(mask,it)}}
+    val revealAll=onDevSkill!=null
+    val states=remember(mask,revealAll){Array(SkillGraph.COUNT){id->
+        val state=SkillGraph.visibility(mask,id)
+        if(revealAll&&state==SkillVisibility.HIDDEN)SkillVisibility.REVEALED else state
+    }}
     val count=SkillGraph.count(mask)
     val discovered=states.count{it!=SkillVisibility.HIDDEN}
     val paint=remember{Paint(Paint.ANTI_ALIAS_FLAG).apply{textAlign=Paint.Align.CENTER;typeface=Typeface.DEFAULT_BOLD}}
@@ -68,14 +73,14 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
         val w=viewport.width.toFloat();val h=viewport.height.toFloat()
         if(w>0f&&h>0f)update(SkillMapCamera(zoom,px,py).gesture(w,h,w/2,h/2,0f,0f,factor))
     }
-    fun inspect(id:Int){if(SkillGraph.visibility(currentMask,id)!=SkillVisibility.HIDDEN)selected=id}
+    fun inspect(id:Int){if(revealAll||SkillGraph.visibility(currentMask,id)!=SkillVisibility.HIDDEN)selected=id}
     LaunchedEffect(mask,pending){
         if(pending!=null){if(pending==mask)delay(1600L);pending=null}
     }
-    LaunchedEffect(mask){if(selected>=0&&SkillGraph.visibility(mask,selected)==SkillVisibility.HIDDEN)selected=-1}
+    LaunchedEffect(mask,revealAll){if(!revealAll&&selected>=0&&SkillGraph.visibility(mask,selected)==SkillVisibility.HIDDEN)selected=-1}
     BackHandler{if(selected>=0)selected=-1 else onBack()}
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x2)){
-        Row(Modifier.fillMaxWidth().height(48.dp),verticalAlignment=Alignment.CenterVertically){
+        if(!embedded) Row(Modifier.fillMaxWidth().height(48.dp),verticalAlignment=Alignment.CenterVertically){
             BackButton(backLabel,onBack)
             Spacer(Modifier.weight(1f))
             Text("$count / ${SkillGraph.COUNT} unlocked",Type.subhead,c.ink)
@@ -96,9 +101,11 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                         update(SkillMapCamera(zoom,px,py).gesture(size.width.toFloat(),size.height.toFloat(),centroid.x,centroid.y,pan.x,pan.y,change))
                     }
                 }
-                .pointerInput(Unit){
+                .pointerInput(revealAll){
                     detectTapGestures { at ->
-                        val id=SkillMapCamera(zoom,px,py).hitDiscovered(size.width.toFloat(),size.height.toFloat(),at.x,at.y,12.dp.toPx(),currentMask)
+                        val cam=SkillMapCamera(zoom,px,py)
+                        val id=if(revealAll)cam.hit(size.width.toFloat(),size.height.toFloat(),at.x,at.y,12.dp.toPx())
+                        else cam.hitDiscovered(size.width.toFloat(),size.height.toFloat(),at.x,at.y,12.dp.toPx(),currentMask)
                         if(id!=null)inspect(id) else selected=-1
                     }
                 }) {
@@ -207,6 +214,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                         if(backLabel=="Home")Text("Preview only. Earn run coins to purchase skills.",Type.footnote,c.ink2)
                         Text("First 6 nodes use base prices. Skills reset on a new run.",Type.caption,c.ink3)
                     }
+                    if(onDevSkill!=null)SecondaryButton(if(own)"DEV · Remove" else "DEV · Grant",{onDevSkill(n.id,!own)},Modifier.fillMaxWidth())
                     PrimaryButton(if(own)"Unlocked" else "Unlock · $price",{if(ready){pending=mask;onSpend(n.id)}},Modifier.fillMaxWidth(),enabled=ready)
                 }
             }

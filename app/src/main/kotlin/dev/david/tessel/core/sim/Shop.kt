@@ -6,6 +6,7 @@ import dev.david.tessel.core.content.CardFamily
 import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
 import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.SkillBonus
@@ -136,21 +137,18 @@ class Shop {
     /** Only called by the isolated developer scenario runner. Real purchases still use canBuy(). */
     fun devStock(w:World,requested:List<Int>){
         require(w.playerCount==1&&w.phase==Phase.SHOP)
+        val original=stock[0].copyOf()
+        stock[0].fill(-1);locks[0].fill(false);quotes[0].fill(0)
         val used=mutableSetOf<Int>()
         for(slot in 0 until SHOP_SLOTS){
-            val raw=requested.getOrElse(slot){-1}
-            val id=CardCode.item(raw)
-            if(id>=0&&used.add(id)){
-                stock[0][slot]=raw;locks[0][slot]=false;quotes[0][slot]=0
-            }
+            val raw=requested.getOrElse(slot){-1};val id=CardCode.item(raw)
+            if(id>=0&&used.add(id))stock[0][slot]=raw
         }
-        // Keep forced slots first; remove duplicate random draws, then refill only the empty slots.
+        // Preserve the original random choices where they do not conflict with a forced node.
         for(slot in 0 until SHOP_SLOTS){
-            if(CardCode.valid(requested.getOrElse(slot){-1}))continue
-            val id=item(0,slot)
-            if(id>=0&&!used.add(id)){
-                stock[0][slot]=-1;locks[0][slot]=false;quotes[0][slot]=0
-            }
+            if(stock[0][slot]>=0)continue
+            val id=CardCode.item(original[slot])
+            if(id>=0&&used.add(id))stock[0][slot]=original[slot]
         }
         for(slot in 0 until SHOP_SLOTS){
             if(item(0,slot)>=0)continue
@@ -203,6 +201,7 @@ class Shop {
         for (k in 0 until levelsBought(w, p, slot)) total += Upgrades.price(u, w.players.levels[p][u] + k, w.stage)
         total *= rarity(p, slot).premium
         if (w.players.has(p, Perks.HAGGLER)) total *= 0.9
+        if (w.players.combo(p,PerkCombo.SALVAGE_CONTRACT))total *= .95
         if(w.players.character[p] == dev.david.tessel.core.content.CharacterDef.BALANCED) total *= 0.9
         total *= 1.0 - w.players.skill(p,SkillBonus.CARD_DISCOUNT)*.01
         return total.roundToInt().coerceAtLeast(1)
