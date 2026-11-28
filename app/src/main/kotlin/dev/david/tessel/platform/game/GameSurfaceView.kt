@@ -1410,7 +1410,10 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         if (mode != current) {
             if(mode==Mode.SHOP) shopSound(Sound.SHOP)
             if(mode==Mode.OVER) {
-                val won=if(playingAs==Role.CLIENT) client?.latest?.victory==true else world.victory
+                val won=if(playingAs==Role.CLIENT) {
+                    val snap=client?.latest
+                    if(snap?.duel==true) snap.duelChampion==me else snap?.victory==true
+                } else if(world.duel.on) world.duel.champion==me else world.victory
                 sfx.play(if(won)Sound.WIN else Sound.LOSS,SystemClock.uptimeMillis(),500L)
             }
             if(mode!=Mode.SHOP) shopSoundPending=null

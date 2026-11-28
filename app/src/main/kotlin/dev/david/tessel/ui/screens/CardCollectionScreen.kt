@@ -99,7 +99,7 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
             }else{
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Box(Modifier.weight(1f)){FilterBar(listOf("All","Unlocked","Locked","Legacy"),status,{status=it})}
-                    SecondaryButton(if(moreFilters)"Hide build" else "Build filter",{moreFilters=!moreFilters})
+                    SecondaryButton(if(moreFilters)"Hide build" else "Build filter",{if(moreFilters)cardBuild=0;moreFilters=!moreFilters})
                 }
                 if(moreFilters){FilterBar(BuildFilter.entries.map{it.label},cardBuild,{cardBuild=it})}
                 Spacer(Modifier.height(4.dp))

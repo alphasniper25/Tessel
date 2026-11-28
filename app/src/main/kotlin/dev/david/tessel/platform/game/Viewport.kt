@@ -50,7 +50,7 @@ class Viewport {
 
     /** Close, isolated codex training camera. Never used in live gameplay. */
     fun preview(width: Int,height: Int,x: Float,y: Float) {
-        scale=min(width/720f,height/360f).coerceAtLeast(.01f)
+        scale=min(width/540f,height/270f).coerceAtLeast(.01f)
         left=width/2f-x*scale
         top=height/2f-y*scale
     }

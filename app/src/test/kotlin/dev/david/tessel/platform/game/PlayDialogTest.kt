@@ -124,4 +124,32 @@ class PlayDialogTest {
         compose.onNodeWithText("Continue").performClick()
         waitForMode(Mode.SHOP)
     }
+
+    @Test
+    fun skillTreeIsVisibleFromHomeBeforeAnyRunAndCanReturn() {
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Skill Tree").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Refresh I").assertIsDisplayed()
+        compose.onNodeWithText("Fortune I").assertIsDisplayed()
+        compose.onNodeWithText("Trade I").assertIsDisplayed()
+        compose.onNodeWithText("Home").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Play").assertIsDisplayed()
+    }
+
+    @Test
+    fun codexCardCanOpenDetailsAndReturnToList() {
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Codex").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Cards").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Damage").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Run rank limit").assertIsDisplayed()
+        compose.onNodeWithText("Codex").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Cards").assertIsDisplayed()
+    }
 }

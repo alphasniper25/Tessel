@@ -39,8 +39,12 @@ class PerksAndElitesTest {
     }
 
     @Test
-    fun otherStagesOfferNoPerk() {
+    fun nonMilestoneStageOffersNoBossPerkWhenSkillPointWasSpent() {
+        val before = world(2)
+        before.shop.open(before)
+        assertFalse(before.shop.perkPending(0))
         val w = world(4)
+        w.players.perks[0] = 1 shl Perks.REFRESH_I
         w.shop.open(w)
         assertFalse(w.shop.perkPending(0))
     }

@@ -68,4 +68,20 @@ class SkillTreeAlpha12Test {
         assertTrue(w.shop.setLocked(w,0,0,true));take(w,0,2)
         assertEquals(quote,w.shop.price(w,0,0))
     }
+
+    @Test fun fortuneRollsMatchTheDocumentedProbabilityIncrease() {
+        val normal=dev.david.tessel.core.rng.Rng(721L)
+        val lucky=dev.david.tessel.core.rng.Rng(721L)
+        val base=IntArray(CardRarity.entries.size)
+        val improved=IntArray(CardRarity.entries.size)
+        repeat(20000) {
+            base[CardRarity.roll(normal).ordinal]++
+            improved[CardRarity.roll(lucky,6).ordinal]++
+        }
+        val epic=CardRarity.EPIC.ordinal;val legendary=CardRarity.LEGENDARY.ordinal
+        assertTrue(improved[epic]>base[epic])
+        assertTrue(improved[legendary]>base[legendary])
+        assertTrue(improved[legendary] in 1200..1600)
+        assertEquals(base.sum(),improved.sum())
+    }
 }

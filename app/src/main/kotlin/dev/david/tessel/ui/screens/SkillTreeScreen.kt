@@ -9,7 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +30,13 @@ fun SkillTreeScreen(clearedStage:Int, mask:Int, available:List<PerkOffer>, canSp
     val earned=SkillTree.earned(clearedStage)
     val points=SkillTree.unspent(clearedStage,mask)
     val tints=listOf(c.accent,c.perk,c.coin)
+    var pendingMask by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(mask,pendingMask) {
+        if(pendingMask!=null) {
+            if(pendingMask==mask) delay(1500L)
+            pendingMask=null
+        }
+    }
     Column(Modifier.fillMaxSize().background(c.ground).pointerInput(Unit){detectTapGestures { }}.windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)) {
         Row(Modifier.fillMaxWidth().height(52.dp),verticalAlignment=Alignment.CenterVertically) {
             BackButton(backLabel,onBack)
@@ -52,11 +60,11 @@ fun SkillTreeScreen(clearedStage:Int, mask:Int, available:List<PerkOffer>, canSp
                             val id=SkillTree.node(branch,rank)
                             val offer=available.firstOrNull{it.id==id}
                             val unlocked=rank<=owned
-                            val ready=canSpend && points>0 && offer!=null && rank==owned+1
+                            val ready=canSpend && points>0 && offer!=null && rank==owned+1 && pendingMask!=mask
                             val shape=RoundedCornerShape(10.dp)
                             Column(Modifier.fillMaxWidth().heightIn(min=78.dp).border(if(ready)2.dp else 1.dp,if(unlocked||ready)tint else c.line,shape)
                                 .background(if(unlocked)tint.copy(alpha=.12f) else c.surface,shape)
-                                .clickable(enabled=ready,role=Role.Button){offer?.let{onSpend(it.slot)}}.padding(9.dp)) {
+                                .clickable(enabled=ready,role=Role.Button){if(pendingMask!=mask)offer?.let{pendingMask=mask;onSpend(it.slot)}}.padding(9.dp)) {
                                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                                     Text(Perks.of(id).name,Type.subhead,c.ink,Modifier.weight(1f))
                                     Text(if(unlocked)"OWNED" else if(ready)"UNLOCK" else if(rank==owned+1)"NEXT" else "LOCKED",Type.caption,if(unlocked||ready)tint else c.ink3)

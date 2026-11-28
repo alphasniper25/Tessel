@@ -499,7 +499,14 @@ class ClientSession(val me: Int, private var players: Int, private val send: (By
         var hp = s.enemyHp[at]
         if (hp == Float.POSITIVE_INFINITY) return
         for (k in 0 until myHits) if (myHitId[k] == id16) hp -= myHitDamage[k]
-        if (hp > 0.001f) return
+        if (hp > 0.001f) {
+            val e=view.enemies
+            for(j in 0 until e.count) if(e.id[j]==id16) {
+                view.events.add(Events.ENEMY_HIT,e.type[j],e.x[j],e.y[j],ux,uy)
+                break
+            }
+            return
+        }
         val e = view.enemies
         for (j in 0 until e.count) {
             if (e.id[j] != id16) continue
