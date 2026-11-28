@@ -14,8 +14,9 @@ class SkillTreeAlpha12Test {
     }
     private fun buy(w:World,id:Int,p:Int=0){
         val before=w.players.coins[p]
+        val quote=SkillGraph.price(w.players.skillMask(p),id)
         assertTrue("purchase $id",w.shop.buySkill(w,p,id))
-        assertEquals(before-SkillGraph.nodes[id].price,w.players.coins[p])
+        assertEquals(before-quote,w.players.coins[p])
         assertTrue(SkillGraph.owns(w.players.skillMask(p),id))
     }
     @Test fun allSixtyNodesAreUniqueConnectedAndHavePositiveEffects(){

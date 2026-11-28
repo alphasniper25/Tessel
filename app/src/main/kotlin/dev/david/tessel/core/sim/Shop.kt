@@ -124,7 +124,7 @@ class Shop {
         if(!canBuySkill(w,p,id))return false
         val pl=w.players
         val node=SkillGraph.nodes[id]
-        pl.coins[p]-=node.price
+        pl.coins[p]-=SkillGraph.price(pl.skillMask(p),id)
         pl.setSkills(p,pl.skillMask(p) or SkillGraph.bit(id))
         if(node.bonus==SkillBonus.HEALTH){
             pl.maxHp[p]+=node.amount

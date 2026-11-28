@@ -89,7 +89,18 @@ class BalanceAuditTest {
         var f=goal
         while(true){if(f==candidate)return true;if(f.parent<0)return false;f=TankEvolution.fromId(f.parent)}
     }
-    private fun shop(w:World,p:Int,goal:TankEvolution,policy:Int):Int{
+    private val graphQuote=SkillGraph.javaClass.methods.firstOrNull{
+        it.name=="price"&&it.parameterCount==2&&it.parameterTypes[0]==java.lang.Long.TYPE
+    }
+    private fun quote(mask:Long,node:SkillNode):Int=
+        (graphQuote?.invoke(SkillGraph,mask,node.id) as? Int) ?: node.price
+    private val difficultyReward=StageRewards.javaClass.methods.firstOrNull{
+        it.name=="coins"&&it.parameterCount==4&&it.parameterTypes[3]==Difficulty::class.java
+    }
+    private fun reward(stage:Int,collected:Int,kills:Int,d:Difficulty):Int=
+        (difficultyReward?.invoke(StageRewards,stage,collected,kills,d) as? Int) ?: StageRewards.coins(stage,collected,kills)
+    private data class ShopResult(val cards:Int,val skillSpend:Int)
+    private fun shop(w:World,p:Int,goal:TankEvolution,policy:Int):ShopResult{
         val s=w.shop;val pl=w.players
         val offers=(0 until TankEvolution.REWARD_SLOTS).filter{s.rewardOffer(p,it)>=0}
         if(offers.isNotEmpty()){
@@ -104,12 +115,14 @@ class BalanceAuditTest {
         // Three profiles spend roughly 20%, 35% or 50% of shop-entry cash on the graph.
         val fraction=when(policy%3){0->.20;1->.35;else->.50}
         var remaining=(budget*fraction).toInt()
+        var skillSpend=0
         repeat(4){
-            val n=SkillGraph.nodes.filter{it.price<=remaining&&s.canBuySkill(w,p,it.id)}.maxByOrNull{
+            val n=SkillGraph.nodes.filter{quote(pl.skillMask(p),it)<=remaining&&s.canBuySkill(w,p,it.id)}.maxByOrNull{
                 val preference=when(it.sector){SkillSector.FIREPOWER->if(pl.evolution[p].melee)4 else 6;SkillSector.HULL->5;SkillSector.REFRESH->6;SkillSector.TRADE->5;SkillSector.FORTUNE->4;SkillSector.MOBILITY->3}
-                (preference+if(it.root)2 else 0).toDouble()/it.price
+                (preference+if(it.root)2 else 0).toDouble()/quote(pl.skillMask(p),it)
             }?:return@repeat
-            if(s.buySkill(w,p,n.id))remaining-=n.price
+            val before=pl.coins[p]
+            if(s.buySkill(w,p,n.id)){val paid=before-pl.coins[p];remaining-=paid;skillSpend+=paid}
         }
         var bought=0
         repeat(5){
@@ -121,7 +134,7 @@ class BalanceAuditTest {
             if(k!=null){if(s.buy(w,p,k))bought++}
             else if(s.canReroll(w,p)&&s.rerollPrice(w,p)==0)s.reroll(w,p)
         }
-        return bought
+        return ShopResult(bought,skillSpend)
     }
 
     @Test fun allTankFramesCombatAndScaling(){
@@ -179,11 +192,11 @@ class BalanceAuditTest {
                     var ticks=0;var purchases=0;var previousEarned=0;var peakWallet=0;var peak=0;var firstSkill=-1;var skillSpend=0
                     while(!w.over&&ticks<1800*TICK_HZ){
                         if(w.phase==Phase.SHOP){
-                            val p=w.players;val before=p.coins[0];val oldMask=p.skillMask(0)
+                            val p=w.players;val before=p.coins[0]
                             peakWallet=max(peakWallet,before)
-                            val bought=shop(w,0,goal,idx);purchases+=bought
+                            val result=shop(w,0,goal,idx);val bought=result.cards;purchases+=bought
                             if(team==2)shop(w,1,goals[(idx+1)%goals.size],idx+1)
-                            val newMask=p.skillMask(0);val spend=SkillGraph.nodes.filter{SkillGraph.owns(newMask,it.id)&&!SkillGraph.owns(oldMask,it.id)}.sumOf{it.price}
+                            val newMask=p.skillMask(0);val spend=result.skillSpend
                             skillSpend+=spend;if(firstSkill<0&&newMask!=0L)firstSkill=w.stage
                             stages.appendLine(listOf(d.name,team,goal.label,seed,w.stage,p.earned[0]-previousEarned,before,p.coins[0],bought,p.bought(0),SkillGraph.count(newMask),spend,p.hp[0],p.maxHp[0],p.evolution[0].label).joinToString(","))
                             stages.flush();previousEarned=p.earned[0];w.nextStage()
@@ -203,15 +216,15 @@ class BalanceAuditTest {
     @Test fun fullStageCurve(){
         val dir=directory()
         File(dir,"economy.csv").bufferedWriter().use{out->
-            out.appendLine("difficulty,stage,price_scale,base_reward,mid_reward,cap_reward,damage_card,heal,first_reroll,root_skill,all_skills_cost,enemy_hp,boss_hp")
+            out.appendLine("difficulty,stage,price_scale,base_reward,mid_reward,cap_reward,damage_card,heal,first_reroll,root_skill,all_skills_base_cost,enemy_hp,boss_hp")
             for(d in Difficulty.entries)for(stage in 1..50){
                 val w=World(11);w.reset(seed=11,difficulty=d);w.skipTo(stage)
                 // Apply the world's actual clear reward for empty combat; the baseline
                 // StageRewards signature has no difficulty argument, so use a tiny
                 // real empty stage for cross-version parity where possible.
-                val base=StageRewards.coins(stage,0,0)
-                val mid=StageRewards.coins(stage,(20*Upgrades.inflation(stage)).roundToInt(),25)
-                val cap=StageRewards.coins(stage,100000000,100000)
+                val base=reward(stage,0,0,d)
+                val mid=reward(stage,(20*Upgrades.inflation(stage)).roundToInt(),25,d)
+                val cap=reward(stage,100000000,100000,d)
                 out.appendLine(listOf(d.name,stage,Upgrades.inflation(stage),base,mid,cap,Upgrades.price(Upgrades.DAMAGE,0,stage),Upgrades.healPrice(stage),Upgrades.rerollPrice(stage,0),SkillGraph.nodes[0].price,SkillGraph.nodes.sumOf{it.price},w.enemyHpScale(),w.bossHpScale()).joinToString(","))
             }
         }

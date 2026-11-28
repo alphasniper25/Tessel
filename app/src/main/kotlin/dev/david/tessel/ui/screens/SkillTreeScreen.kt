@@ -57,6 +57,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
     val node=SkillGraph.nodes[selected]
     val owned=SkillGraph.owns(mask,selected)
     val connected=SkillGraph.connected(mask,selected)
+    val cost=SkillGraph.price(mask,selected)
     val affordable=SkillGraph.canBuy(mask,selected,clearedStage,coins)
     val ready=canSpend && affordable && pending==null
     val camera=SkillMapCamera(zoom,px,py)
@@ -139,7 +140,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                         if(at.x+radius<0||at.x-radius>w||at.y+radius<0||at.y-radius>h)continue
                         val own=SkillGraph.owns(mask,n.id)
                         val avail=SkillGraph.eligible(mask,n.id,clearedStage)
-                        val buy=avail&&coins>=n.price
+                        val buy=avail&&coins>=SkillGraph.price(mask,n.id)
                         val color=sectorTint(n.sector,c.dark)
                         val selectedNode=n.id==selected
                         val outline=if(n.bridge)c.coin else color
@@ -181,7 +182,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                     Text(node.description,Type.subhead,c.ink)
                     Text(when{owned->"UNLOCKED";clearedStage<node.minStage->"LOCKED · STAGE ${node.minStage}";!connected->"LOCKED · CONNECT A NODE";!affordable->"NOT ENOUGH COINS";!canSpend->"PURCHASE IN SHOP";else->"AVAILABLE"},Type.caption,if(owned||ready)tint else c.ink2)
                     if(!owned){
-                        Row(verticalAlignment=Alignment.CenterVertically){Text("Cost",Type.footnote,c.ink2,Modifier.weight(1f));CoinAmount(node.price,style=Type.headline)}
+                        Row(verticalAlignment=Alignment.CenterVertically){Text("Cost",Type.footnote,c.ink2,Modifier.weight(1f));CoinAmount(cost,style=Type.headline)}
                         if(!connected)Text("Connect from "+SkillGraph.neighbors(selected).joinToString(" / "){it.name},Type.footnote,c.ink2)
                     }
                     if(backLabel=="Home")Text("Preview only. Earn coins during a run.",Type.footnote,c.ink2)
@@ -190,14 +191,14 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                         Text("YOUR BONUSES",Type.caption,c.ink3)
                         for(b in SkillBonus.entries)if(total[b.ordinal]>0)Text(b.description(total[b.ordinal]),Type.footnote,c.ink2)
                     }
-                    Text("Skills reset on a new run. Cross-connections let you change direction.",Type.caption,c.ink3)
+                    Text("First 6 nodes use base prices; later purchases cost more. Skills reset on a new run.",Type.caption,c.ink3)
                 }
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
                     MapButton("‹",{selected=(selected+59)%60},Modifier.weight(1f))
                     MapButton("›",{selected=(selected+1)%60},Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(4.dp))
-                PrimaryButton(if(owned)"Unlocked" else "Unlock · ${node.price}",{if(ready){pending=mask;onSpend(node.id)}},Modifier.fillMaxWidth(),enabled=ready)
+                PrimaryButton(if(owned)"Unlocked" else "Unlock · $cost",{if(ready){pending=mask;onSpend(node.id)}},Modifier.fillMaxWidth(),enabled=ready)
             }
         }
     }

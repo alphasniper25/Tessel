@@ -36,7 +36,19 @@ object CampaignEconomy {
         val extra=collected.coerceAtLeast(0)*b.pickupShare+kills.coerceAtLeast(0)*b.killBonus*scale
         return ((b.base*scale+extra.coerceAtMost(b.bonusCap*scale))*multiplier).roundToInt().coerceAtLeast(1)
     }
-    /** Fixed skill prices: a late player can change direction, but the
-     * investment competes with cards and healing rather than free milestones. */
+    // Each seat receives full pickup value up to a generous wave allowance.
+    // Extra pickups still pay, but the marginal rate gradually falls from stage 10.
+    private val pickupAllowances=LongArray(50){i->(75*priceScale(i+1)).roundToInt().toLong()}
+    private val excessRates=IntArray(50){i->100-((i+1-10).coerceIn(0,20)*75/20)}
+    fun pickupAllowance(stage:Int)=pickupAllowances[stage.coerceIn(1,50)-1]
+    fun pickupPayout(stage:Int,raw:Long):Long{
+        val value=raw.coerceAtLeast(0L)
+        val allowance=pickupAllowance(stage)
+        val rate=excessRates[stage.coerceIn(1,50)-1]
+        val extra=(value-allowance).coerceAtLeast(0L)
+        return minOf(value,allowance)+(extra/100)*rate+(extra%100)*rate/100
+    }
+    /** Base skill prices are stage-gated; the common ownership surcharge
+     * is applied by SkillGraph, regardless of which route was chosen. */
     fun skillPrice(base:Int,stage:Int)=(base*priceScale(stage)*1.12).roundToInt()
 }

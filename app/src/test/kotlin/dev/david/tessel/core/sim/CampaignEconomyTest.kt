@@ -17,7 +17,7 @@ class CampaignEconomyTest {
         assertTrue(StageRewards.coins(50,100000,1000)<1500)
         assertTrue(CampaignEconomy.bands.zipWithNext().all{(a,b)->b.through>a.through})
     }
-    @Test fun skillPricesAreFixedAndStageGatedNotInfiniteProgression(){
+    @Test fun baseSkillPricesAreStageGatedNotInfiniteProgression(){
         val nodes=SkillGraph.nodes
         assertEquals(60,nodes.size)
         assertTrue(nodes.all{it.price>0})
@@ -26,6 +26,33 @@ class CampaignEconomyTest {
         assertTrue(nodes.sumOf{it.price}>10000)
         assertFalse(SkillGraph.canBuy(0,0,2,100000))
         assertTrue(SkillGraph.canBuy(0,0,3,nodes[0].price))
+    }
+    @Test fun skillPricesRiseAfterSixPurchasesAndUseTheSameQuoteForEveryRoute(){
+        val six=(1L shl 6)-1
+        val seven=(1L shl 7)-1
+        assertEquals(SkillGraph.nodes[9].price,SkillGraph.price(six,9))
+        val price=SkillGraph.price(seven,9)
+        assertTrue(price>SkillGraph.nodes[9].price)
+        assertEquals(price,SkillGraph.price(seven shl 18,9))
+        assertFalse(SkillGraph.canBuy(seven,9,50,price-1))
+        assertTrue(SkillGraph.canBuy(seven,9,50,price))
+    }
+    @Test fun wealthyWavePayoutIsMonotonicAndIndependentOfPickupBatching(){
+        assertEquals(100000L,CampaignEconomy.pickupPayout(9,100000))
+        for(stage in 1..50){
+            val allowance=CampaignEconomy.pickupAllowance(stage)
+            assertEquals(allowance,CampaignEconomy.pickupPayout(stage,allowance))
+            var sum=0L
+            var previous=0L
+            for(raw in 1L..5000L){
+                val next=CampaignEconomy.pickupPayout(stage,raw)
+                assertTrue(next>=previous&&next-previous<=1L)
+                sum+=next-previous;previous=next
+            }
+            assertEquals(CampaignEconomy.pickupPayout(stage,5000),sum)
+        }
+        val allowance=CampaignEconomy.pickupAllowance(49)
+        assertEquals(allowance+2500L,CampaignEconomy.pickupPayout(49,allowance+10000L))
     }
     @Test fun starterRewardsStillAllowAffordableUpgrades(){
         for(d in Difficulty.entries){

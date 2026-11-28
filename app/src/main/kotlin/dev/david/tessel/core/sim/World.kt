@@ -200,6 +200,7 @@ class World(seed: Long = 1L) {
     val over get() = phase == Phase.OVER
 
     private val stageEarned = IntArray(MAX_PLAYERS)
+    private val rawStagePickups = LongArray(MAX_PLAYERS)
     private val stageKills = IntArray(MAX_PLAYERS)
     private var clearTicks = 0
     private var coinBase = 1f
@@ -223,7 +224,7 @@ class World(seed: Long = 1L) {
         nextId = 1
         playerCount = players.coerceIn(1, MAX_PLAYERS)
         this.players.reset(playerCount, difficulty.bonusHp)
-        stageEarned.fill(0); stageKills.fill(0)
+        stageEarned.fill(0); stageKills.fill(0); rawStagePickups.fill(0); shareTurn=0
         shop.reset()
         bullets.clear()
         droneWing.clear()
@@ -305,7 +306,7 @@ class World(seed: Long = 1L) {
     fun nextStage() {
         if (phase != Phase.SHOP) return
         stage++
-        players.earned.copyInto(stageEarned); players.kills.copyInto(stageKills)
+        players.earned.copyInto(stageEarned); players.kills.copyInto(stageKills); rawStagePickups.fill(0)
         stageTicks = 0
         coinBase = coinBaseFor(stage)
         phase = Phase.FIGHT
@@ -1327,27 +1328,36 @@ class World(seed: Long = 1L) {
      * the game, whoever walked into them. What does not divide goes round the
      * team one coin at a time, so over a stage nobody falls behind.
      */
+    private fun creditSeat(p:Int,value:Int){
+        if(value<=0)return
+        val paid=if(practice||duel.on)value else {
+            val before=rawStagePickups[p]
+            val after=before+value
+            rawStagePickups[p]=after
+            (dev.david.tessel.core.content.CampaignEconomy.pickupPayout(stage,after)-
+                dev.david.tessel.core.content.CampaignEconomy.pickupPayout(stage,before)).toInt()
+        }
+        players.coins[p]+=paid
+        players.earned[p]+=paid
+    }
     private fun credit(p: Int, value: Int) {
         val pl = players
         val n = presentCount()
         if (n <= 1) {
-            pl.coins[p] += value
-            pl.earned[p] += value
+            creditSeat(p,value)
             return
         }
         val each = value / n
         var rest = value - each * n
         for (q in 0 until playerCount) {
             if (!pl.present[q]) continue
-            pl.coins[q] += each
-            pl.earned[q] += each
+            creditSeat(q,each)
         }
         while (rest > 0) {
             val q = shareTurn % playerCount
             shareTurn++
             if (!pl.present[q]) continue
-            pl.coins[q]++
-            pl.earned[q]++
+            creditSeat(q,1)
             rest--
         }
     }

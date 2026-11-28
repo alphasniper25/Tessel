@@ -4,7 +4,7 @@ import kotlin.math.*
 
 /** Stable node IDs. The center is a free navigation hub, not a purchased node.
  * Six nine-node sectors and six bridges share one per-seat 60-bit mask.
- * Coin costs are fixed at a node's minimum stage, so changing route later is not penalized. */
+ * Base costs depend on the node's minimum stage; ownership adds a common surcharge, not a branch-specific penalty. */
 enum class SkillBonus {
     FREE_REFRESH, LUCK, CARD_DISCOUNT, REROLL_DISCOUNT, HEAL_DISCOUNT,
     HEALTH, HEAL_POWER, SPEED, PICKUP, DAMAGE, FIRE_RATE, RANGE;
@@ -108,7 +108,9 @@ object SkillGraph {
         val n=nodes.getOrNull(id)?:return false
         return !owns(mask,id) && stage>=n.minStage && connected(mask,id)
     }
-    fun canBuy(mask:Long,id:Int,stage:Int,coins:Int)=eligible(mask,id,stage) && coins>=nodes[id].price
+    private val ownershipMultipliers=DoubleArray(COUNT+1){1.055.pow((it-6).coerceAtLeast(0))}
+    fun price(mask:Long,id:Int):Int=(nodes[id].price*ownershipMultipliers[count(mask)]).roundToInt()
+    fun canBuy(mask:Long,id:Int,stage:Int,coins:Int)=eligible(mask,id,stage) && coins>=price(mask,id)
     fun neighbors(id:Int):List<SkillNode> = if(id in 0 until COUNT)nodes.filter{adjacency[id] and bit(it.id)!=0L}else emptyList()
     fun count(mask:Long)=java.lang.Long.bitCount(mask and MASK)
     fun fill(mask:Long,out:IntArray){
