@@ -111,7 +111,7 @@ fun PlayPanel(
                 Spacer(Modifier.height(Space.x2))
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
                     if(saves.isEmpty()){
-                        Box(Modifier.fillMaxWidth().weight(1f,fill=false).border(1.dp,c.line,RoundedCornerShape(10.dp)).padding(Space.x3)){
+                        Box(Modifier.fillMaxWidth().border(1.dp,c.line,RoundedCornerShape(10.dp)).padding(Space.x3)){
                             Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
                                 Text("No runs in progress",Type.subhead,c.ink)
                                 Text("Save and quit between stages to resume your campaign here.",Type.footnote,c.ink2)

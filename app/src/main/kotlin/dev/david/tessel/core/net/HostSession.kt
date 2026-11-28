@@ -118,7 +118,7 @@ class HostSession(private val world: World, private val send: (player: Int, byte
                     Wire.HEAL -> world.shop.heal(world, player)
                     Wire.REROLL -> world.shop.reroll(world, player)
                     Wire.READY -> { markReady(player); false }
-                    Wire.RESTART -> { markRematchReady(player, arg); false }
+                    Wire.RESTART -> { markRematchReady(player, arg and 255); false }
                     Wire.PERK -> world.shop.pickPerk(world, player, arg)
                     else -> { onRequest?.invoke(kind); false }
                 }

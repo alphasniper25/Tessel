@@ -18,7 +18,7 @@ enum class BuildFilter(val label:String) {
 }
 object CodexCatalog {
     fun legacy(id:Int)=id==Upgrades.MULTISHOT || id==Upgrades.VELOCITY
-    fun firstStage(id:Int)=if(id>=Upgrades.RESERVE_POWER)15 else 1
+    fun firstStage(id:Int)=Upgrades.firstStage(id)
     fun unlockStage(frame:TankEvolution)=if(frame.secret)40 else when(frame.tier){0->1;1->5;2->15;3->25;else->35}
     fun compatible(id:Int,filter:BuildFilter)=!legacy(id) && TankEvolution.entries.any { filter.matches(it) && Upgrades.offered(id,it) }
     fun role(frame:TankEvolution)=when {

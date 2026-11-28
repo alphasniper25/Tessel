@@ -47,6 +47,10 @@ object Upgrades {
     const val RESERVE_POWER = 20
     const val RESERVE_HULL = 21
     const val RESERVE_DRIVE = 22
+    const val SCAVENGER=23
+    const val PHASE_CAPACITOR=24
+    const val GUARDIAN_KIT=25
+    const val DRONE_RELAY=26
 
     private val defs = arrayOf(
         UpgradeDef("Damage", "+15% damage per bullet", basePrice = 10, maxLevel = 25, step = 0.15f, stat = UpgradeStat.DAMAGE),
@@ -72,14 +76,20 @@ object Upgrades {
         UpgradeDef("Reserve Power", "+3% base damage / Rammer impact", basePrice=30, maxLevel=40, step=.03f, stat=UpgradeStat.DAMAGE),
         UpgradeDef("Reserve Hull", "+1 filled health pip", basePrice=52, maxLevel=12, step=1f, family=CardFamily.HEALTH, stat=UpgradeStat.MAX_HP),
         UpgradeDef("Reserve Drive", "+1.5% movement speed", basePrice=28, maxLevel=30, step=.015f, family=CardFamily.MOBILITY, stat=UpgradeStat.SPEED),
+        UpgradeDef("Scavenger", "+30% pickup radius; +10% coin value", basePrice=30, maxLevel=1, step=.30f, family=CardFamily.ECONOMY, stat=UpgradeStat.MAGNET,secondaryStat=UpgradeStat.WEALTH,secondaryStep=.10f),
+        UpgradeDef("Phase Capacitor", "+12% firing / drone refill rate; +10% projectile range (half for drones)", basePrice=43,maxLevel=1,step=.12f,stat=UpgradeStat.FIRE_RATE,secondaryStat=UpgradeStat.RANGE,secondaryStep=.10f),
+        UpgradeDef("Guardian Kit", "+2 filled HP; +1 HP per shop heal",basePrice=54,maxLevel=1,step=2f,family=CardFamily.HEALTH,stat=UpgradeStat.MAX_HP,secondaryStat=UpgradeStat.HEAL,secondaryStep=1f),
+        UpgradeDef("Drone Relay", "+25% drone impact damage",basePrice=72,maxLevel=1,step=.25f,stat=UpgradeStat.DRONE_POWER),
     )
 
     val count get() = defs.size
-    fun availableAt(id: Int, stage: Int) = id in 0 until count && (id < RESERVE_POWER || stage >= 15)
+    fun firstStage(id:Int)=if(id in RESERVE_POWER..RESERVE_DRIVE)15 else 1
+    fun availableAt(id: Int, stage: Int) = id in 0 until count && stage>=firstStage(id)
     fun offered(id: Int, frame: TankEvolution): Boolean {
         if(id==MULTISHOT || id==VELOCITY) return false
         if(id==SHIELD_RECHARGE) return frame.melee
-        if(id==DRONE_POWER) return frame.drones
+        if(id==DRONE_POWER || id==DRONE_RELAY) return frame.drones
+        if(id==PHASE_CAPACITOR && frame.melee)return false
         if(frame.drones && (id==PIERCE || id==CALIBER)) return false
         if(frame.melee && (id==FIRE_RATE || id==PIERCE || id==RANGE || id==CALIBER || id==CORE_BREAKER)) return false
         if(!frame.melee && frame!=TankEvolution.BASIC && id==RAM_DAMAGE) return false
@@ -147,7 +157,7 @@ object Upgrades {
      * same upgrade later costs more; a locked card retains its quoted price.
      */
     fun price(id: Int, level: Int, stage: Int) =
-        (defs[id].basePrice * (if (id >= RESERVE_POWER) 1.16 else LEVEL_GROWTH).pow(level) * inflation(stage)).roundToInt()
+        (defs[id].basePrice * (if (id in RESERVE_POWER..RESERVE_DRIVE) 1.16 else LEVEL_GROWTH).pow(level) * inflation(stage)).roundToInt()
 
     fun inflation(stage: Int) = STAGE_GROWTH.pow(stage - 1)
 

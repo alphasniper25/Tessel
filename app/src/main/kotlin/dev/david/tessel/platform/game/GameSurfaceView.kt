@@ -1384,7 +1384,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             val changed=prior!=null && prior.stage==s.stage && when(sound) {
                 Sound.BUY -> s.coins[me]<prior.coins && prior.offers.any{!it.empty && s.shopItem[it.slot]<0}
                 Sound.HEAL -> s.healsLeft<prior.healsLeft
-                Sound.REROLL -> s.rerollPrice!=prior.rerollPrice || prior.offers.any{ s.shopItem[it.slot]>=0 && (Upgrades.of(s.shopItem[it.slot]).name!=it.name || s.shopRarity[it.slot]!=it.rarity) }
+                Sound.REROLL -> s.freeRefreshesLeft!=prior.freeRefreshesLeft || s.rerollPrice!=prior.rerollPrice || prior.offers.any{ s.shopItem[it.slot]>=0 && (Upgrades.of(s.shopItem[it.slot]).name!=it.name || s.shopRarity[it.slot]!=it.rarity) }
                 Sound.LOCK,Sound.UNLOCK -> prior.offers.any{it.locked!=s.shopLocked[it.slot]}
                 Sound.SKILL,Sound.EVOLVE -> s.skillNodes[me]!=prior.skillNodes || s.perks[me]!=prior.perkMask || prior.perkOffers.any{it.id !in s.perkOffer}
                 else -> false

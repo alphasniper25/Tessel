@@ -40,7 +40,7 @@ class DroneWing {
             }}
             val input=inputs[p];val manual=input.fire&&pl.stun[p]==0&&input.aimX*input.aimX+input.aimY*input.aimY>.01f
             val aim=atan2(pl.aimY[p],pl.aimX[p]);val cx=px+cos(aim)*reach*.8f;val cy=py+sin(aim)*reach*.8f
-            if(manual||pl.stun[p]>0)guardSlot[p]=-1 else if((w.tick+p)%6==0||guardSlot[p]<0||hp[guardSlot[p]]<=0)selectGuard(w,p,s)
+            if(manual||pl.stun[p]>0)guardSlot[p]=-1 else if((w.tick+p)%6==0)selectGuard(w,p,s)
             for(k in 0 until s.cap){val i=base+k;if(hp[i]<=0)continue
                 anyLiving=true;prevX[i]=x[i];prevY[i]=y[i];if(contact[i]>0)contact[i]--
                 val a=k*2f*PI.toFloat()/s.cap+w.tick*TICK_SECONDS*.85f

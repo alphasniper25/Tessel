@@ -260,7 +260,7 @@ class Shop {
             if(cp.loadedUpgradeCount <= Upgrades.RESERVE_POWER && w.stage >= 15 &&
                 (0 until SHOP_SLOTS).all { maxed(w,p,it) }) restock(w,p)
             // Old saved offers may contain retired cards.
-            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && (!Upgrades.availableAt(item(p,slot),w.stage) || !Upgrades.offered(item(p,slot),w.players.evolution[p]))) {
+            for(slot in 0 until SHOP_SLOTS) if(item(p,slot)>=0 && (!Upgrades.availableAt(item(p,slot),w.stage) || !Upgrades.offered(item(p,slot),w.players.evolution[p]) || !CardMission.eligible(item(p,slot),w.players.missionMask[p],rarity(p,slot)))) {
                 val available=(0 until Upgrades.count).filter { u -> Upgrades.availableAt(u,w.stage) && Upgrades.offered(u,w.players.evolution[p]) && w.players.levels[p][u]<Upgrades.runCap(u) && CardMission.eligible(u,w.players.missionMask[p],CardRarity.COMMON) && (0 until SHOP_SLOTS).none{item(p,it)==u} }
                 stock[p][slot]=if(available.isEmpty()) -1 else CardCode.pack(available[w.rng.int(0,available.lastIndex)],CardRarity.COMMON)
                 locks[p][slot]=false;quotes[p][slot]=0

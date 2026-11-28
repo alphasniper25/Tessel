@@ -102,6 +102,16 @@ object Achievements {
         a("Impossible Finish", Tier.LEGENDARY, "Complete a run on Impossible.", 1) { finished(it, Difficulty.IMPOSSIBLE) },
         a("Repeat Customer", Tier.LEGENDARY, "Complete 5 runs.", 5) { it.totals.completed },
 
+        // Shorter, varied goals derived from the durable run ledger.
+        a("Salvage Run",Tier.EASY,"Collect 2,500 coins.",2500){it.totals.coins},
+        a("Tuned Chassis",Tier.EASY,"Buy 75 upgrade ranks.",75){it.totals.upgrades},
+        a("Deep Expedition",Tier.MEDIUM,"Reach stage 25.",25){it.totals.deepest},
+        a("Veteran Engineer",Tier.HARD,"Deal 100,000 damage across runs.",100000){it.totals.damage},
+        a("Rescue Team",Tier.MEDIUM,"Revive five teammates.",5){it.totals.revives},
+        a("Boss Specialist",Tier.MEDIUM,"Beat 20 bosses.",20){it.totals.bosses},
+        a("Long Campaign",Tier.HARD,"Reach stage 45.",45){it.totals.deepest},
+        a("Core Veteran",Tier.LEGENDARY,"Complete three campaigns.",3){it.totals.completed},
+
         // Duels
         a("First Duel", Tier.EASY, "Win a duel.", 1) { it.totals.pvpWins },
         a("Rival", Tier.MEDIUM, "Win 10 duels.", 10) { it.totals.pvpWins },

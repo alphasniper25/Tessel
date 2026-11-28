@@ -4,13 +4,17 @@ import dev.david.tessel.core.stats.Totals
 
 /** Mission cards are distinct upgrade IDs. Unlocks are earned, never bought.
  * IDs and bit positions are persistent: append entries, do not reorder. */
-enum class MissionMetric(val read: (Totals) -> Int) { COINS({ it.coins }), DEPTH({ it.deepest }), BOSSES({ it.bosses }), WINS({ it.completed }) }
+enum class MissionMetric(val read: (Totals) -> Int) { COINS({ it.coins }), DEPTH({ it.deepest }), BOSSES({ it.bosses }), WINS({ it.completed }), KILLS({it.kills}), SHOTS({it.shots}), REVIVES({it.revives}) }
 
 enum class CardMission(val upgrade: Int, val rarity: CardRarity, val goal: String, val target: Int, val metric: MissionMetric) {
     FIELD_MEDIC(Upgrades.FIELD_MEDIC, CardRarity.COMMON, "Collect 500 coins across runs", 500, MissionMetric.COINS),
     AFTERBURNER(Upgrades.AFTERBURNER, CardRarity.RARE, "Reach stage 15 in a run", 15, MissionMetric.DEPTH),
     TITAN_PLATING(Upgrades.TITAN_PLATING, CardRarity.EPIC, "Defeat 20 bosses across runs", 20, MissionMetric.BOSSES),
-    CORE_BREAKER(Upgrades.CORE_BREAKER, CardRarity.LEGENDARY, "Complete the 50-stage campaign", 1, MissionMetric.WINS);
+    CORE_BREAKER(Upgrades.CORE_BREAKER, CardRarity.LEGENDARY, "Complete the 50-stage campaign", 1, MissionMetric.WINS),
+    SCAVENGER(Upgrades.SCAVENGER,CardRarity.UNCOMMON,"Defeat 1,000 enemies across runs",1000,MissionMetric.KILLS),
+    PHASE_CAPACITOR(Upgrades.PHASE_CAPACITOR,CardRarity.RARE,"Fire 10,000 shots or make drone contacts across runs",10000,MissionMetric.SHOTS),
+    GUARDIAN_KIT(Upgrades.GUARDIAN_KIT,CardRarity.RARE,"Revive five teammates across runs",5,MissionMetric.REVIVES),
+    DRONE_RELAY(Upgrades.DRONE_RELAY,CardRarity.EPIC,"Reach stage 25 in a run",25,MissionMetric.DEPTH);
 
     val bit: Int get() = 1 shl ordinal
     fun progress(t: Totals): Int = metric.read(t).coerceAtLeast(0)

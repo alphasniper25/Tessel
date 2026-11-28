@@ -113,7 +113,7 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                     (cardBuild==0 || CodexCatalog.compatible(id,BuildFilter.entries[cardBuild])) &&
                     when(status){1->unlocked;2->!legacy&&!unlocked;3->legacy;else->true}
                 }
-                Text(if(tab==2)"${CardMission.entries.count{it.unlocked(totals)}} / ${CardMission.entries.size} missions unlocked" else "${cards.size} cards · Tap for stats and compatible builds",Type.footnote,c.ink2,Modifier.padding(vertical=4.dp))
+                Text(if(tab==2)"${CardMission.entries.count{it.unlocked(totals)}} / ${CardMission.entries.size} missions unlocked · rewards enter new runs" else "${cards.size} cards · Tap for stats and compatible builds",Type.footnote,c.ink2,Modifier.padding(vertical=4.dp))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
                     items(cards.chunked(2)){row->
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
@@ -121,12 +121,21 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                                 val def=Upgrades.of(id);val mission=CardMission.forUpgrade(id)
                                 val legacy=CodexCatalog.legacy(id);val locked=mission!=null&&!mission.unlocked(totals)
                                 Column(Modifier.weight(1f).background(c.surface,RoundedCornerShape(10.dp)).clickable{onTap();cardId=id}.padding(11.dp)){
-                                    Text(when{legacy->"LEGACY";locked->"LOCKED";mission!=null->mission.rarity.label.uppercase();id>=Upgrades.RESERVE_POWER->"STAGE 15+";else->familyName(def.family).uppercase()},Type.caption,if(locked||legacy)c.ink3 else c.accent)
+                                    Text(when{legacy->"LEGACY";locked->"LOCKED";mission!=null->mission.rarity.label.uppercase();Upgrades.firstStage(id)==15->"STAGE 15+";else->familyName(def.family).uppercase()},Type.caption,if(locked||legacy)c.ink3 else c.accent)
                                     Row(verticalAlignment=Alignment.CenterVertically){
                                         Text(def.name,Type.headline,c.ink,Modifier.weight(1f),maxLines=2);Chevron(c.ink3)
                                     }
                                     Text(def.blurb,Type.footnote,c.ink2,maxLines=2)
-                                    if(mission!=null) Text("${mission.progress(totals).coerceAtMost(mission.target)} / ${mission.target}",Type.caption,c.ink3)
+                                    if(mission!=null) {
+                                        if(tab==2)Text(mission.goal,Type.footnote,c.ink2)
+                                        val progress=mission.progress(totals).coerceAtMost(mission.target)
+                                        Row(Modifier.fillMaxWidth().padding(top=5.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            Box(Modifier.weight(1f).height(4.dp).background(c.track,RoundedCornerShape(2.dp))){
+                                                Box(Modifier.fillMaxWidth(progress.toFloat()/mission.target).height(4.dp).background(c.accent,RoundedCornerShape(2.dp)))
+                                            }
+                                            Text("$progress / ${mission.target}",Type.caption,c.ink2)
+                                        }
+                                    }
                                 }
                             }
                             if(row.size==1)Spacer(Modifier.weight(1f))
