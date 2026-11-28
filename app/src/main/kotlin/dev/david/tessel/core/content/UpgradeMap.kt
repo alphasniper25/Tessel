@@ -46,8 +46,14 @@ object UpgradeMap {
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
         for(group in groups){
             val row=positions.filter{it.family==group}
-            if(row.isNotEmpty())add(MapLink(HUB_ID,row[row.size/2].id))
-            row.zipWithNext().forEach{(a,b)->add(MapLink(a.id,b.id))}
+            if(row.isNotEmpty()){
+                val middle=row.size/2
+                add(MapLink(HUB_ID,row[middle].id))
+                // Orient both arms outward from their shared root. Connections
+                // remain visual only, but every track is reachable from the hub.
+                for(i in middle downTo 1)add(MapLink(row[i].id,row[i-1].id))
+                for(i in middle until row.lastIndex)add(MapLink(row[i].id,row[i+1].id))
+            }
         }
     }
 
