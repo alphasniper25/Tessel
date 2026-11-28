@@ -78,7 +78,7 @@ abstract class MenuGalleryBase {
         }
         compose.waitForIdle()
     }
-    fun sampleShop(stage:Int=27,mask:Long=0L,perks:Int=0,developer:Boolean=false,reward:Int=0,wallet:Int=418,repeatMagnet:Boolean=false):ShopView{
+    fun sampleShop(stage:Int=27,mask:Long=0L,perks:Int=0,developer:Boolean=false,reward:Int=0,wallet:Int=418,repeatMagnet:Boolean=false,rewardOverride:List<PerkOffer>?=null):ShopView{
         val w=World(seed=721L)
         w.reset(seed=721L,difficulty=Difficulty.NORMAL)
         w.skipTo(stage)
@@ -107,7 +107,7 @@ abstract class MenuGalleryBase {
             if(id<0)null else PerkOffer(slot,TankEvolution.rewardName(id),TankEvolution.rewardDetail(id),TankEvolution.fromReward(id),id=id)
         }
         return ShopView(stage,pl.coins[0],pl.hp[0],pl.maxHp[0],offers,s.healPrice(w,0),s.healsLeft(0),s.canHeal(w,0),s.rerollPrice(w,0),s.canReroll(w,0),
-            perkOffers=rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
+            perkOffers=rewardOverride?:rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
             devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
     @Composable fun Market(s:ShopView,onPerk:(Int)->Unit={}){
@@ -214,10 +214,10 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
     }
     @Test fun actualRevealAnimationFrames(){
         val combo=PerkCombo.PHASE_ESCAPE
-        val before=sampleShop(stage=30,perks=combo.mask and (1 shl Perks.AFTERBURNER).inv(),reward=1)
         // The real production screen receives a representative valid reward snapshot.
         val choices=listOf(Perks.AFTERBURNER,Perks.VITAL_CORE,Perks.LONGSHOT).mapIndexed{i,id->PerkOffer(i,Perks.of(id).name,Perks.of(id).blurb,id=id)}
-        var live by mutableStateOf(before.copy(perkOffers=choices))
+        val before=sampleShop(stage=30,perks=combo.mask and (1 shl Perks.AFTERBURNER).inv(),reward=1,rewardOverride=choices)
+        var live by mutableStateOf(before)
         val after=sampleShop(stage=30,perks=combo.mask)
         show{Market(live){slot->if(slot==0)live=after}}
         capture("72-before-final-perk")
