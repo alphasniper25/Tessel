@@ -72,7 +72,7 @@ object SkillGraph {
         val a=angle*PI.toFloat()/180f
         return radius*cos(a)*1.25f to radius*sin(a)*.67f
     }
-    private fun price(base:Int,stage:Int)=(base*Upgrades.inflation(stage)).roundToInt()
+    private fun price(base:Int,stage:Int)=CampaignEconomy.skillPrice(base,stage)
     val nodes:List<SkillNode> = buildList {
         for(sector in SkillSector.entries){
             val k=sector.ordinal

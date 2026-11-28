@@ -159,10 +159,9 @@ object Upgrades {
     fun price(id: Int, level: Int, stage: Int) =
         (defs[id].basePrice * (if (id in RESERVE_POWER..RESERVE_DRIVE) 1.16 else LEVEL_GROWTH).pow(level) * inflation(stage)).roundToInt()
 
-    fun inflation(stage: Int) = STAGE_GROWTH.pow(stage - 1)
+    fun inflation(stage: Int) = CampaignEconomy.priceScale(stage)
 
     private const val LEVEL_GROWTH = 1.23
-    private const val STAGE_GROWTH = 1.12
 
     const val HEAL_AMOUNT = 3
     const val HEALS_PER_SHOP = 2

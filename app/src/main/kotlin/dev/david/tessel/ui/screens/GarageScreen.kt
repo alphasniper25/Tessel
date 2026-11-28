@@ -65,7 +65,7 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
             Text("$balance credits", Type.headline, c.coin)
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Tank type", Type.headline, c.ink)
+            Text("Starting tank", Type.headline, c.ink)
             Segmented(CharacterDef.entries.map { it.label }, settings.tankClass.ordinal, { i -> onChange { it.copy(tankClass=CharacterDef.fromId(i)) } })
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TankPreview(settings.tankClass, look, Modifier.width(150.dp).height(112.dp).background(c.surface, RoundedCornerShape(12.dp)))
@@ -76,6 +76,7 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
                     Text("Cosmetics do not change stats. Credits are earned from finished runs, kills, survival and bosses.", Type.footnote, c.ink3)
                 }
             }
+            Text("Cosmetic shop",Type.title3,c.ink)
             Segmented(listOf("Body", "Turret", "Paint", "Skin"), tab, { tab=it; previewId=-1 })
             Segmented(listOf("All","Owned","Unowned"),filter,{ filter=it;previewId=-1 })
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -14,7 +14,19 @@ object GarageCatalog {
         Cosmetic(0, CosmeticSlot.BODY, "Class hull", 0), Cosmetic(1, CosmeticSlot.BODY, "Square", 40, hull = HullVisual.SQUARE), Cosmetic(2, CosmeticSlot.BODY, "Diamond", 60, hull = HullVisual.DIAMOND), Cosmetic(3, CosmeticSlot.BODY, "Hexagon", 80, hull = HullVisual.HEXAGON),
         Cosmetic(4, CosmeticSlot.TURRET, "Standard", 0), Cosmetic(5, CosmeticSlot.TURRET, "Long", 45, barrelLength = 1.55f), Cosmetic(6, CosmeticSlot.TURRET, "Twin", 75, barrels = 2),
         Cosmetic(7, CosmeticSlot.PAINT, "Original", 0), Cosmetic(8, CosmeticSlot.PAINT, "Mint", 25, 0xFF76CF8A.toInt()), Cosmetic(9, CosmeticSlot.PAINT, "Blue", 25, 0xFF8EB5FF.toInt()), Cosmetic(10, CosmeticSlot.PAINT, "Amber", 35, 0xFFF2C14E.toInt()), Cosmetic(11, CosmeticSlot.PAINT, "Purple", 35, 0xFFCBA1FA.toInt()),
-        Cosmetic(12, CosmeticSlot.SKIN, "Plain", 0), Cosmetic(13, CosmeticSlot.SKIN, "Stripe", 50, pattern = SkinVisual.STRIPE), Cosmetic(14, CosmeticSlot.SKIN, "Ring", 90, pattern = SkinVisual.RING)
+        Cosmetic(12, CosmeticSlot.SKIN, "Plain", 0), Cosmetic(13, CosmeticSlot.SKIN, "Stripe", 50, pattern = SkinVisual.STRIPE), Cosmetic(14, CosmeticSlot.SKIN, "Ring", 90, pattern = SkinVisual.RING),
+        // Appended IDs preserve existing ownership bits and four-nibble wire appearance.
+        Cosmetic(15,CosmeticSlot.BODY,"Round",55,hull=HullVisual.CIRCLE),
+        Cosmetic(16,CosmeticSlot.TURRET,"Stub",55,barrelLength=.90f),
+        Cosmetic(17,CosmeticSlot.TURRET,"Long twin",110,barrelLength=1.65f,barrels=2),
+        Cosmetic(18,CosmeticSlot.PAINT,"Graphite",60,0xFF8995A1.toInt()),
+        Cosmetic(19,CosmeticSlot.PAINT,"Copper",75,0xFFC78962.toInt()),
+        Cosmetic(20,CosmeticSlot.PAINT,"Ice",55,0xFFA8DFEC.toInt()),
+        Cosmetic(21,CosmeticSlot.PAINT,"Crimson",75,0xFFE88088.toInt()),
+        Cosmetic(22,CosmeticSlot.PAINT,"Lime",55,0xFFC5D779.toInt()),
+        Cosmetic(23,CosmeticSlot.PAINT,"Ivory",80,0xFFE3DCC9.toInt()),
+        Cosmetic(24,CosmeticSlot.PAINT,"Indigo",85,0xFF888DD9.toInt()),
+        Cosmetic(25,CosmeticSlot.PAINT,"Rose",85,0xFFD59AB4.toInt())
     )
     init { require(items.size <= 32 && items.indices.all { items[it].id == it }) }
     // Local slot indexes are stable as long as new items are appended to the catalog.

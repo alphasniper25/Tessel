@@ -5,6 +5,7 @@ import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.StatusEffect
 import dev.david.tessel.core.content.CampaignScaling
+import dev.david.tessel.core.content.CampaignEconomy
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.CoreRules
 import dev.david.tessel.core.content.Difficulty
@@ -201,7 +202,7 @@ class World(seed: Long = 1L) {
     private val stageEarned = IntArray(MAX_PLAYERS)
     private val stageKills = IntArray(MAX_PLAYERS)
     private var clearTicks = 0
-    private var coinBase = 1
+    private var coinBase = 1f
     private var nextId = 1
     private var bossDue = -1
 
@@ -579,13 +580,13 @@ class World(seed: Long = 1L) {
 
     fun enemyHpScale() = difficulty.toughness *
         (1f + Balance.ENEMY_HP_PER_STAGE * max(0, stage - Balance.ENEMY_HP_FROM_STAGE + 1)) * (1f + .035f * max(0,stage-10)) *
-        (1f + Balance.HP_PER_PLAYER * (presentCount() - 1))
+        (1f + Balance.HP_PER_PLAYER * (presentCount() - 1)) * CampaignScaling.enemyHullFactor(stage)
 
     fun bossHpScale(): Float {
         val round = (stage / Bestiary.BOSS_EVERY - 1).coerceAtLeast(0) / Bestiary.bossOrder.size
         return difficulty.bossToughness * (if(stage==5 && (difficulty==Difficulty.EASY || difficulty==Difficulty.NORMAL)) .70f else if(stage==5) .8f else 1f) *
             (1f + Balance.BOSS_HP_PER_PLAYER * (presentCount() - 1)) *
-            (if(stage==CoreRules.STAGE) CoreRules.FINAL_ROUND_SCALE else 1f + Balance.BOSS_HP_PER_ROUND * round) * (1f + .018f * max(0,stage-10))
+            (if(stage==CoreRules.STAGE) CoreRules.FINAL_ROUND_SCALE else 1f + Balance.BOSS_HP_PER_ROUND * round) * (1f + .018f * max(0,stage-10)) * CampaignScaling.bossHullFactor(stage)
     }
 
     /** Enemies attack more often as stages go by. */
@@ -618,7 +619,7 @@ class World(seed: Long = 1L) {
         return best
     }
 
-    private fun coinBaseFor(stage: Int) = max(1, Balance.COIN_GROWTH.pow(stage - 1).roundToInt())
+    private fun coinBaseFor(stage: Int) = CampaignEconomy.pickupBase(stage)
 
     private fun endFight() {
         phase = Phase.CLEAR
@@ -1382,7 +1383,7 @@ class World(seed: Long = 1L) {
         hostile.clear()
         phase = Phase.SHOP
         if (!practice && !duel.on) for (p in 0 until playerCount) if (players.present[p]) {
-            val bonus = dev.david.tessel.core.content.StageRewards.coins(stage, players.earned[p] - stageEarned[p], players.kills[p] - stageKills[p])
+            val bonus = dev.david.tessel.core.content.StageRewards.coins(stage, players.earned[p] - stageEarned[p], players.kills[p] - stageKills[p], difficulty)
             players.coins[p] += bonus
             players.earned[p] += bonus
             val growth=CampaignScaling.hullGrowth(stage)

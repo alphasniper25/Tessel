@@ -24,23 +24,23 @@ enum class Difficulty(
     val score: Float,
 ) {
     EASY(
-        "Easy", "Slower, softer enemies, more health and more coins.",
+        "Easy", "Slower, softer enemies and more starting health.",
         spawn = 0.6f, speed = 0.75f, toughness = 0.55f, bossToughness = 0.45f,
-        shotSpeed = 0.75f, attackRate = 0.6f, bonusHp = 4, coinValue = 1.6f, score = 0.6f,
+        shotSpeed = 0.75f, attackRate = 0.6f, bonusHp = 4, coinValue = 1.10f, score = 0.6f,
     ),
     NORMAL(
         "Normal", "A fair fight.",
         spawn = 0.78f, speed = 0.87f, toughness = 0.80f, bossToughness = 0.59f,
-        shotSpeed = 0.9f, attackRate = 0.85f, bonusHp = 2, coinValue = 1.25f, score = 1f,
+        shotSpeed = 0.9f, attackRate = 0.85f, bonusHp = 2, coinValue = 1.02f, score = 1f,
     ),
     HARD(
         "Hard", "More enemies, faster and tougher. Less health.",
         spawn = 1.2f, speed = 1.06f, toughness = 1.15f, bossToughness = 1.15f,
-        shotSpeed = 1.05f, attackRate = 1.1f, bonusHp = 0, coinValue = 1f, score = 1.5f,
+        shotSpeed = 1.05f, attackRate = 1.1f, bonusHp = 0, coinValue = 1.0f, score = 1.5f,
     ),
     IMPOSSIBLE(
         "Impossible", "Everything at once. Eight health. Good luck.",
         spawn = 1.6f, speed = 1.2f, toughness = 1.5f, bossToughness = 1.6f,
-        shotSpeed = 1.2f, attackRate = 1.35f, bonusHp = -2, coinValue = 0.9f, score = 2.2f,
+        shotSpeed = 1.2f, attackRate = 1.35f, bonusHp = -2, coinValue = 1.0f, score = 2.2f,
     ),
 }

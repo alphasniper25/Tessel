@@ -58,7 +58,7 @@ object Balance {
     const val ENEMY_HP_FROM_STAGE = 4
 
     /** Coin value multiplies by this each stage. */
-    const val COIN_GROWTH = 1.105
+    const val COIN_GROWTH = CampaignEconomy.PICKUP_GROWTH
 
     // Enemy shots: hollow, slow enough to read, a little faster and more frequent each stage.
     const val HOSTILE_RADIUS = 5.5f
