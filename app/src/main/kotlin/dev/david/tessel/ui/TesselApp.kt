@@ -2,6 +2,9 @@ package dev.david.tessel.ui
 
 import androidx.activity.compose.BackHandler
 import dev.david.tessel.ui.screens.CardCollectionScreen
+import dev.david.tessel.ui.screens.UpgradeTreeShopScreen
+import dev.david.tessel.core.content.ShopMode
+import dev.david.tessel.core.sim.UpgradeBuild
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -229,10 +232,15 @@ fun TesselApp(
             )
         }
 
-        Sheet(visible = mode == Mode.SHOP && !treeOpen, onDismiss = null) {
+        Sheet(visible = mode == Mode.SHOP && !treeOpen && (shop?:lastShop)?.treeBuild==null, onDismiss = null) {
             (shop ?: lastShop)?.let {
                 ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
             }
+        }
+        val treeShop=shop
+        if(mode==Mode.SHOP && treeShop?.treeBuild!=null && !waitingOnSomeone){
+            UpgradeTreeShopScreen(treeShop.stage,treeShop.treeBuild,treeShop.coins,shop=treeShop,infinite=treeShop.infiniteMoney,
+                onBuy=game::buyTree,onPerk=game::pickPerk,onHeal=game::heal,onNext=game::nextStage,onSave=game::saveForLater)
         }
 
         RunOverCard(
@@ -320,6 +328,8 @@ fun TesselApp(
                 initialCharacter = settings.tankClass,
                 look = settings.tankLook,
                 onBack = { playOpen=false;game.menuSound() },
+                trial=settings.infiniteTrial,
+                shopMode=settings.effectiveShopMode,
                 onNewCharacter = { character ->
                     store.update { it.copy(tankClass = character) }
                     playOpen = false
@@ -329,7 +339,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen && !cardsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
-            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
+            dev.david.tessel.ui.screens.PlayerProfileScreen(profileName,ledger, onName={lobby.setUsername(it);profileName=lobby.myName},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()},settings=settings,onChange=store::update,onAdvanced={settingsOpen=true;devOpen=true;game.menuSound()})
         }
 
         // The lobby and settings slide in from the trailing edge and leave the same way.
@@ -483,14 +493,19 @@ fun TesselApp(
         if(treeOpen && !waitingOnSomeone && (mode==Mode.HOME || mode==Mode.SHOP || mode==Mode.PAUSED)) {
             val currentShop=shop.takeIf { mode==Mode.SHOP }
             val run=runStats.takeIf { mode==Mode.PAUSED }
-            dev.david.tessel.ui.screens.SkillTreeScreen(
+            val preview=run?.treeBuild ?: if(mode==Mode.HOME&&settings.effectiveShopMode==ShopMode.TREE)UpgradeBuild(character=settings.tankClass,look=settings.tankLook) else null
+            if(preview!=null){
+                UpgradeTreeShopScreen((run?.stage?:1).minus(1).coerceAtLeast(0),preview,run?.coinsInHand?:0,
+                    backLabel=if(mode==Mode.PAUSED)"Pause" else "Home",infinite=run?.infiniteMoney==true,onBack={treeOpen=false;game.menuSound()})
+            }else dev.david.tessel.ui.screens.SkillTreeScreen(
                 clearedStage=currentShop?.stage ?: ((run?.stage ?: 1)-1).coerceAtLeast(0),
                 mask=currentShop?.skillNodes ?: run?.skillNodes ?: 0L,
                 coins=currentShop?.coins ?: run?.coinsInHand ?: 0,
                 canSpend=currentShop!=null && !currentShop.selfReady && currentShop.perkOffers.isEmpty(),
                 onSpend=game::buySkill,
                 onBack={treeOpen=false;game.menuSound()},
-                backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home"
+                backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home",
+                infiniteMoney=currentShop?.infiniteMoney==true||run?.infiniteMoney==true
             )
         }
         // The partner left, or the link never came back, while the lobby screen was closed.
@@ -500,7 +515,7 @@ fun TesselApp(
         }
     }
 
-    val treeHandlesBack=treeOpen && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
+    val treeHandlesBack=(treeOpen || (mode==Mode.SHOP&&shop?.treeBuild!=null)) && lobbyState !is LobbyState.Reconnecting && !held && (mode==Mode.HOME||mode==Mode.SHOP||mode==Mode.PAUSED)
     BackHandler(enabled = !arsenalVisible && !treeHandlesBack && (profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME)) {
         when {
             treeOpen -> treeOpen=false
