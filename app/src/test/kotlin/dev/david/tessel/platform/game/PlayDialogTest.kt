@@ -130,9 +130,14 @@ class PlayDialogTest {
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Skill Tree").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Refresh I").assertIsDisplayed()
-        compose.onNodeWithText("Fortune I").assertIsDisplayed()
-        compose.onNodeWithText("Trade I").assertIsDisplayed()
+        compose.onNodeWithText("Quick Refresh").assertIsDisplayed()
+        compose.onNodeWithText("LOCKED · STAGE 3").assertIsDisplayed()
+        compose.onNodeWithText("+").performClick()
+        compose.onNodeWithText("133%").assertIsDisplayed()
+        compose.onNodeWithText("Fit").performClick()
+        compose.onNodeWithText("100%").assertIsDisplayed()
+        compose.onNodeWithText("›").performClick()
+        compose.onNodeWithText("Double Refresh").assertIsDisplayed()
         compose.onNodeWithText("Home").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Play").assertIsDisplayed()
@@ -141,15 +146,40 @@ class PlayDialogTest {
     @Test
     fun codexCardCanOpenDetailsAndReturnToList() {
         compose.mainClock.advanceTimeBy(1000)
-        compose.onNodeWithText("Codex").performClick()
+        compose.onNodeWithText("Arsenal").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Cards").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Damage").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Run rank limit").assertIsDisplayed()
-        compose.onNodeWithText("Codex").performClick()
+        compose.onNodeWithText("Arsenal").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Cards").assertIsDisplayed()
+    }
+
+    @Test
+    fun savedStageThreeShopNeverOpensTreeAutomaticallyAndPurchaseCostsCoins(){
+        val cp=Checkpoint(Difficulty.NORMAL,3,3*3900,1,true,0)
+        cp.present[0]=true;cp.hp[0]=10;cp.maxHp[0]=10;cp.coins[0]=200
+        saves.write(1,cp)
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Play").performClick()
+        compose.mainClock.advanceTimeBy(1500)
+        compose.onNodeWithText("Continue").performClick()
+        waitForMode(Mode.SHOP);compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Next Stage").assertIsDisplayed()
+        compose.onNodeWithText("Skill Tree").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        val cost=dev.david.tessel.core.content.SkillGraph.nodes[0].price
+        compose.onNodeWithText("Unlock · $cost").performClick()
+        val until=System.currentTimeMillis()+5000
+        while(game.shop.value?.skillNodes!=1L&&System.currentTimeMillis()<until){compose.waitForIdle();Thread.sleep(10)}
+        assertEquals(1L,game.shop.value?.skillNodes)
+        assertEquals(200-cost,game.shop.value?.coins)
+        compose.onNodeWithText("Unlocked").assertIsDisplayed()
+        compose.onNodeWithText("Shop").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Next Stage").assertIsDisplayed()
     }
 }

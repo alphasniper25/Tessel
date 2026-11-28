@@ -190,7 +190,7 @@ fun TesselApp(
         }
 
         val waitingOnSomeone = lobbyState is LobbyState.Reconnecting || held
-        Sheet(visible = mode == Mode.PAUSED && !breakDue && !settingsOpen && !waitingOnSomeone, onDismiss = game::resume) {
+        Sheet(visible = mode == Mode.PAUSED && !breakDue && !settingsOpen && !waitingOnSomeone && !treeOpen, onDismiss = game::resume) {
             PausePanel(
                 coop = coop,
                 host = role == Role.HOST,
@@ -217,7 +217,7 @@ fun TesselApp(
             )
         }
 
-        Sheet(visible = mode == Mode.SHOP, onDismiss = null) {
+        Sheet(visible = mode == Mode.SHOP && !treeOpen, onDismiss = null) {
             (shop ?: lastShop)?.let {
                 ShopPanel(it, settings.vibration, game::buy, game::heal, game::reroll, game::nextStage, game::pickPerk, game::setCardLocked, onTree={treeOpen=true;game.menuSound()}, onSave=game::saveForLater)
             }
@@ -259,7 +259,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen,
+            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !treeOpen,
             enter = fadeIn(Springs.ui()),
             exit = fadeOut(Springs.ui()),
         ) {

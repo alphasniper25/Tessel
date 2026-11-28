@@ -23,7 +23,7 @@ class Alpha11ProgressionTest {
         val w = World(seed=8).apply { spawning=false }
         val idle = Array(MAX_PLAYERS) { PlayerInput() }
         while(w.phase != Phase.SHOP) w.step(idle)
-        w.players.perks[0] = 1 shl Perks.REFRESH_I
+        w.players.setSkills(0,SkillGraph.bit(0))
         w.players.coins[0] = 100
         assertEquals(0,w.shop.rerollPrice(w,0))
         assertTrue(w.shop.reroll(w,0))
@@ -47,24 +47,21 @@ class Alpha11ProgressionTest {
         w.shop.open(w)
         assertEquals(setOf(Upgrades.RESERVE_POWER, Upgrades.RESERVE_HULL, Upgrades.RESERVE_DRIVE),
             (0 until SHOP_SLOTS).map { w.shop.item(0,it) }.toSet())
-        assertEquals(2,SkillTree.unspent(17,0))
-        assertTrue(w.shop.pickPerk(w,0,0))
-        assertTrue(w.shop.pickPerk(w,0,0))
         assertFalse(w.shop.perkPending(0))
-        assertEquals(2,SkillTree.freeRefreshes(w.players.perks[0]))
+        assertEquals(0L,w.players.skillMask(0))
     }
 
     @Test fun checkpointPreservesSeatSkillsReserveRanksAndUsedFreeRefresh() {
         val w=World(seed=8).apply { spawning=false }
         val idle=Array(MAX_PLAYERS){PlayerInput()}
         while(w.phase != Phase.SHOP) w.step(idle)
-        w.players.perks[0] = 1 shl Perks.REFRESH_I
+        w.players.setSkills(0,SkillGraph.bit(0))
         w.players.levels[0][Upgrades.RESERVE_POWER] = 3
         w.players.coins[0] = 300
         assertTrue(w.shop.reroll(w,0))
         val cp=Checkpoint.read(w.capture().write())!!
         assertEquals(3,cp.levels[0][Upgrades.RESERVE_POWER])
-        assertEquals(1,SkillTree.freeRefreshes(cp.perks[0]))
+        assertTrue(SkillGraph.owns(cp.skillNodes[0],0))
         val restored=World(seed=10)
         restored.restore(cp,10L){true}
         assertEquals(Upgrades.rerollPrice(restored.stage,0),restored.shop.rerollPrice(restored,0))
@@ -82,7 +79,7 @@ class Alpha11ProgressionTest {
         val w=World(seed=8)
         w.restore(cp,8L){true}
         assertTrue((0 until SHOP_SLOTS).all { w.shop.item(0,it) >= Upgrades.RESERVE_POWER })
-        assertTrue(w.shop.perkPending(0))
+        assertFalse(w.shop.perkPending(0))
         assertEquals(0,w.players.coins[0])
     }
 }

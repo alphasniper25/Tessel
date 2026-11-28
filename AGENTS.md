@@ -62,3 +62,10 @@
 - Original synthesized effects only, per-event priorities/rate limits, master volume and menu sound preference. No licensed music.
 - Drone HP/caps unchanged. Invulnerable boss states excluded from contact; small provisional balance changes to reach, damage, speed and refill.
 - Run full Android unit suite then assemble debug; permanent test signing must match the pinned original certificate and version/package check. Never expose private backup/password or publish the temporary CI APK.
+
+## Alpha.13 — constellation tree (source only)
+- Replace milestone skill prompts with an optional 60-node, six-sector connected graph. Run coins pay fixed prices, minimum cleared stage 3; stage gates and adjacency checked by the host. A player may branch or cross through six bridges, or skip all skill spending.
+- Home skill map is preview-only; pause inspects current run; purchase only from the shop, never automatically open. Preserve boss evolutions/perks, three paid cards, locks, prior balance configuration except explicitly enumerated graph bonuses. Keep separate free/paid reroll counters.
+- Stable graph IDs 0–59 and seat masks (long); migrate format 1–7 checkpoints to FORMAT=8, preserve legacy purchased ranks without charging coins, remove unclaimed old milestone prompts, carry remaining free refresh accounting. Wire.VERSION=27, action BUY_SKILL=13, host validates seat/readiness/purchase. Alpha.12 and 13 are not multiplayer-compatible. 
+- Arsenal is the new displayed name for the existing tank/card/mission collection; preserve all 33 live previews and related filters. Main menu sequence Play, Play Together, Tank Garage, Skill Tree, Arsenal, Statistics, Settings.
+- Owner explicitly requests NO APK for this candidate. Only testDebugUnitTest in source workflow; no assemble, sign, publish or release. VersionCode 34 reserved for future authorized build.

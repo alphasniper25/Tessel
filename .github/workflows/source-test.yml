@@ -1,9 +1,9 @@
-name: TESSEL alpha.12 source checks
+name: TESSEL alpha.13 source checks
 on:
   push:
-    branches: [test/alpha12]
+    branches: [test/alpha13]
 concurrency:
-  group: alpha12-${{ github.ref }}
+  group: alpha13-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,15 +33,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha12-unit-tests
+          name: TESSEL-alpha13-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7
-      - name: Assemble debug APK intermediate (not for distribution)
-        run: ./gradlew --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: TESSEL-alpha12-debug-intermediate-NOT-UPDATE-SIGNED
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 7
+      # Source-only candidate: no APK assembly, signing or publication.
