@@ -33,6 +33,7 @@ import kotlin.math.sqrt
 
 class Renderer(private val density: Float, palette: Palette) {
     var showStats = false
+    var gridStep=72f
     var zoom = 1.60f
     private val tankArt = TankArt()
     var names: List<String> = emptyList()
@@ -133,7 +134,7 @@ class Renderer(private val density: Float, palette: Palette) {
     /** World-anchored, low-contrast grid; only visible lines are drawn. */
     private fun drawFloor(canvas: Canvas, view: Viewport) {
         if (view.scale <= 0f) return
-        val step = 72f
+        val step = gridStep
         val x0 = maxOf(0f, view.left)
         val y0 = maxOf(0f, view.top)
         val x1 = minOf(canvas.width.toFloat(), view.right)

@@ -30,6 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.platform.store.Settings
+import dev.david.tessel.platform.store.PerformancePreset
+import dev.david.tessel.platform.store.FpsLimit
+import dev.david.tessel.platform.store.EffectsQuality
 import dev.david.tessel.platform.store.StickSize
 import dev.david.tessel.platform.update.UpdateState
 import dev.david.tessel.platform.update.Updater
@@ -84,6 +87,20 @@ fun SettingsScreen(
                 Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = Space.x2),
                 verticalArrangement = Arrangement.spacedBy(Space.x6),
             ) {
+                Group("Performance") {
+                    Column(Modifier.padding(horizontal=Space.x4,vertical=Space.x3),verticalArrangement=Arrangement.spacedBy(Space.x2)){
+                        Text("Quick preset",Type.body,c.ink)
+                        val selected=PerformancePreset.entries.indexOfFirst{it.matches(settings)}
+                        // Custom settings remain editable; the selection indicates an exact match.
+                        Segmented(PerformancePreset.entries.map{it.label} + "Custom",if(selected<0)3 else selected,{i->PerformancePreset.entries.getOrNull(i)?.let{p->onChange{p.apply(it)}}})
+                        Text(when(selected){0->"30 FPS target, light effects, no vibration or menu audio.";1->"60 FPS target, reduced debris and shot vibration off.";2->"Display-native frame rate, full effects and feedback.";else->"Your own combination of graphics and feedback."},Type.footnote,c.ink2)
+                        Text("Frame-rate target",Type.body,c.ink)
+                        Segmented(FpsLimit.entries.map{it.label},settings.fpsLimit.ordinal,{i->onChange{it.copy(fpsLimit=FpsLimit.entries[i])}})
+                        Text("Visual effects",Type.body,c.ink)
+                        Segmented(EffectsQuality.entries.map{it.label},settings.effectsQuality.ordinal,{i->onChange{it.copy(effectsQuality=EffectsQuality.entries[i])}})
+                        Text("Display-native uses the refresh rate the phone permits. Combat, hitboxes, enemy counts and multiplayer simulation stay the same.",Type.footnote,c.ink2)
+                    }
+                }
                 Group("Controls") {
                     Column(Modifier.padding(horizontal = Space.x4, vertical = Space.x3)) {
                         Text("Stick size", Type.body, c.ink)

@@ -84,7 +84,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
             if(backLabel!="Home")CoinAmount(coins,style=Type.headline) else Text("Preview",Type.subhead,c.accent)
         }
         Text(if(clearedStage<SkillGraph.FIRST_STAGE)"Clear stage 3 to unlock skill purchases · spend run coins in the shop" else "Stage $clearedStage cleared · choose your own route · purchases are optional",
-            Type.footnote,c.ink2,Modifier.padding(horizontal=4.dp,bottom=5.dp),maxLines=1)
+            Type.footnote,c.ink2,Modifier.padding(start=4.dp,end=4.dp,bottom=5.dp),maxLines=1)
         Row(Modifier.fillMaxWidth().weight(1f).padding(bottom=6.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(14.dp)).background(c.surface).border(1.dp,c.line,RoundedCornerShape(14.dp))) {
                 Canvas(Modifier.fillMaxSize().onSizeChanged{viewport=it}

@@ -2,6 +2,15 @@ package dev.david.tessel.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,6 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.Balance
+import dev.david.tessel.ui.components.BackButton
+import dev.david.tessel.ui.components.Divider
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.platform.store.SoloSave
 import dev.david.tessel.platform.store.SoloSaves
@@ -57,45 +69,67 @@ fun PlayPanel(
     val c = Theme.colors
     val full = saves.size >= SoloSaves.SLOTS
     var selected by remember(initialCharacter) { mutableIntStateOf(initialCharacter.ordinal) }
-    // Reserve the action row before measuring scrollable content. The sheet can
-    // be shorter than the preferred layout on a phone with a large font scale.
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Space.x4, vertical = Space.x2)) {
-        val panelHeight = minOf(maxHeight, 292.dp)
-        Column(Modifier.fillMaxWidth().height(panelHeight), verticalArrangement = Arrangement.spacedBy(Space.x2)) {
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.x4)) {
-                Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Space.x1)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text("Start a run", Type.title2, c.ink,Modifier.weight(1f))
-                        if(onBack!=null) dev.david.tessel.ui.components.BackButton("Home",onBack)
+    val frame=CharacterDef.fromId(selected)
+    // Permanent header and footer; only the two content columns scroll. No fixed 292dp sheet.
+    Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)
+        .padding(horizontal=Space.x4,vertical=Space.x2)) {
+        Row(Modifier.fillMaxWidth().height(44.dp),verticalAlignment=Alignment.CenterVertically) {
+            if(onBack!=null)BackButton("Home",onBack)
+            Spacer(Modifier.weight(1f))
+            Text("Start a run",Type.title2,c.ink)
+            Spacer(Modifier.weight(1f))
+            Text("${saves.size} / ${SoloSaves.SLOTS} slots",Type.caption.merge(Type.numbers),c.ink2)
+        }
+        Divider()
+        Row(Modifier.weight(1f).fillMaxWidth().padding(vertical=Space.x2),horizontalArrangement=Arrangement.spacedBy(Space.x4)){
+            Column(Modifier.weight(1.05f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                verticalArrangement=Arrangement.spacedBy(5.dp)){
+                Text("01  /  DIFFICULTY",Type.caption,c.ink2)
+                Segmented(Difficulty.entries.map { it.label },difficulty.ordinal,{onDifficulty(Difficulty.entries[it])})
+                if(onNewCharacter!=null){
+                    Spacer(Modifier.height(2.dp))
+                    Text("02  /  STARTING TANK",Type.caption,c.ink2)
+                    Segmented(CharacterDef.entries.map{it.label},selected,{selected=it})
+                    Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(10.dp)).padding(8.dp),
+                        verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        TankPreview(frame,look,Modifier.size(52.dp))
+                        Column(Modifier.weight(1f)){
+                            Text(frame.label,Type.headline,c.ink)
+                            Text("HP ${(Balance.PLAYER_HP+difficulty.bonusHp+frame.extraHp).coerceAtLeast(1)}  ·  DMG ${(frame.damageScale*100).toInt()}%",Type.footnote.merge(Type.numbers),c.ink)
+                            Text("Speed ${(frame.speedScale*100).toInt()}%  ·  Fire ${(frame.fireScale*100).toInt()}%",Type.footnote.merge(Type.numbers),c.ink2)
+                        }
                     }
-                    Text("Difficulty", Type.footnote, c.ink2)
-                    Segmented(Difficulty.entries.map { it.label }, difficulty.ordinal, { onDifficulty(Difficulty.entries[it]) })
-                    if (onNewCharacter != null) {
-                        Text("Starting passive · evolve after stage 5", Type.footnote, c.ink2)
-                        Segmented(CharacterDef.entries.map { it.label }, selected, { selected = it })
-                        CharacterPreview(CharacterDef.fromId(selected), look, difficulty,
-                            Modifier.clip(RoundedCornerShape(Corner.chip)).background(c.raised).padding(horizontal = Space.x2, vertical = Space.x1), compact = true)
-                    }
-                }
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Saved Runs", Type.title2, c.ink, Modifier.weight(1f))
-                        Text("${saves.size} / ${SoloSaves.SLOTS}", Type.footnote.merge(Type.numbers), c.ink3)
-                    }
-                    Spacer(Modifier.height(Space.x2))
-                    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(Space.x2)) {
-                        if (saves.isEmpty()) Text("No saved runs. Save and quit during a run to continue later.", Type.subhead, c.ink3)
-                        for (save in saves) SavedRun(save, now, { onContinue(save.slot) }, { onDelete(save.slot) })
-                    }
+                    Text(frame.description,Type.footnote,c.ink2)
                 }
             }
-            dev.david.tessel.ui.components.Divider()
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.x4)) {
-                PrimaryButton("New Run", { if (onNewCharacter == null) onNew() else onNewCharacter(CharacterDef.fromId(selected)) }, Modifier.weight(1.05f), enabled = !full)
-                Text(if (full) "All slots are in use. Delete a saved run to start another." else "${difficulty.label} · ${CharacterDef.fromId(selected).label}", Type.footnote, c.ink2, Modifier.weight(1f), maxLines = 2)
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))
+            Column(Modifier.weight(1f).fillMaxHeight()){
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Text("Saved runs",Type.headline,c.ink,Modifier.weight(1f))
+                    Text("${saves.size} / ${SoloSaves.SLOTS}",Type.caption.merge(Type.numbers),c.ink3)
+                }
+                Spacer(Modifier.height(Space.x2))
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    if(saves.isEmpty()){
+                        Box(Modifier.fillMaxWidth().weight(1f,fill=false).border(1.dp,c.line,RoundedCornerShape(10.dp)).padding(Space.x3)){
+                            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                Text("No runs in progress",Type.subhead,c.ink)
+                                Text("Save and quit between stages to resume your campaign here.",Type.footnote,c.ink2)
+                                Text("5 save slots available",Type.caption,c.ink3)
+                            }
+                        }
+                    }
+                    for(save in saves)SavedRun(save,now,{onContinue(save.slot)},{onDelete(save.slot)})
+                }
             }
+        }
+        Divider()
+        Row(Modifier.fillMaxWidth().padding(top=Space.x2),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(Space.x4)){
+            Column(Modifier.weight(1f)){
+                Text(if(full)"All slots occupied" else "${difficulty.label} · ${frame.label}",Type.headline,c.ink)
+                Text(if(full)"Delete a saved run to start another." else "First evolution after stage 5",Type.footnote,c.ink2)
+            }
+            PrimaryButton("New Run",{if(onNewCharacter==null)onNew() else onNewCharacter(frame)},Modifier.weight(1f),enabled=!full)
         }
     }
 }

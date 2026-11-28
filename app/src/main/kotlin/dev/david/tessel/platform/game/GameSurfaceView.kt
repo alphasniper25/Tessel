@@ -104,6 +104,9 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private var shopSoundPending: Sound? = null
     private var shopSoundAt = 0L
     private val stats = FrameStats()
+    private val renderPacer=RenderPacer()
+    private var renderTarget=60
+    private var lastDrawMode:Mode?=null
     private val inputs = Array(MAX_PLAYERS) { PlayerInput() }
     private val moveView = StickView()
     private val aimView = StickView()
@@ -650,6 +653,11 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             renderer.stickRadius = controller.stickRadius
             renderer.showStats = s.showStats
             renderer.zoom = s.cameraZoom
+            renderTarget=s.fpsLimit.fps
+            renderer.gridStep=s.effectsQuality.gridStep
+            shards.limit=s.effectsQuality.particles
+            renderPacer.reset()
+            requestSurfaceRate()
             hud.showLink = s.showLink
             breakEvery = s.breakEvery
             dev = s.dev
@@ -663,8 +671,19 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         updateRunning()
     }
 
+    private fun requestSurfaceRate(){
+        if(Build.VERSION.SDK_INT>=30) synchronized(surfaceLock){
+            if(surfaceLive && holder.surface.isValid)runCatching{
+                // 0 lets the display choose; native mode explicitly requests its highest advertised mode.
+                val rate=if(renderTarget==0)display?.supportedModes?.maxOfOrNull{it.refreshRate} ?: 0f else renderTarget.toFloat()
+                holder.surface.setFrameRate(rate,android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+            }
+        }
+    }
+
     override fun surfaceCreated(holder: SurfaceHolder) {
         synchronized(surfaceLock) { surfaceLive = true }
+        handler.post { requestSurfaceRate() }
         updateRunning()
     }
 
@@ -801,8 +820,11 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         shards.update(usable / 1e9f)
         val blend = if (playingAs != Role.CLIENT && current == Mode.PLAYING) pendingNanos.toFloat() / STEP_NANOS else 1f
         val drawStart = System.nanoTime()
-
-        synchronized(surfaceLock) {
+        // Menus do not need a continuously redrawn world. Network and sim work above
+        // still run on every callback, regardless of the presentation rate.
+        val drawTarget=if(current==Mode.PLAYING)renderTarget else 20
+        val drawNow=renderPacer.due(frameTimeNanos,drawTarget,lastDrawMode!=current || (current==Mode.HOME&&!homeDrawn))
+        if(drawNow) synchronized(surfaceLock) {
             if (!surfaceLive) return
             val canvas = holder.lockHardwareCanvas() ?: return
             try {
@@ -825,6 +847,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             } finally {
                 holder.unlockCanvasAndPost(canvas)
             }
+            lastDrawMode=current
         }
 
         if (playingAs != Role.SOLO && nowNanos >= nextNetLog) {
@@ -832,7 +855,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             logNet()
         }
 
-        if (stats.record(elapsed, drawStart - simStart, System.nanoTime() - drawStart)) {
+        if (drawNow && stats.record(renderPacer.drawnIntervalNanos, drawStart - simStart, System.nanoTime() - drawStart)) {
             renderer.setStats(stats, shown.enemies.count, shown.bullets.count)
             if (debuggable && ++statWindows % LOG_EVERY_WINDOWS == 0) {
                 Log.d(TAG, "fps=${stats.fps} frame=${stats.frameMs} worst=${stats.worstMs} sim=${stats.simMs} draw=${stats.drawMs} enemies=${shown.enemies.count} stage=${shown.stage} mode=$current role=$playingAs")
@@ -1442,6 +1465,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     private fun restartClock() {
         lastFrameNanos = 0L
         pendingNanos = 0L
+        renderPacer.reset()
+        lastDrawMode=null
     }
 
     /** The blank home frame is on the screen, so no more frames are needed there. */

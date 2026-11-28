@@ -259,7 +259,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !treeOpen,
+            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !treeOpen && !playOpen,
             enter = fadeIn(Springs.ui()),
             exit = fadeOut(Springs.ui()),
         ) {
@@ -284,7 +284,11 @@ fun TesselApp(
 
         // Play with runs waiting asks first: a new one, or one of the saved ones. Drawn after the home
         // screen, or that would cover it.
-        Sheet(visible = playOpen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen, onDismiss = { playOpen = false }) {
+        // Full-screen run setup, not a bottom sheet; no obscured preview or overlapping home controls.
+        AnimatedVisibility(
+            visible = playOpen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen,
+            enter = fadeIn(Springs.ui()), exit = fadeOut(Springs.ui())
+        ) {
             PlayPanel(
                 saves = savedRuns,
                 difficulty = settings.difficulty,

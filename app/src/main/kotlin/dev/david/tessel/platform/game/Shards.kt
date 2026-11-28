@@ -28,10 +28,13 @@ class Shards(private val capacity: Int = 500) {
     private val color = IntArray(capacity)
     private val piece = IntArray(capacity)
     private var count = 0
+    var limit=capacity
+        set(value){field=value.coerceIn(0,capacity);if(count>field)count=field}
 
     private val rng = Rng(0x5EED_5A4DL)
 
     fun burst(shape: Shape, x: Float, y: Float, radius: Float, angle: Float, dirX: Float, dirY: Float, body: Int, facet: Int) {
+        if(count>=limit)return
         // Round bodies are drawn unrotated, so their pieces start unrotated too.
         val a = if (shape == Shape.CIRCLE) 0f else angle
         val c = cos(a)
@@ -47,7 +50,7 @@ class Shards(private val capacity: Int = 500) {
     }
 
     private fun emit(kind: Int, cx: Float, cy: Float, ox: Float, oy: Float, degrees: Float, scale: Float, tint: Int, dirX: Float, dirY: Float) {
-        if (count == capacity) return
+        if (count >= limit) return
         val i = count++
         val len = sqrt(ox * ox + oy * oy).coerceAtLeast(0.001f)
         val burst = rng.range(70f, 170f)
@@ -85,13 +88,15 @@ class Shards(private val capacity: Int = 500) {
 
     fun draw(canvas: Canvas, view: Viewport, paint: Paint) {
         for (i in 0 until count) {
+            val sx=view.screenX(x[i]);val sy=view.screenY(y[i]);val margin=size[i]*view.scale*PATH_UNIT
+            if(sx+margin<0f||sx-margin>canvas.width||sy+margin<0f||sy-margin>canvas.height)continue
             val t = age[i] / life[i]
             val shrink = 1f - 0.35f * t
             paint.color = color[i]
-            if (t > FADE_FROM) paint.alpha = (255 * (1f - (t - FADE_FROM) / (1f - FADE_FROM))).toInt()
+            paint.alpha=if(t>FADE_FROM)(255*(1f-(t-FADE_FROM)/(1f-FADE_FROM))).toInt().coerceIn(0,255) else 255
             val s = size[i] * view.scale * shrink
             canvas.save()
-            canvas.translate(view.screenX(x[i]), view.screenY(y[i]))
+            canvas.translate(sx,sy)
             canvas.rotate(rot[i])
             canvas.scale(s, s)
             canvas.drawPath(Bodies.piecePath[piece[i]], paint)

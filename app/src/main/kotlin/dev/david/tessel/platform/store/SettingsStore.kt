@@ -62,6 +62,17 @@ private fun decodeTweaks(s: String?): Map<Int, Tweak> = s.orEmpty().split(';').m
     k to Tweak(f[1].toFloatOrNull() ?: 1f, f[2].toFloatOrNull() ?: 1f, f[3].toIntOrNull() ?: 1)
 }.toMap()
 
+/** Presentation only. Presets never alter the fixed simulation or network rates. */
+enum class FpsLimit(val label:String,val fps:Int){ THIRTY("30",30), SIXTY("60",60), NATIVE("Display",0) }
+enum class EffectsQuality(val label:String,val particles:Int,val gridStep:Float){ LOW("Low",72,144f), MEDIUM("Medium",260,72f), HIGH("High",500,72f) }
+enum class PerformancePreset(val label:String,val fps:FpsLimit,val effects:EffectsQuality,val audio:Boolean,val menuAudio:Boolean,val vibration:Boolean,val shotVibration:Boolean,val volume:Int){
+    SAVER("Battery saver",FpsLimit.THIRTY,EffectsQuality.LOW,true,false,false,false,50),
+    CONTROLLED("Controlled",FpsLimit.SIXTY,EffectsQuality.MEDIUM,true,true,true,false,75),
+    HIGH("High quality",FpsLimit.NATIVE,EffectsQuality.HIGH,true,true,true,true,75);
+    fun apply(s:Settings)=s.copy(fpsLimit=fps,effectsQuality=effects,sound=audio,menuSounds=menuAudio,vibration=vibration,shotVibration=shotVibration,soundVolume=volume)
+    fun matches(s:Settings)=apply(s)==s
+}
+
 data class Settings(
     val difficulty: Difficulty = Difficulty.NORMAL,
     val stickSize: StickSize = StickSize.MEDIUM,
@@ -83,6 +94,8 @@ data class Settings(
     val cameraZoom: Float = 1.60f,
     val soundVolume: Int = 75,
     val menuSounds: Boolean = true,
+    val fpsLimit:FpsLimit=FpsLimit.SIXTY,
+    val effectsQuality:EffectsQuality=EffectsQuality.MEDIUM,
 )
 
 /** Settings in one small preferences file. Writes happen off the main thread. */
@@ -106,6 +119,8 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_SOUND, next.sound)
             .putInt("sound_volume", next.soundVolume.coerceIn(0,100))
             .putBoolean("menu_sounds", next.menuSounds)
+            .putString("fps_limit",next.fpsLimit.name)
+            .putString("effects_quality",next.effectsQuality.name)
             .putBoolean(KEY_STATS, next.showStats)
             .putBoolean(KEY_LINK, next.showLink)
             .putInt(KEY_BREAK, next.breakEvery)
@@ -138,6 +153,8 @@ class SettingsStore(context: Context) {
         sound = prefs.getBoolean(KEY_SOUND, true),
         soundVolume = prefs.getInt("sound_volume",75).coerceIn(0,100),
         menuSounds = prefs.getBoolean("menu_sounds",true),
+        fpsLimit=enumOr(prefs.getString("fps_limit",null),FpsLimit.SIXTY),
+        effectsQuality=enumOr(prefs.getString("effects_quality",null),EffectsQuality.MEDIUM),
         showStats = prefs.getBoolean(KEY_STATS, debuggable),
         showLink = prefs.getBoolean(KEY_LINK, true),
         breakEvery = prefs.getInt(KEY_BREAK, 0).coerceIn(0, MAX_BREAK_MINUTES),
