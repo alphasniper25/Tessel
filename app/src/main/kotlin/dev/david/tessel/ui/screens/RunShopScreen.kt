@@ -415,6 +415,16 @@ private fun MarketCanvas(items:List<MarketItem>,selected:Int,inspect:(Int)->Unit
             val center=Offset(camera.sx(0f,w,h),camera.sy(0f,w,h))
             // No floating text or decorative grid. Only same-type upgrade
             // rank paths have links; skills and perks remain line-free.
+            if(tag=="upgrade-map"){
+                // Every independent track is rooted at the tank. Draw behind nodes.
+                for(n in items.filter{it.ranks.isNotEmpty()}){
+                    val first=n.ranks.first()
+                    val at=Offset(camera.sx(first.x,w,h),camera.sy(first.y,w,h))
+                    val active=n.rankOwned>0||n.rolls.any{it.affordable}
+                    drawLine(n.tint.copy(alpha=if(active).65f else .24f),center,at,
+                        strokeWidth=if(active)1.8.dp.toPx() else 1.dp.toPx())
+                }
+            }
             treeTank(art,center,(78f*scale).coerceIn(13.dp.toPx(),48.dp.toPx()),character,look,frame,c.ink,c.ground,c.accent)
             for(n in items){
                 val at=pos(n)
