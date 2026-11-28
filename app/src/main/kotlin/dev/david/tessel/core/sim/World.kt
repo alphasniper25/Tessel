@@ -177,6 +177,15 @@ class World(seed: Long = 1L) {
         shop.open(this)
     }
 
+    fun devFinish(won:Boolean){
+        require(playerCount==1&&!duel.on)
+        enemies.clear();hostile.clear();bullets.clear();coins.clear();droneWing.clear()
+        boss=-1;bossDue=-1;shownBossType=-1;core.reset();events.clear()
+        victory=won
+        if(won)stage=50 else players.hp[0]=0
+        phase=Phase.OVER
+    }
+
     /** Developer option: perks the player starts with. */
     fun devPerks(ids: Set<Int>) {
         for (k in ids) {

@@ -202,7 +202,7 @@ class PlayDialogTest {
         compose.onNodeWithText("Continue").performClick()
         waitForMode(Mode.SHOP);compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Next Stage").assertIsDisplayed()
-        compose.onNodeWithText("Skill Tree").performClick()
+        compose.onNodeWithText("Skills").performClick()
         compose.mainClock.advanceTimeBy(1000)
         tapSkill(0)
         val cost=SkillGraph.nodes[0].price
@@ -220,7 +220,7 @@ class PlayDialogTest {
         compose.onNodeWithText("×").performClick()
         tapSkill(3)
         compose.onNodeWithText("Triple Refresh").assertDoesNotExist()
-        compose.onNodeWithText("Shop").performClick()
+        compose.onNodeWithText("Upgrades").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Next Stage").assertIsDisplayed()
     }

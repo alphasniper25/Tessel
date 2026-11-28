@@ -49,7 +49,7 @@ import dev.david.tessel.platform.store.Settings
 import dev.david.tessel.platform.update.Updater
 import dev.david.tessel.ui.screens.HomeScreen
 import dev.david.tessel.ui.screens.SettingsScreen
-import dev.david.tessel.ui.screens.ShopPanel
+import dev.david.tessel.ui.screens.RunShopScreen
 import dev.david.tessel.ui.screens.PausePanel
 import dev.david.tessel.ui.screens.RunOverCard
 import dev.david.tessel.ui.screens.SavedGame
@@ -235,7 +235,7 @@ class Screenshots {
         scene.play(14f)
         val arena = draw(scene, Palette.Dark)
         val stage = 6
-        val picks = intArrayOf(Upgrades.FIRE_RATE, Upgrades.MULTISHOT, Upgrades.DAMAGE, Upgrades.PIERCE, Upgrades.SPEED)
+        val picks = intArrayOf(Upgrades.FIRE_RATE, Upgrades.MAX_HEALTH, Upgrades.DAMAGE, Upgrades.PIERCE, Upgrades.SPEED)
         val levels = intArrayOf(4, 1, 3, 0, 2)
         val coins = 418
         scene.world.players.coins[0] = coins
@@ -243,7 +243,7 @@ class Screenshots {
             val u = picks[k]
             val def = Upgrades.of(u)
             val price = Upgrades.price(u, levels[k], stage)
-            ShopOffer(k, def.name, def.blurb, levels[k], def.maxLevel, price, maxed = false, affordable = price <= coins)
+            ShopOffer(k, def.name, def.blurb, levels[k], def.maxLevel, price, maxed = false, affordable = price <= coins,upgradeId=u)
         }
         val shop = ShopView(
             stage = stage, coins = coins, hp = 4, maxHp = 7, offers = offers,
@@ -254,9 +254,8 @@ class Screenshots {
             TesselTheme {
                 Box(Modifier.fillMaxSize()) {
                     Image(arena.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-                    Sheet(visible = true, onDismiss = null) {
-                        ShopPanel(shop, vibrate = false, onBuy = {}, onHeal = {}, onReroll = {}, onNext = {})
-                    }
+                    RunShopScreen(shop,false,{}, {}, {}, {}, {}, {_,_->}, {}, {},
+                        {}, {_,_->}, {_,_->}, {_,_->})
                 }
             }
         }

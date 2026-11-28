@@ -43,6 +43,12 @@ import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.dev.DevScenario
 import dev.david.tessel.core.dev.DevReward
+import dev.david.tessel.core.content.Difficulty
+import dev.david.tessel.core.content.CharacterDef
+import dev.david.tessel.core.audio.Synth
+import dev.david.tessel.platform.game.ShopView
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -82,8 +88,14 @@ fun DevScreen(
     onChange: ((Settings) -> Settings) -> Unit,
     onBreakNow: () -> Unit,
     onTutorial: () -> Unit,
-    onStartRun: (DevScenario) -> Unit,
-    onStartShop: (DevScenario)->Unit,
+    onStartRun: (Difficulty,DevScenario) -> Unit,
+    onStartShop: (Difficulty,DevScenario)->Unit,
+    onResult:(Difficulty,DevScenario,Boolean)->Unit,
+    onSound:(Synth.Sound)->Unit,
+    onHaptic:(Int)->Unit,
+    liveShop:ShopView?=null,
+    onWallet:(Int,Int)->Unit={_,_->},
+    backLabel:String="Settings",
     sandbox:Boolean=false,
     onBack: () -> Unit,
 ) {
@@ -92,13 +104,15 @@ fun DevScreen(
     val dev = settings.dev
     fun change(next: (Dev) -> Dev) = onChange { it.copy(dev = next(it.dev)) }
     var exported by remember { mutableStateOf<String?>(null) }
+    var difficulty by remember { mutableStateOf(settings.difficulty) }
+    var character by remember { mutableStateOf(settings.tankClass) }
     var frame by remember { mutableStateOf(TankEvolution.BASIC) }
     var skillMask by remember { mutableStateOf(0L) }
     var health by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf(listOf(-1,-1,-1)) }
     var reward by remember { mutableStateOf(DevReward.AUTO) }
     var allMissions by remember { mutableStateOf(true) }
-    fun scenario()=DevScenario(frame,skillMask,health.toIntOrNull()?:-1,stock,reward,allMissions)
+    fun scenario()=DevScenario(frame,skillMask,health.toIntOrNull()?:-1,stock,reward,allMissions,character)
 
     Column(
         Modifier
@@ -107,13 +121,13 @@ fun DevScreen(
             .windowInsetsPadding(WindowInsets.displayCutout),
     ) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
-            BackButton("Settings", onBack, Modifier.align(Alignment.CenterStart))
+            BackButton(backLabel, onBack, Modifier.align(Alignment.CenterStart))
             Text("Developer Options", Type.headline, c.ink, Modifier.align(Alignment.Center))
         }
         if(!inRun||sandbox){
             Row(Modifier.fillMaxWidth().padding(horizontal=Space.x4,vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                PrimaryButton("Open Shop Preview",{onStartShop(scenario())},Modifier.weight(1f))
-                SecondaryButton("Try a Run With These",{onStartRun(scenario())},Modifier.weight(1f))
+                PrimaryButton("Open Shop Preview",{onStartShop(difficulty,scenario())},Modifier.weight(1f))
+                SecondaryButton("Try a Run With These",{onStartRun(difficulty,scenario())},Modifier.weight(1f))
             }
         }else Text("Leave the normal run to start a developer sandbox.",Type.footnote,c.ink2,Modifier.padding(horizontal=Space.x4))
         Column(
@@ -124,10 +138,27 @@ fun DevScreen(
                 Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(top = Space.x2),
                 verticalArrangement = Arrangement.spacedBy(Space.x6),
             ) {
+                if(liveShop?.devPreview==true){
+                    Group("Live shop state",footer="Updates the currently open test shop, without restarting it."){
+                        var coins by remember(liveShop.coins){mutableStateOf(liveShop.coins.toString())}
+                        var hp by remember(liveShop.hp){mutableStateOf(liveShop.hp.toString())}
+                        Column(Modifier.padding(Space.x3),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                            Text("Coins",Type.subhead,c.ink);NumberEntry(coins,{coins=it},Modifier.fillMaxWidth())
+                            Text("HP / ${liveShop.maxHp}",Type.subhead,c.ink);NumberEntry(hp,{hp=it},Modifier.fillMaxWidth())
+                            PrimaryButton("Apply live wallet & HP",{onWallet(coins.toIntOrNull()?:0,hp.toIntOrNull()?:1)},Modifier.fillMaxWidth())
+                        }
+                    }
+                }
                 Group(
                     "Solo Trial",
                     footer = "These only reach an explicit developer trial or shop preview. Play on the home screen is always a normal run. A team never gets them. A trial run is not saved, not counted and not in the logbook.",
                 ) {
+                    Column(Modifier.padding(Space.x3),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text("Difficulty",Type.subhead,c.ink)
+                        Segmented(Difficulty.entries.map{it.label},difficulty.ordinal,{difficulty=Difficulty.entries[it]})
+                        Text("Starting passive",Type.subhead,c.ink)
+                        Segmented(CharacterDef.entries.map{it.label},character.ordinal,{character=CharacterDef.entries[it]})
+                    }
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Space.x4, vertical = Space.x2),
                         verticalAlignment = Alignment.CenterVertically,
@@ -198,7 +229,7 @@ fun DevScreen(
                                 Text(def.blurb, Type.footnote, c.ink3, maxLines = 1)
                             }
                             Nudge("-1") { set(level - 1) }
-                            Text("$level", Type.headline.merge(Type.numbers), c.ink, Modifier.width(44.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
+                            NumberEntry(level.toString(),{set(it.toIntOrNull()?:0)},Modifier.width(58.dp))
                             Nudge("+1") { set(level + 1) }
                             Nudge("Max") { set(def.maxLevel) }
                         }
@@ -251,6 +282,30 @@ fun DevScreen(
                 }
                 Group("Enemies and bosses"){
                     DevEnemyOptions(settings,onChange)
+                }
+                Group("Screen & feedback tests"){
+                    if(!inRun||sandbox){
+                        Row(Modifier.padding(Space.x3),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            SecondaryButton("Victory screen",{onResult(difficulty,scenario(),true)},Modifier.weight(1f))
+                            SecondaryButton("Defeat screen",{onResult(difficulty,scenario(),false)},Modifier.weight(1f))
+                        }
+                    }
+                    Column(Modifier.padding(Space.x3),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                        Text("Audio cues",Type.headline,c.ink)
+                        for(row in Synth.Sound.entries.chunked(3)){
+                            Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                                for(sound in row)SecondaryButton(sound.name.replace('_',' '),{onSound(sound)},Modifier.weight(1f))
+                                repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                            }
+                        }
+                        Text("Haptic feedback",Type.headline,c.ink)
+                        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                            SecondaryButton("Shot",{onHaptic(0)},Modifier.weight(1f))
+                            SecondaryButton("Hit",{onHaptic(1)},Modifier.weight(1f))
+                            SecondaryButton("Down",{onHaptic(2)},Modifier.weight(1f))
+                        }
+                        Text("Audio and vibration respect your current settings.",Type.caption,c.ink2)
+                    }
                 }
                 Group("Tools", footer = exported) {
                     ActionLine("Export Log", "Writes a text file and opens the share sheet.") {
@@ -326,7 +381,7 @@ private fun Nudge(label: String, onClick: () -> Unit) {
 @Composable
 private fun NumberEntry(value:String,onChange:(String)->Unit,modifier:Modifier=Modifier){
     val c=Theme.colors
-    BasicTextField(value,{raw->onChange(raw.filter{it.isDigit()}.take(9))},singleLine=true,
+    BasicTextField(value,{raw->onChange(raw.filter{it.isDigit()}.take(9))},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),
         textStyle=Type.body.copy(color=c.ink),cursorBrush=SolidColor(c.accent),
         modifier=modifier.clip(RoundedCornerShape(8.dp)).background(c.track).padding(8.dp))
 }

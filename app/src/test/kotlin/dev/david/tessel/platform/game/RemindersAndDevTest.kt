@@ -273,4 +273,31 @@ class RemindersAndDevTest {
         settle()
         compose.onNodeWithText("Try a Run With These").performScrollTo().assertExists()
     }
+
+    @Test
+    fun directShopPreviewIsIsolatedEvenWithoutCheats(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=true,dev=Dev(startStage=17,startCoins=500))}
+        settle(400)
+        game.startDevShop(Difficulty.NORMAL,dev.david.tessel.core.dev.DevScenario(reward=dev.david.tessel.core.dev.DevReward.NONE))
+        waitForMode(Mode.SHOP)
+        assertEquals(17,game.shop.value?.stage)
+        assertEquals(500,game.shop.value?.coins)
+        assertTrue(game.shop.value?.devPreview==true)
+        assertTrue(saves.saves.value.isEmpty())
+        game.leaveRun()
+        waitForMode(Mode.HOME)
+        assertTrue(saves.saves.value.isEmpty())
+    }
+
+    @Test
+    fun lockedDeveloperCannotStartPreview(){
+        launch(seen=true)
+        store.update{it.copy(devUnlocked=false)}
+        settle(400)
+        game.startDevShop(Difficulty.NORMAL)
+        settle(400)
+        assertEquals(Mode.HOME,game.mode.value)
+        assertEquals(null,game.shop.value)
+    }
 }

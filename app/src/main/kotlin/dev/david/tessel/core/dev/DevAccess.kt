@@ -17,6 +17,8 @@ object DevAccess {
 class TapCounter {
     private var count = 0
 
+    fun reset(){count=0}
+
     fun tap() {
         count++
     }
