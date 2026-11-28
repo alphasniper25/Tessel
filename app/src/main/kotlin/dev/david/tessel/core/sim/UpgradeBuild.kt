@@ -4,6 +4,8 @@ import dev.david.tessel.core.content.*
 import java.util.Locale
 import kotlin.math.roundToInt
 
+data class PurchasedUpgrade(val node:UpgradeNode,val sector:UpgradeSector,val title:String,val rank:Int,val effect:String)
+
 /** Immutable per-player projection; UI cannot mutate the authoritative World. */
 data class UpgradeBuild(val frame:TankEvolution=TankEvolution.BASIC,
     val character:CharacterDef=CharacterDef.BALANCED,val look:TankLook=TankLook(),
@@ -15,6 +17,14 @@ data class UpgradeBuild(val frame:TankEvolution=TankEvolution.BASIC,
         private fun f(v:Float)=String.format(Locale.US,"%.2f",v).trimEnd('0').trimEnd('.')
     }
     fun perks()=(0 until SkillTree.ORIGINAL_PERKS).filter{perkMask and (1 shl it)!=0}
+    /** A rank summary is computed from owned levels, never from revealed nodes. */
+    fun purchased():List<PurchasedUpgrade> = UpgradeTree.lanes.mapNotNull{lane->
+        val rank=levels.getOrElse(lane.upgrade){0}
+        if(rank<=0)return@mapNotNull null
+        val node=UpgradeTree.node(lane.upgrade,rank.coerceAtMost(lane.ranks))?:return@mapNotNull null
+        PurchasedUpgrade(node,UpgradeTree.sector(node,frame),UpgradeTree.title(node,frame),rank,
+            UpgradeTree.effect(node,frame)+" per rank")
+    }
     fun stats():List<ArsenalStat>{
         val p=PlayerState().apply{
             reset(1)

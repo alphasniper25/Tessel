@@ -72,7 +72,7 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(Space.x2))
             Text("TESSEL", Type.largeTitle, c.ink)
-            Text("ARENA SURVIVAL  /  ALPHA 17",Type.caption,c.accent)
+            Text("ARENA SURVIVAL  /  ALPHA 18",Type.caption,c.accent)
             Spacer(Modifier.height(Space.x2))
             val best = ledger.bestOverall()
             val line = if (best == null) {

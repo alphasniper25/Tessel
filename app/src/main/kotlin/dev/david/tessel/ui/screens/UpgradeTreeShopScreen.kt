@@ -9,7 +9,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -90,10 +90,6 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
         if(w>0f&&h>0f)camera=camera.gesture(layout,w,h,w/2,h/2,0f,0f,factor)
     }
     fun select(id:Int){if(currentLayout.point(id)!=null&&UpgradeTree.discovery(UpgradeTree.nodes[id],currentBuild.levels)!=UpgradeDiscovery.HIDDEN){selected=id;specs=false}}
-    fun jump(sector:UpgradeSector){
-        val p=points.firstOrNull{UpgradeTree.sector(it.node,build.frame)==sector}?:return
-        if(viewport.width>0&&viewport.height>0)camera=camera.focus(layout,viewport.width.toFloat(),viewport.height.toFloat(),p)
-    }
     LaunchedEffect(layout){selected=-1;specs=false}
     LaunchedEffect(build.levels,pending){
         if(pending>=0){val n=UpgradeTree.nodes[pending];if(build.levels[n.upgrade]<n.rank)delay(1600L);pending=-1}
@@ -107,13 +103,8 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
             BackButton(if(shop!=null)"Exit" else backLabel,{if(shop!=null)confirmExit=true else onBack()})
             Text(if(shop!=null)"Stage $stage" else build.frame.label,Type.subhead,c.ink,Modifier.weight(1f),maxLines=1)
             if(infinite)Text("∞",Type.headline,c.coin) else if(shop!=null||backLabel!="Home")CoinAmount(coins,style=Type.headline)
-            SecondaryButton("Specs",{specs=!specs;selected=-1})
+            SecondaryButton("Stats",{specs=!specs;selected=-1},enabled=!confirmExit)
             if(shop!=null)PrimaryButton(if(ready)"Waiting" else if(shop.coop)"Ready" else "Next Stage",onNext,enabled=!hasReward&&!ready)
-        }
-        Row(Modifier.fillMaxWidth().heightIn(min=38.dp).horizontalScroll(rememberScrollState()),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)){
-            Text("$owned / ${points.size} ranks",Type.caption,c.ink2,Modifier.padding(horizontal=4.dp))
-            if(shop!=null)MapControl("Repair +${shop.healAmount} · ${shop.healPrice}",onHeal,shop.canHeal&&!ready&&!hasReward)
-            for(region in layout.regions)MapControl(region.sector.title,{jump(region.sector)},true)
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(bottom=4.dp).clip(RoundedCornerShape(10.dp)).background(c.surface)){
             val wide=maxWidth>=580.dp
@@ -139,67 +130,74 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
                 while(gx<w){drawLine(c.ink.copy(alpha=.035f),Offset(gx,0f),Offset(gx,h));gx+=step}
                 var gy=((center.y%step)+step)%step
                 while(gy<h){drawLine(c.ink.copy(alpha=.035f),Offset(0f,gy),Offset(w,gy));gy+=step}
-                for(p in points){
-                    val parent=UpgradeTree.prerequisite(p.node)?.let{layout.point(it.id)}
-                    if(parent!=null){
-                        val a=pos(parent);val b=pos(p)
-                        val own=states[p.node.id]==UpgradeDiscovery.OWNED
-                        val revealed=states[p.node.id]!=UpgradeDiscovery.HIDDEN
-                        val tint=if(revealed)upgradeTint(UpgradeTree.sector(p.node,build.frame),c.dark) else c.ink
-                        val stroke=if(own)2.dp.toPx() else 1.dp.toPx()
-                        val color=tint.copy(alpha=if(own).9f else if(revealed).55f else .10f)
-                        if(parent.y==p.y)drawLine(color,a,b,stroke)
-                        else {val elbow=Offset(b.x-40f*scale,a.y);val lower=Offset(elbow.x,b.y);drawLine(color,a,elbow,stroke);drawLine(color,elbow,lower,stroke);drawLine(color,lower,b,stroke)}
-                    }
+                // The original elliptical constellation language: a center
+                // hub, subtle orbit rings and real links growing outward.
+                for(r in layout.rings)drawOval(c.ink.copy(alpha=.055f),
+                    topLeft=pos(-r*UpgradeMapLayout.ASPECT_X,-r*UpgradeMapLayout.ASPECT_Y),
+                    size=Size(2*r*UpgradeMapLayout.ASPECT_X*scale,2*r*UpgradeMapLayout.ASPECT_Y*scale),style=Stroke(1.dp.toPx()))
+                for(link in layout.links){
+                    val p=layout.point(link.to)?:continue
+                    val parent=link.from?.let{layout.point(it)}
+                    val a=parent?.let{pos(it)}?:center
+                    val b=pos(p)
+                    val own=states[p.node.id]==UpgradeDiscovery.OWNED
+                    val frontier=states[p.node.id]!=UpgradeDiscovery.HIDDEN
+                    val tint=if(frontier)upgradeTint(UpgradeTree.sector(p.node,build.frame),c.dark) else c.ink
+                    drawLine(tint.copy(alpha=if(own).92f else if(frontier).58f else .14f),a,b,
+                        strokeWidth=if(own)2.2.dp.toPx() else 1.dp.toPx())
                 }
+                val hr=(29f*scale).coerceIn(7.dp.toPx(),24.dp.toPx())
+                drawCircle(c.ground,hr+2.dp.toPx(),center)
+                drawCircle(c.accent,hr,center,style=Stroke(1.7.dp.toPx()))
+                drawCircle(c.accent,hr*.27f,center)
                 for(region in layout.regions){
-                    val at=pos(-layout.width*.5f+35f,region.y)
-                    if(at.y in 0f..h){
-                        paint.color=upgradeTint(region.sector,c.dark).toArgb();paint.textAlign=Paint.Align.LEFT
-                        paint.textSize=(20f*scale).coerceIn(9.dp.toPx(),15.dp.toPx())
-                        drawContext.canvas.nativeCanvas.drawText(region.sector.title.uppercase(),maxOf(5f,at.x),at.y,paint)
-                    }
-                }
-                for(label in layout.labels){
-                    val root=UpgradeTree.node(label.lane.upgrade,1)!!
-                    if(states[root.id]==UpgradeDiscovery.HIDDEN)continue
-                    val at=pos(label.x,label.y)
-                    if(at.x in 0f..w&&at.y in 0f..h&&scale*104f>=25.dp.toPx()){
-                        paint.textAlign=Paint.Align.LEFT;paint.color=c.ink2.toArgb();paint.textSize=(18f*scale).coerceIn(9.dp.toPx(),13.dp.toPx())
-                        drawContext.canvas.nativeCanvas.drawText(UpgradeTree.title(root,build.frame),at.x-10.dp.toPx(),at.y,paint)
+                    val at=pos(region.x,region.y)
+                    if(at.x in 0f..w&&at.y in 0f..h){
+                        paint.color=upgradeTint(region.sector,c.dark).copy(alpha=.86f).toArgb()
+                        paint.textAlign=Paint.Align.CENTER;paint.textSize=9.dp.toPx()
+                        val label=region.sector.title.uppercase()
+                        val half=paint.measureText(label)*.5f
+                        val x=at.x.coerceIn(half+3f,maxOf(half+3f,w-half-3f))
+                        val dy=if(region.y<0)-10.dp.toPx() else 14.dp.toPx()
+                        val y=(at.y+dy).coerceIn(paint.textSize+2f,maxOf(paint.textSize+2f,h-3f))
+                        drawContext.canvas.nativeCanvas.drawText(label,x,y,paint)
                     }
                 }
                 for(p in points){
                     val at=pos(p);val n=p.node
-                    val r=(30f*scale).coerceIn(3.2.dp.toPx(),27.dp.toPx())
+                    val r=(22f*scale).coerceIn(3.dp.toPx(),27.dp.toPx())
                     if(at.x+r<0||at.x-r>w||at.y+r<0||at.y-r>h)continue
                     val state=states[n.id]
                     if(state==UpgradeDiscovery.HIDDEN){
-                        drawCircle(c.ink.copy(alpha=.13f),r*.70f,at,style=Stroke(1.dp.toPx()))
-                        drawCircle(c.ink.copy(alpha=.15f),r*.13f,at);continue
+                        drawCircle(c.ink.copy(alpha=.17f),r*.76f,at,style=Stroke(1.dp.toPx()))
+                        drawCircle(c.ink.copy(alpha=.20f),r*.14f,at);continue
                     }
                     val own=state==UpgradeDiscovery.OWNED
                     val affordable=canSpend&&UpgradeTree.eligible(n,build.frame,build.lastEvolution,stage,build.levels)&&(infinite||coins>=UpgradeTree.price(n,stage,build.character,build.perkMask))
                     val tint=upgradeTint(UpgradeTree.sector(n,build.frame),c.dark)
-                    val radius=maxOf(r,5.dp.toPx())
+                    val radius=if(n.rank==1&&n.lane.parent<0)maxOf(r,7.dp.toPx()) else maxOf(r,4.5.dp.toPx())
                     if(n.id==selected)drawCircle(tint.copy(alpha=.22f),radius+4.dp.toPx(),at)
                     drawCircle(if(own)tint else if(affordable)tint.copy(alpha=.18f) else c.ground,radius,at)
                     drawCircle(tint.copy(alpha=if(own||affordable||n.id==selected)1f else .62f),radius,at,style=Stroke(if(n.id==selected)2.dp.toPx() else 1.2.dp.toPx()))
                     skillGlyph(glyph(n),at,radius*.55f,if(own)c.ground else tint)
-                    if(scale*104f>=35.dp.toPx()){
+                    if(scale*UpgradeMapLayout.MIN_SPACING>=30.dp.toPx()){
                         paint.textAlign=Paint.Align.CENTER;paint.color=c.ink2.toArgb();paint.textSize=9.dp.toPx()
                         drawContext.canvas.nativeCanvas.drawText(n.rank.toString(),at.x,at.y+radius+12.dp.toPx(),paint)
                     }
                 }
             }
             Row(Modifier.align(Alignment.TopStart).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically){
-                MapControl("−",{resize(.72f)});MapControl("+",{resize(1.38f)});MapControl("Fit",{camera=UpgradeMapCamera()})
+                MapControl("−",{resize(.75f)});MapControl("+",{resize(1.33f)});MapControl("Fit",{camera=UpgradeMapCamera()})
                 Text("${(camera.zoom*100).roundToInt()}%",Type.caption,c.ink2)
             }
             Column(Modifier.align(Alignment.BottomStart).padding(6.dp)){
-                Text("$discovered / ${points.size} discovered",Type.caption,c.ink2)
+                Text("$owned / ${points.size} unlocked · $discovered discovered",Type.caption,c.ink2)
                 Text(if(build.frame==TankEvolution.BASIC&&build.lastEvolution<5)"Specialization revealed after your stage 5 choice" else "Tap a revealed node · drag or pinch",Type.caption,c.ink3)
             }
+            if(shop!=null&&!specs&&selectedNode==null&&!hasReward&&!confirmExit)
+                Row(Modifier.align(Alignment.BottomEnd).padding(6.dp),verticalAlignment=Alignment.CenterVertically){
+                    MapControl("Repair +${shop.healAmount} · ${shop.healPrice}",onHeal,shop.canHeal&&!ready)
+                }
             val panelMod=if(wide)Modifier.align(Alignment.CenterEnd).padding(5.dp).width(300.dp).fillMaxHeight(.97f)
                 else Modifier.align(Alignment.BottomCenter).padding(5.dp).fillMaxWidth().fillMaxHeight(.82f)
             if(selectedNode!=null&&!specs&&!hasReward&&!confirmExit){
@@ -216,14 +214,32 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
                     PrimaryButton(if(own)"Unlocked" else if(infinite)"Unlock · ∞" else "Unlock · $price",{if(buy){pending=n.id;onBuy(n.id)}},Modifier.fillMaxWidth(),enabled=buy)
                 }
             }
-            if(specs&&!hasReward&&!confirmExit){
-                MapPanel(panelMod,"Current build",{specs=false}){
+            if(specs&&!confirmExit){
+                MapPanel(if(wide)Modifier.align(Alignment.CenterEnd).padding(5.dp).width(340.dp).fillMaxHeight(.97f) else panelMod,"Current build",{specs=false}){
                     Row(verticalAlignment=Alignment.CenterVertically){
                         TankPreview(build.character,build.look,Modifier.size(68.dp),build.frame)
                         Column(Modifier.weight(1f)){Text(build.frame.label,Type.title3,c.ink);Text(build.character.label,Type.caption,c.ink2)}
                     }
                     for(stat in remember(build){build.stats()})Row(Modifier.fillMaxWidth().padding(vertical=2.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)){
                         Text(stat.label,Type.footnote,c.ink2,Modifier.weight(1f));Text(stat.value,Type.subhead,c.ink)
+                    }
+                    Divider()
+                    Text("Purchased upgrades",Type.headline,c.ink)
+                    val purchases=remember(build){build.purchased()}
+                    if(purchases.isEmpty())Text("No upgrades purchased yet",Type.footnote,c.ink2)
+                    for(purchase in purchases){
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            Canvas(Modifier.size(28.dp)){
+                                val tint=upgradeTint(purchase.sector,c.dark)
+                                drawCircle(tint.copy(alpha=.14f),size.minDimension*.47f)
+                                skillGlyph(glyph(purchase.node),center,size.minDimension*.25f,tint)
+                            }
+                            Column(Modifier.weight(1f)){
+                                Text(purchase.title,Type.subhead,c.ink)
+                                Text(purchase.effect,Type.caption,c.ink2)
+                            }
+                            Text("Rank ${purchase.rank}",Type.footnote,c.accent)
+                        }
                     }
                     Divider()
                     Text("Perks",Type.headline,c.ink)
@@ -237,7 +253,7 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
                     Text("Stats use current ranks and permanent perks; temporary combat effects may differ.",Type.caption,c.ink3)
                 }
             }
-            if(hasReward&&!confirmExit){
+            if(hasReward&&!confirmExit&&!specs){
                 val evolution=shop!!.perkOffers.any{it.evolution!=null}
                 Box(Modifier.fillMaxSize().background(c.ground.copy(alpha=.86f)).pointerInput(Unit){detectTapGestures{}}){
                     Column(Modifier.align(Alignment.Center).widthIn(max=760.dp).fillMaxWidth(.94f).fillMaxHeight().padding(10.dp)){
@@ -269,7 +285,7 @@ fun UpgradeTreeShopScreen(stage:Int,build:UpgradeBuild,coins:Int,shop:ShopView?=
 @Composable
 private fun MapControl(label:String,onClick:()->Unit,enabled:Boolean=true){
     val c=Theme.colors
-    Box(Modifier.heightIn(min=36.dp).widthIn(min=40.dp).clip(RoundedCornerShape(7.dp)).background(c.track)
+    Box(Modifier.heightIn(min=44.dp).widthIn(min=44.dp).clip(RoundedCornerShape(7.dp)).background(c.track)
         .clickable(enabled=enabled,onClick=onClick).padding(horizontal=9.dp,vertical=5.dp),contentAlignment=Alignment.Center){
         Text(label,Type.footnote,if(enabled)c.ink else c.ink3,maxLines=1)
     }
