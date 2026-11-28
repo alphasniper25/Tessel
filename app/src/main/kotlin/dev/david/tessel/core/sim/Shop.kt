@@ -6,6 +6,7 @@ import dev.david.tessel.core.content.CardFamily
 import dev.david.tessel.core.content.CardCode
 import dev.david.tessel.core.content.CardRarity
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
 import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.SkillBonus
@@ -133,6 +134,16 @@ class Shop {
         return true
     }
 
+    /** Debug fixture only; caller must be an isolated solo trial. A forced
+     * offer still goes through the normal buy eligibility and price checks. */
+    fun devStock(w:World,id:Int,slot:Int,tier:CardRarity):Boolean{
+        if(slot !in 0 until SHOP_SLOTS || id !in 0 until Upgrades.count)return false
+        if(!Upgrades.availableAt(id,w.stage)||!Upgrades.offered(id,w.players.evolution[0])||!CardMission.eligible(id,w.players.missionMask[0],tier))return false
+        for(k in 0 until SHOP_SLOTS)if(k!=slot&&item(0,k)==id){stock[0][k]=-1;locks[0][k]=false;quotes[0][k]=0}
+        stock[0][slot]=CardCode.pack(id,tier);locks[0][slot]=false;quotes[0][slot]=0
+        return true
+    }
+    fun devRefreshRewards(w:World){offerPerks(w,0)}
     fun item(p: Int, slot: Int) = CardCode.item(stock.getOrNull(p)?.getOrNull(slot) ?: -1)
     fun raw(p: Int, slot: Int) = stock[p][slot]
     fun rarity(p: Int, slot: Int) = CardCode.tier(raw(p, slot))
@@ -195,7 +206,7 @@ class Shop {
 
     fun healPrice(w: World,p:Int=0) = (Upgrades.healPrice(w.stage)*(1.0-w.players.skill(p,SkillBonus.HEAL_DISCOUNT)*.01)).roundToInt().coerceAtLeast(1)
 
-    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + Upgrades.delta(w.players.levels[p], UpgradeStat.HEAL).toInt() + w.players.skill(p,SkillBonus.HEAL_POWER)
+    fun healAmount(w: World, p: Int) = Upgrades.HEAL_AMOUNT + Upgrades.delta(w.players.levels[p], UpgradeStat.HEAL).toInt() + w.players.skill(p,SkillBonus.HEAL_POWER) + if(PerkCombo.MEDIC.active(w.players.perks[p]))1 else 0
 
     fun healsLeft(p: Int) = Upgrades.HEALS_PER_SHOP - heals[p]
 

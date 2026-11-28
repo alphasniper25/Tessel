@@ -36,6 +36,10 @@ data class Dev(
     val invincible: Boolean = false,
     val noSpawns: Boolean = false,
     val speed: Float = 1f,
+    val frame:Int=0,
+    val skills:Long=0L,
+    val startHp:Int=-1,
+    val allMissions:Boolean=true,
 ) {
     val active get() = this != Dev()
 
@@ -137,6 +141,10 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_DEV_INVINCIBLE, next.dev.invincible)
             .putBoolean(KEY_DEV_NO_SPAWNS, next.dev.noSpawns)
             .putFloat(KEY_DEV_SPEED, next.dev.speed)
+            .putInt("dev_frame",next.dev.frame)
+            .putLong("dev_skills",next.dev.skills)
+            .putInt("dev_hp",next.dev.startHp)
+            .putBoolean("dev_all_missions",next.dev.allMissions)
             .putString("tank_class", next.tankClass.name)
             .putInt("cosmetic_owned", next.cosmeticOwned)
             .putString("tank_look", next.tankLook.encode())
@@ -176,11 +184,15 @@ class SettingsStore(context: Context) {
                 val n = f.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
                 id to n
             }.toMap(),
-            startStage = prefs.getInt(KEY_DEV_STAGE, 1).coerceIn(1, 99),
+            startStage = prefs.getInt(KEY_DEV_STAGE, 1).coerceIn(1, 50),
             startCoins = prefs.getInt(KEY_DEV_COINS, 0).coerceAtLeast(0),
             invincible = prefs.getBoolean(KEY_DEV_INVINCIBLE, false),
             noSpawns = prefs.getBoolean(KEY_DEV_NO_SPAWNS, false),
             speed = prefs.getFloat(KEY_DEV_SPEED, 1f).takeIf { it in DEV_SPEEDS } ?: 1f,
+            frame=prefs.getInt("dev_frame",0),
+            skills=prefs.getLong("dev_skills",0L),
+            startHp=prefs.getInt("dev_hp",-1),
+            allMissions=prefs.getBoolean("dev_all_missions",true),
         ),
     )
 
@@ -198,7 +210,7 @@ class SettingsStore(context: Context) {
         const val KEY_LINK = "show_link"
         const val KEY_BREAK = "break_every"
         const val KEY_TUTORIAL = "tutorial_seen"
-        const val KEY_DEV_UNLOCKED = "dev_unlocked"
+        const val KEY_DEV_UNLOCKED = "dev_unlocked_v16_rework"
         const val KEY_DEV_OFF = "dev_off"
         const val KEY_DEV_BOSS = "dev_boss"
         const val KEY_DEV_TWEAKS = "dev_tweaks"

@@ -2,9 +2,9 @@ package dev.david.tessel.core.dev
 
 /** What it takes to open the developer page. The code sits in the game files on purpose; it only keeps the page out of the way. */
 object DevAccess {
-    const val CODE = "33155"
-    const val CODE_LENGTH = 5
-    const val TAPS = 7
+    const val CODE = "5144"
+    const val CODE_LENGTH = 4
+    const val TAPS = 5
     const val QUIET_MS = 1000L
 }
 

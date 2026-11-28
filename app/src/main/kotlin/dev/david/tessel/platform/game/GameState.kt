@@ -36,6 +36,7 @@ class ShopOffer(
     val rarity: CardRarity = if (rare) CardRarity.RARE else CardRarity.COMMON,
     val locked: Boolean = false,
     val empty: Boolean = false,
+    val id:Int=-1,
 )
 
 /** One perk on offer after a boss. */
@@ -63,6 +64,9 @@ class ShopView(
     val perkMask: Int = 0,
     val skillNodes: Long = 0L,
     val freeRefreshesLeft: Int = 0,
+    val upgradeRanks:List<Int> = emptyList(),
+    val frame:dev.david.tessel.core.content.TankEvolution=dev.david.tessel.core.content.TankEvolution.BASIC,
+    val devTrial:Boolean=false,
 )
 
 /** One player's column in the run's statistics. */

@@ -205,6 +205,7 @@ object Protocol {
         buf.put((if (inShop) 1 else 0).toByte())
         if (inShop) {
             val s = w.shop
+            for(rank in pl.levels[forPlayer])buf.put(rank.coerceIn(0,255).toByte())
             for (slot in 0 until SHOP_SLOTS) {
                 val u = s.item(forPlayer, slot)
                 buf.putShort(s.raw(forPlayer, slot).toShort())
@@ -362,6 +363,7 @@ object Protocol {
 
         s.hasShop = buf.get().toInt() != 0
         if (s.hasShop) {
+            for(i in s.upgradeRanks.indices)s.upgradeRanks[i]=buf.get().toInt() and 255
             for (slot in 0 until SHOP_SLOTS) {
                 val raw = buf.short.toInt()
                 s.shopItem[slot] = CardCode.item(raw)

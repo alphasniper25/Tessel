@@ -5,6 +5,7 @@ import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.CharacterDef
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
 import dev.david.tessel.core.content.SkillGraph
@@ -105,14 +106,20 @@ class PlayerState {
     fun damage(p: Int): Float {
         var d = scaled(p, UpgradeStat.DAMAGE, Balance.BULLET_DAMAGE) * character[p].damageScale * (1f + Upgrades.delta(levels[p], UpgradeStat.DAMAGE_BONUS))
         if (has(p, Perks.HEAVY_ROUNDS)) d *= 1.3f
-        if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) d *= 1.5f
+        if (has(p, Perks.LAST_STAND) && hp[p] in 1..2) {
+            d *= 1.5f
+            if(PerkCombo.PHOENIX.active(perks[p]))d*=1.20f
+        }
         if (surge[p] > 0) d *= Elite.SURGE_DAMAGE
         return d * evolution[p].damage * skillFactor(p,SkillBonus.DAMAGE) * if(evolution[p].drones) 1f + Upgrades.delta(levels[p],UpgradeStat.DRONE_POWER) else 1f
     }
 
     fun fireRate(p: Int): Float {
         var r = scaled(p, UpgradeStat.FIRE_RATE, Balance.FIRE_RATE) * character[p].fireScale
-        if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) r *= 1.3f
+        if (has(p, Perks.OVERCLOCK) && sinceHit[p] >= OVERCLOCK_TICKS) {
+            r *= 1.3f
+            if(PerkCombo.SIEGE.active(perks[p]))r*=1.10f
+        }
         if (has(p, Perks.HEAVY_ROUNDS)) r *= 0.85f
         if (surge[p] > 0) r *= Elite.SURGE_FIRE
         return r * evolution[p].rate * skillFactor(p,SkillBonus.FIRE_RATE)
@@ -131,7 +138,7 @@ class PlayerState {
     }
     fun shieldTicks(p: Int) = (evolution[p].shieldSeconds*TICK_HZ / (1f+Upgrades.delta(levels[p],UpgradeStat.SHIELD_RECHARGE))).toInt().coerceAtLeast(15)
     fun wealth(p: Int) = Upgrades.delta(levels[p], UpgradeStat.WEALTH)
-    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * if (has(p, Perks.MAGNET_CORE)) 2f else 1f
+    fun magnet(p: Int) = scaled(p, UpgradeStat.MAGNET, Balance.MAGNET_RADIUS) * skillFactor(p,SkillBonus.PICKUP) * (if (has(p, Perks.MAGNET_CORE)) 2f else 1f) * (if(PerkCombo.SALVAGE.active(perks[p]))1.20f else 1f)
     fun bulletRadius(p: Int) = scaled(p, UpgradeStat.CALIBER, Balance.BULLET_RADIUS)
 
     private fun scaled(p: Int, stat: UpgradeStat, base: Float) = base * (1f + Upgrades.delta(levels[p], stat))

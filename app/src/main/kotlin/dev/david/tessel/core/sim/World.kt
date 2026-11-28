@@ -2,6 +2,7 @@ package dev.david.tessel.core.sim
 
 import dev.david.tessel.core.content.TankEvolution
 import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.content.SkillTree
 import dev.david.tessel.core.content.Balance
 import dev.david.tessel.core.content.StatusEffect
 import dev.david.tessel.core.content.CampaignScaling
@@ -11,6 +12,8 @@ import dev.david.tessel.core.content.CoreRules
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.content.Elite
 import dev.david.tessel.core.content.Perks
+import dev.david.tessel.core.content.PerkCombo
+import dev.david.tessel.core.content.SkillBonus
 import dev.david.tessel.core.content.Scoring
 import dev.david.tessel.core.content.Upgrades
 import dev.david.tessel.core.content.UpgradeStat
@@ -125,31 +128,39 @@ class World(seed: Long = 1L) {
         director.allow = kinds
     }
 
-    /** Developer option: gives player 0 these upgrade levels (id to level) before the run, with the health a Max Health level adds. */
-    fun devUpgrades(levels: Map<Int, Int>) {
-        for ((id, level) in levels) {
-            if (id !in 0 until Upgrades.count) continue
-            val n = level.coerceIn(0, Upgrades.of(id).maxLevel)
-            players.levels[0][id] = n
-            val addedHp = (n * Upgrades.amount(id, UpgradeStat.MAX_HP)).toInt()
-            if (addedHp > 0) {
-                players.maxHp[0] += addedHp
-                players.hp[0] = players.maxHp[0]
-            }
-        }
+    /** Trial-only setters. Idempotent: changing a rank or toggling an owned
+     * perk updates hull by the delta, not the entire value again. */
+    private fun devHull(delta:Int){
+        players.maxHp[0]=(players.maxHp[0]+delta).coerceAtLeast(1)
+        if(players.hp[0]>0)players.hp[0]=(players.hp[0]+delta).coerceIn(1,players.maxHp[0])
     }
-
-    /** Developer option: perks the player starts with. */
-    fun devPerks(ids: Set<Int>) {
-        for (k in ids) {
-            if (k !in 0 until Perks.count || players.has(0, k)) continue
-            players.perks[0] = players.perks[0] or (1 shl k)
-            if (k == Perks.THICK_SKIN) {
-                players.maxHp[0] += 2
-                players.hp[0] += 2
-            }
-        }
+    fun devSetUpgrade(id:Int,level:Int){
+        if(id !in 0 until Upgrades.count)return
+        val old=players.levels[0][id]
+        val n=level.coerceIn(0,Upgrades.of(id).maxLevel)
+        players.levels[0][id]=n
+        devHull(((n-old)*Upgrades.amount(id,UpgradeStat.MAX_HP)).toInt())
     }
+    fun devUpgrades(levels:Map<Int,Int>){for((id,level) in levels)devSetUpgrade(id,level)}
+    fun devSetPerk(id:Int,owned:Boolean){
+        if(id !in 0 until SkillTree.ORIGINAL_PERKS || players.has(0,id)==owned)return
+        players.perks[0]=if(owned)players.perks[0] or (1 shl id) else players.perks[0] and (1 shl id).inv()
+        if(id==Perks.THICK_SKIN)devHull(if(owned)2 else -2)
+    }
+    fun devPerks(ids:Set<Int>){for(id in ids)devSetPerk(id,true)}
+    fun devSetSkills(mask:Long){
+        val old=players.skill(0,SkillBonus.HEALTH)
+        players.setSkills(0,mask)
+        devHull(players.skill(0,SkillBonus.HEALTH)-old)
+    }
+    fun devSetFrame(frame:TankEvolution){
+        devHull(frame.hullBonus-players.evolution[0].hullBonus)
+        players.evolution[0]=frame
+        players.shieldCooldown[0]=0
+        droneWing.clear()
+    }
+    /** Opens the real inter-stage shop without crediting a fabricated victory. */
+    fun devOpenShop(){if(phase!=Phase.SHOP)openShop(award=false)}
 
     /** Starts the chosen boss walking in at the start of a run. */
     fun bringDevBoss() {
@@ -1219,7 +1230,7 @@ class World(seed: Long = 1L) {
             val d2 = dx * dx + dy * dy
             if (d2 >= radius * radius || d2 < 0.0001f) continue
             val d = sqrt(d2)
-            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE, dx / d, dy / d, p)
+            if (pl.has(p, Perks.SHOCKWAVE) && e.hp[j] > 0f) damageEnemy(j, SHOCKWAVE_DAMAGE*(if(PerkCombo.BULWARK.active(pl.perks[p]))1.25f else 1f), dx / d, dy / d, p)
             val force = Balance.HIT_SHOVE * (1f - d / radius) / Bestiary.of(e.type[j]).mass
             e.kx[j] += dx / d * force
             e.ky[j] += dy / d * force
@@ -1381,7 +1392,7 @@ class World(seed: Long = 1L) {
     }
 
     /** Sweeps the arena: stragglers and loose coins vanish, the shop opens. */
-    private fun openShop() {
+    private fun openShop(award:Boolean=true) {
         val e = enemies
         for (i in 0 until e.count) events.add(Events.ENEMY_GONE, e.type[i], e.x[i], e.y[i], 0f, 0f, e.angle[i], e.id[i])
         e.clear()
@@ -1392,7 +1403,7 @@ class World(seed: Long = 1L) {
         droneWing.clear()
         hostile.clear()
         phase = Phase.SHOP
-        if (!practice && !duel.on) for (p in 0 until playerCount) if (players.present[p]) {
+        if (award && !practice && !duel.on) for (p in 0 until playerCount) if (players.present[p]) {
             val bonus = dev.david.tessel.core.content.StageRewards.coins(stage, players.earned[p] - stageEarned[p], players.kills[p] - stageKills[p], difficulty)
             players.coins[p] += bonus
             players.earned[p] += bonus

@@ -18,6 +18,8 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.david.tessel.core.content.TankEvolution
+import dev.david.tessel.core.content.CardRarity
+import dev.david.tessel.core.content.SkillGraph
 import dev.david.tessel.core.content.Bestiary
 import dev.david.tessel.core.content.Shape
 import dev.david.tessel.core.content.CardMission
@@ -221,6 +223,10 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
 
     /** The run in progress was started from the developer page; only then do the options reach it. */
     private var devRun = false
+    private var devAccess=false
+    private val devTrialFlow=MutableStateFlow(false)
+    val devTrial:StateFlow<Boolean> = devTrialFlow
+    private fun mayTest()=devAccess&&devRun&&cheating&&playingAs==Role.SOLO
     private var gameSpeed = 1f
 
     // Solo: the slot this run keeps itself in (-1 for none), and what this phone has met and beaten since the last flush.
@@ -259,27 +265,58 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
     fun startRun(difficulty: Difficulty, character: CharacterDef = CharacterDef.BALANCED) = onGameThread { beginSolo(difficulty, withDev = false, character = character) }
 
     /** A trial run from the developer page, with its options on. */
-    fun startDevRun(difficulty: Difficulty) = onGameThread { beginSolo(difficulty, withDev = true) }
+    fun startDevRun(difficulty: Difficulty) = onGameThread {
+        if(devAccess&&(current==Mode.HOME||mayTest()))beginSolo(difficulty,withDev=true,character=preferredCharacter)
+    }
+    fun startDevShop(difficulty:Difficulty)=onGameThread{
+        if(!devAccess||(current!=Mode.HOME&&!mayTest()))return@onGameThread
+        beginSolo(difficulty,withDev=true,character=preferredCharacter)
+        world.devOpenShop();publishShop();enter(Mode.SHOP)
+    }
+    fun devRank(id:Int,rank:Int)=onGameThread{
+        if(mayTest()&&current==Mode.SHOP){world.devSetUpgrade(id,rank);publishShop()}
+    }
+    fun devTogglePerk(id:Int)=onGameThread{
+        if(mayTest()&&current==Mode.SHOP){
+            world.devSetPerk(id,!world.players.has(0,id));world.shop.devRefreshRewards(world);publishShop()
+        }
+    }
+    fun devToggleSkill(id:Int)=onGameThread{
+        if(mayTest()&&current==Mode.SHOP&&id in 0 until SkillGraph.COUNT){
+            world.devSetSkills(world.players.skillMask(0) xor SkillGraph.bit(id));publishShop()
+        }
+    }
+    fun devFrame(frame:TankEvolution)=onGameThread{
+        if(mayTest()&&current==Mode.SHOP){world.devSetFrame(frame);world.shop.open(world);publishShop()}
+    }
+    fun devOffer(id:Int,slot:Int,tier:CardRarity)=onGameThread{
+        if(mayTest()&&current==Mode.SHOP&&world.shop.devStock(world,id,slot,tier))publishShop()
+    }
 
     /** A new solo run in a free slot. With every slot taken it does not start; the menus ask for one to be freed first. */
     private fun beginSolo(difficulty: Difficulty, withDev: Boolean = false, character: CharacterDef = CharacterDef.BALANCED) {
         // A run that uses developer options goes into no save slot and no record.
-        val cheat = withDev && dev.active
+        val cheat = withDev
         val slot = if (cheat) -1 else saves?.free() ?: 0
         if (!cheat && slot < 0) return
         dropCoop()
         devRun = withDev
+        devTrialFlow.value=withDev
         applyDev()
         world.reset(players = 1, seed = SystemClock.elapsedRealtimeNanos(), difficulty = difficulty)
         world.players.chooseCharacter(0, character, difficulty.bonusHp)
         world.players.appearance[0] = preferredLook
         world.players.missionMask[0] = cardUnlockMask()
         if (cheat) {
-            if (dev.startStage > 1) world.skipTo(dev.startStage)
+            if (dev.startStage > 1) world.skipTo(dev.startStage.coerceIn(1,50))
             world.players.coins[0] = dev.startCoins
             world.bringDevBoss()
+            world.devSetFrame(TankEvolution.fromId(dev.frame))
             world.devUpgrades(dev.upgrades)
             world.devPerks(dev.perks)
+            world.devSetSkills(dev.skills)
+            if(dev.allMissions)world.players.missionMask[0]=CardMission.allMask
+            if(dev.startHp>=0)world.players.hp[0]=dev.startHp.coerceIn(1,world.players.maxHp[0])
         }
         soloSlot = slot
         markCheating(cheat)
@@ -661,7 +698,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             requestSurfaceRate()
             hud.showLink = s.showLink
             breakEvery = s.breakEvery
-            dev = s.dev
+            devAccess=s.devUnlocked
+            dev = if(devAccess)s.dev else Dev()
             applyDev(live = true)
         }
     }
@@ -886,6 +924,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         shopFlow.value = null
         statsFlow.value = null
         enter(Mode.HOME)
+        devRun=false;devTrialFlow.value=false
     }
 
     private fun flushLog() {
@@ -1301,6 +1340,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         }
         markCheating(false)
         devRun = false
+        devTrialFlow.value=false
         becomeRole(Role.SOLO)
     }
 
@@ -1326,6 +1366,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 levels = s.levelsBought(world, me, slot),
                 rarity = s.rarity(me, slot),
                 locked = s.locked(me, slot),
+                id=u,
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
@@ -1353,6 +1394,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
+            upgradeRanks=pl.levels[me].toList(),frame=pl.evolution[me],devTrial=mayTest(),
         )
     }
 
@@ -1369,6 +1411,8 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         key = key * 31 + s.skillNodes[me].hashCode()
         key = key * 31 + s.freeRefreshesLeft
         key = key * 31 + s.healPrice
+        key = key * 31 + s.upgradeRanks.contentHashCode()
+        key = key * 31 + s.evolution[me].ordinal
         for (slot in 0 until SHOP_SLOTS) {
             key = key * 31 + s.shopItem[slot]
             key = key * 31 + s.shopLevel[slot]
@@ -1411,6 +1455,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
                 rarity = s.shopRarity[slot],
                 locked = s.shopLocked[slot],
                 levels = s.shopLevels[slot],
+                id=u,
             )
         }
         val perkOffers = (0 until TankEvolution.REWARD_SLOTS).mapNotNull { k ->
@@ -1436,6 +1481,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
+            upgradeRanks=s.upgradeRanks.toList(),frame=s.evolution[me],
         )
     }
 
