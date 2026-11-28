@@ -271,7 +271,7 @@ class RemindersAndDevTest {
         settle()
         compose.onNodeWithText("Developer Options").performScrollTo().performClick()
         settle()
-        compose.onNodeWithText("Try a Run With These").performScrollTo().assertExists()
+        compose.onNodeWithText("Try a Run With These").assertExists()
     }
 
     @Test
