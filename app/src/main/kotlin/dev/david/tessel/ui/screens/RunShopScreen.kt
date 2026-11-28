@@ -107,6 +107,7 @@ fun RunShopScreen(shop:ShopView,vibrate:Boolean,
     }
 }
 
+private data class MarketLabel(val item:MarketItem,val x:Float,val y:Float,val right:Boolean)
 private data class MarketItem(val id:Int,val x:Float,val y:Float,val icon:MarketIcon,val tint:Color,
     val visibleLabel:String?=null,val caption:String?=null,val selectable:Boolean=false,val owned:Boolean=false,val lit:Boolean=false,val locked:Boolean=false,val sigil:Int=-1)
 
@@ -231,7 +232,7 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
                 }
             }
             val edges=PerkCombo.entries.flatMapIndexed{i,combo->listOf(MapLink(UpgradeMap.HUB_ID,combo.first),MapLink(UpgradeMap.HUB_ID,combo.second),MapLink(combo.first,comboBase+i),MapLink(combo.second,comboBase+i))}
-            MarketCanvas(items,edges,selected,{selected=it},tag="perk-map",labels=emptyList(),footer="Matching faint sigils hint at perk combinations",frame=shop.frame,character=shop.character,look=shop.look)
+            MarketCanvas(items,edges,selected,{selected=it},tag="perk-map",labels=emptyList(),footer="Some symbols repeat · Tap a perk to inspect",frame=shop.frame,character=shop.character,look=shop.look)
             if(selected>=0){
                 val combo=PerkCombo.entries.getOrNull(selected-comboBase)
                 val perk=selected.takeIf{it in 0 until SkillTree.ORIGINAL_PERKS}
@@ -316,6 +317,47 @@ private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int
                 val mark=at+dir*(47f*scale).coerceAtLeast(16.dp.toPx())
                 perkSigil(n.sigil,mark,(12f*scale).coerceIn(3.dp.toPx(),11.dp.toPx()),c.perk.copy(alpha=if(n.owned).28f else .13f))
             }
+            // At overview, use the horizontal margins for clean text callouts.
+            // No text label can cover the tank or another node in this mode.
+            val leftX=center.x-487f*scale-22.dp.toPx()
+            val rightX=center.x+487f*scale+22.dp.toPx()
+            val outside=zoom<=1.15f&&leftX>90.dp.toPx()&&w-rightX>90.dp.toPx()
+            val lineGap=29.dp.toPx()
+            val top=28.dp.toPx();val bottom=h-30.dp.toPx()
+            val capacity=((bottom-top)/lineGap).toInt().coerceAtLeast(1)+1
+            val candidates=items.filter{it.visibleLabel!=null&&(it.lit||it.owned||it.id==selected||(it.id>=100&&it.caption!="0/2"))}
+                .filter{val a=pos(it);a.x in 0f..w&&a.y in 0f..h}
+                .sortedByDescending{(if(it.id==selected)8 else 0)+(if(it.lit)4 else 0)+(if(it.owned)2 else 0)}
+            val callouts=mutableListOf<MarketLabel>()
+            if(outside){
+                val left=mutableListOf<MarketItem>();val right=mutableListOf<MarketItem>()
+                for(n in candidates){
+                    val dx=pos(n).x-center.x
+                    val wantRight=if(abs(dx)<3.dp.toPx())right.size<=left.size else dx>0f
+                    val preferred=if(wantRight)right else left
+                    val other=if(wantRight)left else right
+                    if(preferred.size<capacity)preferred.add(n) else if(other.size<capacity)other.add(n)
+                }
+                for((side,group) in listOf(false to left,true to right)){
+                    val sorted=group.sortedBy{pos(it).y}
+                    val ys=FloatArray(sorted.size){i->pos(sorted[i]).y.coerceIn(top,maxOf(top,bottom))}
+                    for(i in 1 until ys.size)ys[i]=maxOf(ys[i],ys[i-1]+lineGap)
+                    if(ys.isNotEmpty()){
+                        ys[ys.lastIndex]=minOf(ys.last(),bottom)
+                        for(i in ys.lastIndex-1 downTo 0)ys[i]=minOf(ys[i],ys[i+1]-lineGap)
+                    }
+                    for((i,n) in sorted.withIndex()){
+                        val x=if(side)rightX else leftX
+                        callouts.add(MarketLabel(n,x,ys[i],side))
+                        val at=pos(n)
+                        val end=Offset(x+if(side)-7.dp.toPx() else 7.dp.toPx(),ys[i]-4.dp.toPx())
+                        val elbow=Offset(center.x+if(side)463f*scale else -463f*scale,ys[i]-4.dp.toPx())
+                        val stroke=1.dp.toPx()
+                        drawLine(n.tint.copy(alpha=.25f),at,elbow,stroke)
+                        drawLine(n.tint.copy(alpha=.55f),elbow,end,stroke)
+                    }
+                }
+            }
             treeTank(art,center,(78f*scale).coerceIn(13.dp.toPx(),48.dp.toPx()),character,look,frame,c.ink,c.ground,c.accent)
             for((label,x,y) in labels){
                 val at=Offset(camera.sx(x,w,h),camera.sy(y,w,h));paint.color=c.ink2.toArgb();paint.textSize=10.dp.toPx()
@@ -330,7 +372,7 @@ private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int
                 drawCircle(n.tint.copy(alpha=if(strong)1f else .32f),radius,at,style=Stroke(if(n.id==selected)2.2.dp.toPx() else 1.15.dp.toPx()))
                 marketGlyph(n.icon,at,radius*.57f,if(n.owned)c.ground else n.tint.copy(alpha=if(strong)1f else .40f))
                 if(n.locked)drawCircle(c.coin,3.dp.toPx(),at+Offset(radius*.75f,-radius*.75f))
-                if(n.visibleLabel!=null){
+                if(!outside&&n.visibleLabel!=null&&(n.id==selected||zoom>=1.8f&&(n.lit||n.owned))){
                     val y=at.y+radius+11.dp.toPx()
                     if(y<h-3.dp.toPx()){
                         paint.textSize=10.dp.toPx();paint.color=(if(strong)c.ink else c.ink2).toArgb()
@@ -343,6 +385,22 @@ private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int
                         }
                     }
                 }
+            }
+            for(label in callouts){
+                val n=label.item
+                val name=n.visibleLabel?:continue
+                paint.textAlign=if(label.right)Paint.Align.LEFT else Paint.Align.RIGHT
+                val available=(if(label.right)w-label.x else label.x)-8.dp.toPx()
+                paint.textSize=11.dp.toPx()
+                val measured=paint.measureText(name)
+                if(measured>available)paint.textSize*=available.coerceAtLeast(1f)/measured
+                paint.color=c.ink.toArgb()
+                drawContext.canvas.nativeCanvas.drawText(name,label.x,label.y,paint)
+                if(n.caption!=null){
+                    paint.textSize=9.dp.toPx();paint.color=n.tint.toArgb()
+                    drawContext.canvas.nativeCanvas.drawText(n.caption,label.x,label.y+11.dp.toPx(),paint)
+                }
+                paint.textAlign=Paint.Align.CENTER
             }
         }
         Row(Modifier.align(Alignment.TopStart).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(3.dp),verticalAlignment=Alignment.CenterVertically){

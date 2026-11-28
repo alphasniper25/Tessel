@@ -36,7 +36,7 @@ object UpgradeMap {
                 if(count<=0)break
                 val radius=listOf(125f,225f,325f,425f)[ring]
                 for(i in 0 until count){
-                    val offset=if(count==1)0f else -29f+58f*i/(count-1)
+                    val offset=if(count==1)0f else -26f+52f*i/(count-1)
                     val (x,y)=point(radius,a+offset)
                     add(UpgradePosition(ids[cursor++],x,y,group))
                 }
