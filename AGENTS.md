@@ -110,3 +110,6 @@
 
 ## Icon-only map refinement
 - No visible lines or floating names/effects on any tree map. All 25 normal upgrade types and all capped rank nodes always included, stable compact circular packing with full-size equal nodes. Distinguish purchasable glow from unaffordable rolled outline and purchased fill. Inspect any type, only actual offer slots can purchase. Existing skill visibility and secret five-fusion rules preserved. Native screenshots only; no APK.
+
+## Sequential upgrade path refinement
+- Supersedes the no-line rule for Upgrades ONLY: draw subtle adjacent rank connectors within the same upgrade type, never cross-type links or floating labels. 25 distinct fixed angular sectors, equal full-size rank circles with contiguous prefix progression. All ranks visible, current rolls light next consecutive ranks; no changes to rarity bundles, economy, skill or perk mechanics, save or wire. Native captures of real common-offer transactions. No APK.

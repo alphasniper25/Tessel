@@ -56,4 +56,20 @@ class RankShopForecastTest {
         assertArrayEquals(p.rewardRounds[0],snap.shopRewardRounds)
         assertEquals(3,snap.shopAllLevels[Upgrades.MAGNET]);assertEquals(123,snap.shopSinceHit)
     }
+
+    @Test fun commonOffersFillMagnetRanksOneThenTwoThenThree(){
+        val w=World(seed=73);w.devOpenShop();val p=w.players
+        p.coins[0]=10000
+        val s=w.shop
+        val roll=CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON)
+        s.devStock(w,listOf(roll,roll,roll))
+        val cap=Upgrades.runCap(Upgrades.MAGNET)
+        for(slot in 0..2){
+            val before=p.levels[0][Upgrades.MAGNET]
+            assertEquals(slot,before)
+            assertEquals(listOf(slot+1),(1..cap).filter{UpgradeMap.offeredRank(it,before,s.levelsBought(w,0,slot))})
+            assertTrue(s.buy(w,0,slot))
+            assertEquals((1..slot+1).toList(),(1..cap).filter{UpgradeMap.ownedRank(it,p.levels[0][Upgrades.MAGNET])})
+        }
+    }
 }

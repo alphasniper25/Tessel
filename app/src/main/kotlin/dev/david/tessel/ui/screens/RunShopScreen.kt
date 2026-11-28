@@ -209,7 +209,7 @@ private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->
                                 if(changes.isEmpty()&&shop.stats!=null)Text("No further effective increase at the current stat cap.",Type.footnote,c.ink2)
                             }
                             Text("Rank $owned → ${(owned+(offer?.levels?:0)).coerceAtMost(cap)} / $cap",Type.subhead,c.ink)
-                            Text("Each purchased rank fills one circle in the map.",Type.caption,c.ink3)
+                            Text(if(owned>=cap)"All ranks filled" else if(offer!=null)"Fills ranks ${owned+1}–${(owned+offer.levels).coerceAtMost(cap)} in order" else "Next rank: ${owned+1}",Type.caption,c.ink3)
                         }
                     }
                     if(wide){
@@ -413,25 +413,40 @@ private fun MarketCanvas(items:List<MarketItem>,selected:Int,inspect:(Int)->Unit
             val w=size.width;val h=size.height;val scale=camera.scale(w,h)
             fun pos(n:MarketItem)=Offset(camera.sx(n.x,w,h),camera.sy(n.y,w,h))
             val center=Offset(camera.sx(0f,w,h),camera.sy(0f,w,h))
-            // No graph edges, grid, ring guides or floating text. Each
-            // node's geometry and color alone communicates progression.
+            // No floating text or decorative grid. Only same-type upgrade
+            // rank paths have links; skills and perks remain line-free.
             treeTank(art,center,(78f*scale).coerceIn(13.dp.toPx(),48.dp.toPx()),character,look,frame,c.ink,c.ground,c.accent)
             for(n in items){
                 val at=pos(n)
                 val radius=if(n.ranks.isNotEmpty())UpgradeMap.NODE_RADIUS*scale else PerkTimeline.NODE_RADIUS*scale
                 if(n.ranks.isNotEmpty()){
+                    // Draw each independent rank chain, never connect two
+                    // unrelated upgrade types. Owned progress is contiguous.
+                    for((a,b) in n.ranks.zipWithNext()){
+                        val p=Offset(camera.sx(a.x,w,h),camera.sy(a.y,w,h))
+                        val q=Offset(camera.sx(b.x,w,h),camera.sy(b.y,w,h))
+                        val bought=UpgradeMap.ownedRank(b.rank,n.rankOwned)
+                        val offered=n.rolls.any{it.affordable&&UpgradeMap.offeredRank(b.rank,n.rankOwned,it.levels)}
+                        val active=bought||offered
+                        val roll=n.rolls.filter{it.affordable&&UpgradeMap.offeredRank(b.rank,n.rankOwned,it.levels)}.maxByOrNull{it.rarity.ordinal}
+                        drawLine((roll?.tint?:n.tint).copy(alpha=if(active).80f else .28f),p,q,
+                            strokeWidth=if(active)2.dp.toPx() else 1.dp.toPx())
+                    }
                     for(cell in n.ranks){
                         val p=Offset(camera.sx(cell.x,w,h),camera.sy(cell.y,w,h))
                         if(p.x+radius<0||p.x-radius>w||p.y+radius<0||p.y-radius>h)continue
-                        val bought=cell.rank<=n.rankOwned
-                        val roll=if(bought)null else n.rolls.filter{cell.rank in (n.rankOwned+1)..(n.rankOwned+it.levels)}
+                        val bought=UpgradeMap.ownedRank(cell.rank,n.rankOwned)
+                        val roll=if(bought)null else n.rolls.filter{UpgradeMap.offeredRank(cell.rank,n.rankOwned,it.levels)}
                             .maxWithOrNull(compareBy<RankRoll>{it.affordable}.thenBy{it.rarity.ordinal})
                         val offered=roll!=null
                         val ready=roll?.affordable==true
                         val tint=roll?.tint?:n.tint
                         if(ready){
-                            drawCircle(tint.copy(alpha=.12f),radius+4.dp.toPx(),p)
-                            drawCircle(tint.copy(alpha=.28f),radius+2.dp.toPx(),p)
+                            // Bright frontier; higher rarity bundles show the
+                            // immediately following ranks, never skip one.
+                            val first=cell.rank==n.rankOwned+1
+                            drawCircle(tint.copy(alpha=if(first).20f else .09f),radius+4.dp.toPx(),p)
+                            drawCircle(tint.copy(alpha=if(first).38f else .20f),radius+2.dp.toPx(),p)
                         }
                         drawCircle(if(bought)n.tint.copy(alpha=.76f) else if(ready)tint.copy(alpha=.28f) else if(offered)tint.copy(alpha=.08f) else c.ground,radius,p)
                         drawCircle(tint.copy(alpha=if(ready)1f else if(offered).73f else if(bought).85f else .30f),radius,p,

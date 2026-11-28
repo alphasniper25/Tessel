@@ -13,13 +13,13 @@ class RadialUpgradeMapTest {
             val seen=mutableSetOf(UpgradeMap.HUB_ID)
             repeat(nodes.size){for(e in edges)if(e.a in seen)seen.add(e.b)}
             assertEquals(nodes.map{it.id}.toSet(),seen-UpgradeMap.HUB_ID)
-            assertTrue(nodes.all{hypot(it.x,it.y) in 124f..426f})
+            assertTrue(nodes.all{hypot(it.x,it.y)>=UpgradeMap.FIRST_RADIUS-.002f})
             for(a in nodes)for(b in nodes)if(a.id!=b.id)
                 assertTrue("Overlap ${a.id},${b.id}",hypot(a.x-b.x,a.y-b.y)>55f)
         }
     }
     @Test fun marketCameraUsesUniformScaleAndFitsWholeCircle(){
-        val cam=MarketCamera()
+        val cam=MarketCamera(extent=UpgradeMap.extent(emptyList(),emptyMap(),true))
         for((w,h) in listOf(900f to 300f,640f to 220f,400f to 800f)){
             for(n in UpgradeMap.positions(true)){
                 assertTrue(cam.sx(n.x,w,h) in 0f..w)
@@ -35,7 +35,9 @@ class RadialUpgradeMapTest {
             for(root in roots){
                 val ranks=UpgradeMap.ranks(root,roots)
                 assertEquals(Upgrades.runCap(root.id),ranks.size)
-                assertEquals(UpgradeMap.FIRST_RADIUS,hypot(ranks.first().x,ranks.first().y),.002f)
+                assertEquals(root.x,ranks.first().x,0f);assertEquals(root.y,ranks.first().y,0f)
+                assertEquals((1..Upgrades.runCap(root.id)).toList(),ranks.map{it.rank})
+                for((a,b) in ranks.zipWithNext())assertTrue("Rank path gap ${root.id}: ${a.rank} to ${b.rank}",hypot(a.x-b.x,a.y-b.y)<150f)
                 for((a,b) in ranks.zipWithNext())assertTrue(hypot(b.x,b.y)+.002f>=hypot(a.x,a.y))
             }
             for(i in all.indices)for(j in i+1 until all.size){
@@ -49,6 +51,16 @@ class RadialUpgradeMapTest {
             assertEquals(UpgradeMap.rankCount(dev),all.size)
             assertEquals(8,UpgradeMap.visibleCount(8,0,0))
             assertTrue(all.all{hypot(it.x,it.y)+UpgradeMap.NODE_RADIUS<=whole*.5f})
+        }
+    }
+
+    @Test fun purchasesAndRarityBundlesAlwaysFillAContiguousPrefix(){
+        for(cap in 1..40)for(owned in 0..cap)for(bundle in 0..5){
+            val ranks=1..cap
+            assertEquals((1..owned).toList(),ranks.filter{UpgradeMap.ownedRank(it,owned)})
+            val end=minOf(cap,owned+bundle)
+            assertEquals(((owned+1)..end).toList(),ranks.filter{UpgradeMap.offeredRank(it,owned,bundle)})
+            assertEquals((1..end).toList(),ranks.filter{UpgradeMap.ownedRank(it,owned)||UpgradeMap.offeredRank(it,owned,bundle)})
         }
     }
 }

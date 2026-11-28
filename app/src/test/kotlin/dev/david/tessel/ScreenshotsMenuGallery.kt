@@ -96,6 +96,10 @@ abstract class MenuGalleryBase {
         // Choose three valid real offers to make the different rarities visible.
         w.shop.devStock(w,if(repeatMagnet)listOf(CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON),CardCode.pack(Upgrades.MAGNET,CardRarity.RARE),CardCode.pack(Upgrades.DAMAGE,CardRarity.UNCOMMON))else listOf(CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE),CardCode.pack(Upgrades.MAX_HEALTH,CardRarity.COMMON),CardCode.pack(Upgrades.WEALTH,CardRarity.UNCOMMON)))
         w.shop.devReward(w,when(reward){1->dev.david.tessel.core.dev.DevReward.PERKS;2->dev.david.tessel.core.dev.DevReward.EVOLUTION;else->dev.david.tessel.core.dev.DevReward.NONE})
+        return snapshotShop(w,developer,rewardOverride)
+    }
+    fun snapshotShop(w:World,developer:Boolean=false,rewardOverride:List<PerkOffer>?=null):ShopView{
+        val pl=w.players
         val s=w.shop
         val offers=List(SHOP_SLOTS){slot->
             val id=s.item(0,slot)
@@ -106,13 +110,13 @@ abstract class MenuGalleryBase {
             val id=s.rewardOffer(0,slot)
             if(id<0)null else PerkOffer(slot,TankEvolution.rewardName(id),TankEvolution.rewardDetail(id),TankEvolution.fromReward(id),id=id)
         }
-        return ShopView(stage,pl.coins[0],pl.hp[0],pl.maxHp[0],offers,s.healPrice(w,0),s.healsLeft(0),s.canHeal(w,0),s.rerollPrice(w,0),s.canReroll(w,0),
-            perkOffers=rewardOverride?:rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
+        return ShopView(w.stage,pl.coins[0],pl.hp[0],pl.maxHp[0],offers,s.healPrice(w,0),s.healsLeft(0),s.canHeal(w,0),s.rerollPrice(w,0),s.canReroll(w,0),
+            perkOffers=rewardOverride?:rewards,healAmount=s.healAmount(w,0),perkMask=pl.perks[0],skillNodes=pl.skillMask(0),freeRefreshesLeft=s.freeRefreshesLeft(w,0),
             devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
-    @Composable fun Market(s:ShopView,onReroll:()->Unit={},onPerk:(Int)->Unit={}){
+    @Composable fun Market(s:ShopView,onReroll:()->Unit={},onBuy:(Int)->Unit={},onPerk:(Int)->Unit={}){
         currentShop=s
-        RunShopScreen(s,false,{}, {}, onReroll, {}, onPerk, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
+        RunShopScreen(s,false,onBuy, {}, onReroll, {}, onPerk, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
     }
 }
 @RunWith(RobolectricTestRunner::class)
@@ -245,6 +249,24 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         tapUpgrade(Upgrades.MAGNET);capture("80-unrolled-upgrade-inspection")
         click("×");click("Skills");capture("81-skills-no-lines")
         click("Perks");capture("82-perks-no-lines")
+    }
+    @Test fun sequentialUpgradePurchases(){
+        val w=World(seed=73);w.reset(seed=73,difficulty=Difficulty.NORMAL)
+        w.players.coins[0]=1000;w.devOpenShop()
+        val roll=CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON)
+        w.shop.devStock(w,listOf(roll,roll,roll))
+        w.shop.devReward(w,dev.david.tessel.core.dev.DevReward.NONE)
+        var live by mutableStateOf(snapshotShop(w))
+        show{Market(live,onBuy={slot->check(w.shop.buy(w,0,slot));live=snapshotShop(w)})}
+        capture("83-upgrade-sequence-zero")
+        tapUpgrade(Upgrades.MAGNET)
+        repeat(3){rank->
+            val price=w.shop.price(w,0,rank)
+            click("Buy $price")
+            check(w.players.levels[0][Upgrades.MAGNET]==rank+1)
+            capture("84-upgrade-sequence-filled-${rank+1}-details")
+        }
+        click("×");capture("87-upgrade-sequence-three-filled")
     }
     @Test fun roundThreeChoices(){
         show{Market(sampleShop(stage=30,perks=PerkCombo.LAST_LIGHT.mask,reward=1))}

@@ -27,69 +27,65 @@ object UpgradeMap {
         return radius*cos(a) to radius*sin(a)
     }
     const val NODE_RADIUS=37f
-    const val FIRST_RADIUS=365f
+    const val FIRST_RADIUS=267f
     const val RANK_STEP=98f
-    // A type has its own radial track. Every rank is the same size, not a satellite.
-    fun positions(includeLegacy:Boolean=false):List<UpgradePosition>{
-        val ids=groups.flatMap{group->(0 until Upgrades.count).filter{(includeLegacy||!legacy(it))&&Upgrades.of(it).family==group}}
-        return ids.mapIndexed{i,id->val (x,y)=point(FIRST_RADIUS,-90f+360f*i/ids.size);UpgradePosition(id,x,y,Upgrades.of(id).family)}
+    private fun ids(includeLegacy:Boolean)=groups.flatMap{group->
+        (0 until Upgrades.count).filter{(includeLegacy||!legacy(it))&&Upgrades.of(it).family==group}
     }
-    /** Complete catalog, not just the owned/rolled frontier. Keep the original
-     * type ring, then pack all remaining ranks into successive concentric rings.
-     * Each ring allocates contiguous runs of equal-sized nodes to upgrade types.
-     * Allocation uses caps only, so purchases and rerolls never move a node. */
-    private fun layout(positions:List<UpgradePosition>):Map<Int,List<RankPosition>>{
-        val out=positions.associate{it.id to mutableListOf(RankPosition(1,it.x,it.y))}
-        var ring=1
-        while(true){
-            val active=positions.filter{out.getValue(it.id).size<Upgrades.runCap(it.id)}
-            if(active.isEmpty())break
-            val radius=FIRST_RADIUS+ring*RANK_STEP
-            // Chord spacing leaves at least 8 units between node borders.
-            val capacity=(PI/asin((NODE_RADIUS+4f)/radius.toDouble())).toInt()
-            val remaining=active.associate{it.id to Upgrades.runCap(it.id)-out.getValue(it.id).size}
-            val slots=active.associate{it.id to 1}.toMutableMap()
-            val count=minOf(capacity,remaining.values.sum())
-            check(count>=active.size)
-            repeat(count-active.size){
-                val next=active.filter{slots.getValue(it.id)<remaining.getValue(it.id)}
-                    .maxByOrNull{remaining.getValue(it.id).toDouble()/(slots.getValue(it.id)+1)}!!
-                slots[next.id]=slots.getValue(next.id)+1
-            }
-            // Stable ordered arcs; rotate the ring toward the original type
-            // bearings so long tracks fill outer space without enormous spokes.
-            val step=360f/count
-            var at=0;var dx=0.0;var dy=0.0
-            for(n in active){
-                val size=slots.getValue(n.id)
-                val desired=atan2(n.y,n.x)*180.0/PI
-                val delta=(desired-(-90f+(at+(size-1)*.5f)*step))*PI/180
-                dx+=size*cos(delta);dy+=size*sin(delta);at+=size
-            }
-            val rotation=(atan2(dy,dx)*180.0/PI).toFloat()
-            at=0
-            for(n in active){
-                val row=out.getValue(n.id)
-                repeat(slots.getValue(n.id)){
-                    val (x,y)=point(radius,-90f+rotation+step*at++)
-                    row.add(RankPosition(row.size+1,x,y))
+    /** Each type owns a separate angular sector. Fill a row of equally sized
+     * circles, then continue outward on the closest end of the next row.
+     * Serpentine order gives every rank exactly one predecessor and successor.
+     * No rank, purchase, or offer can change this geometry. */
+    private fun layout(includeLegacy:Boolean):Map<Int,List<RankPosition>>{
+        val ids=ids(includeLegacy)
+        val power=if(includeLegacy).9 else 1.0
+        val weights=ids.associateWith{Upgrades.runCap(it).toDouble().pow(power)}
+        val sum=weights.values.sum()
+        val free=360.0-5.0*ids.size
+        val out=linkedMapOf<Int,List<RankPosition>>()
+        var angle=-90.0
+        for(id in ids){
+            val width=5.0+free*weights.getValue(id)/sum
+            val cap=Upgrades.runCap(id)
+            val ranks=mutableListOf<RankPosition>()
+            var radius=FIRST_RADIUS
+            while(ranks.size<cap){
+                // Center clearance from each sector boundary and neighbors.
+                val gap=2.0*asin((NODE_RADIUS+4f)/radius.toDouble())*180.0/PI
+                val count=minOf(cap-ranks.size,(width/gap+1e-8).toInt())
+                if(count>0){
+                    val row=(0 until count).map{i->
+                        point(radius,(angle+width*.5+(i-(count-1)*.5)*gap).toFloat())
+                    }
+                    val last=ranks.lastOrNull()
+                    fun distance(p:Pair<Float,Float>)=if(last==null)0f else hypot(p.first-last.x,p.second-last.y)
+                    val ordered=if(last!=null&&distance(row.last())<distance(row.first()))row.reversed()else row
+                    for((x,y) in ordered)ranks.add(RankPosition(ranks.size+1,x,y))
                 }
+                radius+=RANK_STEP
+                check(radius<5000f)
             }
-            ring++
+            out[id]=ranks
+            angle+=width
         }
         return out
     }
-    private val regularLayout by lazy{layout(positions(false))}
-    private val developerLayout by lazy{layout(positions(true))}
-    fun ranks(anchor:UpgradePosition,positions:List<UpgradePosition>,cap:Int=Upgrades.runCap(anchor.id)):List<RankPosition>{
-        val catalog=if(positions.any{legacy(it.id)})developerLayout else regularLayout
-        return catalog.getValue(anchor.id).take(cap)
+    private val regularLayout by lazy{layout(false)}
+    private val developerLayout by lazy{layout(true)}
+    private fun catalog(includeLegacy:Boolean)=if(includeLegacy)developerLayout else regularLayout
+    fun positions(includeLegacy:Boolean=false):List<UpgradePosition> = catalog(includeLegacy).map{(id,ranks)->
+        val first=ranks.first()
+        UpgradePosition(id,first.x,first.y,Upgrades.of(id).family)
     }
-    fun rankCount(includeLegacy:Boolean=false)=positions(includeLegacy).sumOf{Upgrades.runCap(it.id)}
+    fun ranks(anchor:UpgradePosition,positions:List<UpgradePosition>,cap:Int=Upgrades.runCap(anchor.id)):List<RankPosition> =
+        catalog(positions.any{legacy(it.id)}).getValue(anchor.id).take(cap)
+    fun rankCount(includeLegacy:Boolean=false)=ids(includeLegacy).sumOf{Upgrades.runCap(it)}
     fun visibleCount(cap:Int,owned:Int,offered:Int)=cap.coerceAtLeast(0)
+    /** Ranks are a contiguous prefix: the next roll always begins at owned+1. */
+    fun ownedRank(rank:Int,owned:Int)=rank in 1..owned
+    fun offeredRank(rank:Int,owned:Int,levels:Int)=rank>owned&&rank<=owned+levels.coerceAtLeast(0)
     fun extent(owned:List<Int>,offers:Map<Int,Int>,includeLegacy:Boolean=false):Float{
-        val all=if(includeLegacy)developerLayout else regularLayout
-        val radius=all.values.maxOf{nodes->nodes.maxOf{hypot(it.x,it.y)}}
+        val radius=catalog(includeLegacy).values.maxOf{nodes->nodes.maxOf{hypot(it.x,it.y)}}
         return maxOf(WIDTH,2f*(radius+80f))
     }
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
