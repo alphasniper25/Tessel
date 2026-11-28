@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
@@ -39,9 +44,15 @@ fun CodexCombatPreview(frame:TankEvolution,modifier:Modifier=Modifier) {
     val native=remember(bitmap){android.graphics.Canvas(bitmap)}
     val img=remember(bitmap){bitmap.asImageBitmap()}
     var refresh by remember(frame){mutableIntStateOf(0)}
-    var running by remember(frame){mutableStateOf(true)}
-    LaunchedEffect(sim,running) {
-        while(running) {
+    val lifecycle=(LocalContext.current as? LifecycleOwner)?.lifecycle
+    var active by remember(lifecycle){mutableStateOf(lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) ?: true)}
+    DisposableEffect(lifecycle){
+        val observer=LifecycleEventObserver{_,_->active=lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) ?: true}
+        lifecycle?.addObserver(observer)
+        onDispose{lifecycle?.removeObserver(observer)}
+    }
+    LaunchedEffect(sim,active) {
+        while(active) {
             delay(33L)
             if(sim.advance(2))shards.clear()
             val ev=sim.world.events
@@ -54,7 +65,7 @@ fun CodexCombatPreview(frame:TankEvolution,modifier:Modifier=Modifier) {
         }
     }
     Column(modifier) {
-        Canvas(Modifier.fillMaxWidth().aspectRatio(2f).clip(RoundedCornerShape(12.dp)).background(c.surface)) {
+        Canvas(Modifier.fillMaxWidth().aspectRatio(2f).clip(RoundedCornerShape(8.dp)).background(c.surface).testTag("combat-preview")) {
             // Observe the state inside the draw phase; the rest of the codex need not recompose.
             val tick=refresh
             if(tick>=0){
@@ -64,9 +75,6 @@ fun CodexCombatPreview(frame:TankEvolution,modifier:Modifier=Modifier) {
                 drawImage(img,dstSize=IntSize(size.width.toInt().coerceAtLeast(1),size.height.toInt().coerceAtLeast(1)))
             }
         }
-        Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-            Text("LIVE TRAINING · 8s loop",Type.caption,c.accent,Modifier.weight(1f))
-            SecondaryButton(if(running)"Pause" else "Play",{running=!running})
-        }
+        Text("Combat preview · 8 s loop",Type.caption,c.ink2,Modifier.padding(top=5.dp))
     }
 }

@@ -2,6 +2,14 @@ package dev.david.tessel.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.testTag
+import dev.david.tessel.core.sim.ArsenalFrameStats
+import dev.david.tessel.core.sim.ArsenalStat
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -53,16 +61,19 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
     var moreFilters by rememberSaveable{mutableStateOf(false)}
     var frameId by rememberSaveable{mutableIntStateOf(-1)}
     var cardId by rememberSaveable{mutableIntStateOf(-1)}
+    val tankScroll=rememberLazyListState()
+    val cardScroll=rememberLazyListState()
+    val missionScroll=rememberLazyListState()
     val detail=frameId>=0 || cardId>=0
     val back={onTap();if(detail){frameId=-1;cardId=-1}else onBack()}
     BackHandler(onBack=back)
-    Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)){
+    BoxWithConstraints(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)){
+        val columns=if(maxWidth>=650.dp)2 else 1
+        Column(Modifier.fillMaxHeight().widthIn(max=900.dp).fillMaxWidth().align(Alignment.TopCenter).padding(horizontal=Space.x3)){
         Row(Modifier.fillMaxWidth().height(52.dp),verticalAlignment=Alignment.CenterVertically){
             BackButton(if(detail)"Arsenal" else "Home",back)
             Spacer(Modifier.weight(1f))
-            Text(if(frameId>=0)TankEvolution.fromId(frameId).label else if(cardId>=0)Upgrades.of(cardId).name else "Arsenal · Tanks & Cards",Type.title2,c.ink)
-            Spacer(Modifier.weight(1f))
-            Text("LV $level",Type.caption,c.accent)
+            Text("LV $level",Type.caption,c.ink2)
         }
         if(frameId>=0){
             TankDetails(TankEvolution.fromId(frameId),Modifier.weight(1f))
@@ -77,29 +88,30 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                 FilterBar(listOf("All tiers","Basic","Tier 1","Tier 2","Tier 3","Tier 4"),tier,{tier=it})
                 val filtered=TankEvolution.entries.filter { BuildFilter.entries[build].matches(it) && (tier==0 || it.tier==tier-1) }
                 Text("${filtered.size} / ${TankEvolution.entries.size} tanks · Tap a tank to inspect",Type.footnote,c.ink2,Modifier.padding(vertical=4.dp))
-                LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                    items(filtered.chunked(2)){row->
+                LazyColumn(Modifier.weight(1f).fillMaxWidth(),state=tankScroll,verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    items(filtered.chunked(columns),key={it.first().ordinal}){row->
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                             for(frame in row){
-                                Row(Modifier.weight(1f).background(c.surface,RoundedCornerShape(10.dp)).clickable{onTap();frameId=frame.ordinal}.padding(8.dp),verticalAlignment=Alignment.CenterVertically){
+                                Row(Modifier.weight(1f).heightIn(min=72.dp).background(c.surface,RoundedCornerShape(8.dp)).clickable{onTap();frameId=frame.ordinal}.padding(horizontal=10.dp,vertical=5.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                     TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(60.dp),frame)
                                     Column(Modifier.weight(1f)){
                                         Text(frame.label,Type.headline,c.ink,maxLines=2)
-                                        Text("Tier ${frame.tier} · ${CodexCatalog.role(frame)}",Type.caption,if(frame.secret)c.coin else c.ink2,maxLines=2)
+                                        Text(if(frame.secret)"Secret · ${CodexCatalog.role(frame)}" else "Tier ${frame.tier} · ${CodexCatalog.role(frame)}",Type.caption,if(frame.secret)c.coin else c.ink2,maxLines=2)
                                     }
                                     Chevron(c.ink3)
                                 }
                             }
-                            if(row.size==1)Spacer(Modifier.weight(1f))
+                            if(row.size<columns)Spacer(Modifier.weight(1f))
                         }
                     }
                     if(filtered.isEmpty())item{Text("No tanks match these filters.",Type.body,c.ink2)}
                     item{Spacer(Modifier.height(12.dp))}
                 }
             }else{
-                Row(verticalAlignment=Alignment.CenterVertically){
-                    Box(Modifier.weight(1f)){FilterBar(listOf("All","Unlocked","Locked","Legacy"),status,{status=it})}
-                    SecondaryButton(if(moreFilters)"Hide build" else "Build filter",{if(moreFilters)cardBuild=0;moreFilters=!moreFilters})
+                FilterBar(listOf("All","Unlocked","Locked","Legacy"),status,{status=it})
+                Row(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically){
+                    Text(if(moreFilters)"Compatible builds" else "Filter by build",Type.footnote,c.ink2,Modifier.weight(1f))
+                    Text(if(moreFilters)"Hide" else "Show",Type.subhead,c.accent,Modifier.clickable{if(moreFilters)cardBuild=0;moreFilters=!moreFilters}.padding(horizontal=12.dp,vertical=8.dp))
                 }
                 if(moreFilters){FilterBar(BuildFilter.entries.map{it.label},cardBuild,{cardBuild=it})}
                 Spacer(Modifier.height(4.dp))
@@ -114,8 +126,8 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                     when(status){1->unlocked;2->!legacy&&!unlocked;3->legacy;else->true}
                 }
                 Text(if(tab==2)"${CardMission.entries.count{it.unlocked(totals)}} / ${CardMission.entries.size} missions unlocked · rewards enter new runs" else "${cards.size} cards · Tap for stats and compatible builds",Type.footnote,c.ink2,Modifier.padding(vertical=4.dp))
-                LazyColumn(Modifier.weight(1f).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                    items(cards.chunked(2)){row->
+                LazyColumn(Modifier.weight(1f).fillMaxWidth(),state=if(tab==2)missionScroll else cardScroll,verticalArrangement=Arrangement.spacedBy(6.dp)){
+                    items(cards.chunked(columns),key={it.first()}){row->
                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
                             for(id in row){
                                 val def=Upgrades.of(id);val mission=CardMission.forUpgrade(id)
@@ -138,7 +150,7 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                                     }
                                 }
                             }
-                            if(row.size==1)Spacer(Modifier.weight(1f))
+                            if(row.size<columns)Spacer(Modifier.weight(1f))
                         }
                     }
                     if(cards.isEmpty())item{Text("No cards match these filters.",Type.body,c.ink2)}
@@ -146,56 +158,89 @@ fun CardCollectionScreen(ledger:Ledger,onBack:()->Unit,onTap:()->Unit={}) {
                 }
             }
         }
+        }
     }
 }
 
 @Composable
 private fun TankDetails(frame:TankEvolution,modifier:Modifier) {
     val c=Theme.colors
-    Row(modifier.fillMaxWidth().padding(vertical=Space.x2),horizontalArrangement=Arrangement.spacedBy(Space.x4)){
-        Column(Modifier.weight(1.05f).verticalScroll(rememberScrollState())) {
-            CodexCombatPreview(frame)
-            Text("Demonstration uses the real tank and enemy simulation. No progress is recorded.",Type.footnote,c.ink3)
-        }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
-            Text(CodexCatalog.role(frame),Type.title3,c.accent)
-            Text(frame.detail,Type.subhead,c.ink)
-            DetailStat("Unlock",if(frame.tier==0)"Starting frame" else "Stage ${CodexCatalog.unlockStage(frame)}")
-            if(frame.parent>=0)DetailStat("Evolves from",TankEvolution.fromId(frame.parent).label)
-            DetailStat("Movement","${f(Balance.PLAYER_SPEED*frame.move)} units/s")
-            DetailStat("Base hull bonus","+${frame.hullBonus} HP")
-            val drone=frame.droneSpec
-            if(drone!=null){
-                DetailStat("Drone capacity","${drone.cap} units")
-                DetailStat("Drone health","${drone.hp} HP each")
-                DetailStat("Impact damage",f(Balance.BULLET_DAMAGE*frame.damage*drone.impact))
-                DetailStat("Replacement","${f(drone.respawn)} s")
-                DetailStat("Command range",f(drone.reach))
-                DetailStat("Defense","Absorb hostile shots; each block costs 1 drone HP")
-                DetailStat("Control","Aim to command the wing; release to guard")
-                DetailStat("Limitation","Destroyable units; serial replacement")
-            }else if(frame.melee){
-                DetailStat("Base impact",f(frame.ram))
-                DetailStat("Shield recharge","${f(frame.shieldSeconds)} s")
-                DetailStat("Regeneration","${frame.regenSeconds}s per HP")
-                DetailStat("Limitation","Must make contact")
-            }else{
-                DetailStat("Barrels",frame.barrels.toString())
-                DetailStat("Damage / shot",f(Balance.BULLET_DAMAGE*frame.damage))
-                DetailStat("Volleys / second",f(Balance.FIRE_RATE*frame.rate))
-                DetailStat("Range","${f(Balance.BULLET_RANGE*frame.reach)} units")
-                DetailStat("Extra pierce",frame.extraPierce.toString())
-                DetailStat("Limitation",when{BuildFilter.CANNON.matches(frame)->"Slow reload";BuildFilter.SNIPER.matches(frame)->"Precise aim";BuildFilter.RAPID.matches(frame)->"Lower per-shot power";else->"Positioning and aim"})
+    val spec=remember(frame){ArsenalFrameStats.forFrame(frame)}
+    LazyColumn(modifier.fillMaxWidth().testTag("tank-details"),verticalArrangement=Arrangement.spacedBy(10.dp),contentPadding=PaddingValues(bottom=18.dp)){
+        item {
+            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                Text(frame.label,Type.largeTitle,c.ink)
+                Text(CodexCatalog.role(frame),Type.subhead,c.accent)
+                Text(frame.detail,Type.body,c.ink2)
             }
-            Text("Base values before character passives and purchased upgrades.",Type.footnote,c.ink3)
+        }
+        item { TankDiagram(frame,spec.primary) }
+        item { Text("Base values before difficulty, character passives and purchased upgrades.",Type.caption,c.ink3) }
+        item { CodexCombatPreview(frame) }
+        item {
+            Text("Specifications",Type.headline,c.ink)
+            Spacer(Modifier.height(5.dp))
+            for(stat in spec.secondary){DetailStat(stat.label,stat.value);Divider()}
+            DetailStat("Limitation",spec.limitation)
+        }
+    }
+}
+
+/** A common schematic template; values and labels are selected by actual frame type. */
+@Composable
+private fun TankDiagram(frame:TankEvolution,stats:List<ArsenalStat>){
+    val c=Theme.colors
+    BoxWithConstraints(Modifier.fillMaxWidth().height(176.dp).background(c.surface,RoundedCornerShape(10.dp)).testTag("tank-diagram")){
+        Canvas(Modifier.fillMaxSize()){
+            val w=size.width;val h=size.height
+            val grid=22.dp.toPx()
+            var x=grid
+            while(x<w){drawLine(c.ink.copy(alpha=.035f),Offset(x,0f),Offset(x,h));x+=grid}
+            var y=grid
+            while(y<h){drawLine(c.ink.copy(alpha=.035f),Offset(0f,y),Offset(w,y));y+=grid}
+            for(row in 0..1){
+                val sy=h*(if(row==0).27f else .73f)
+                val ey=h*(if(row==0).42f else .58f)
+                for(left in listOf(true,false)){
+                    val start=Offset(w*(if(left).275f else .725f),sy)
+                    val elbow=Offset(w*(if(left).335f else .665f),sy)
+                    val end=Offset(w*(if(left).43f else .57f),ey)
+                    drawLine(c.ink2.copy(alpha=.65f),start,elbow,1.dp.toPx(),StrokeCap.Round)
+                    drawLine(c.ink2.copy(alpha=.65f),elbow,end,1.dp.toPx(),StrokeCap.Round)
+                    drawCircle(c.accent,2.dp.toPx(),end)
+                }
+            }
+        }
+        Row(Modifier.fillMaxSize().padding(horizontal=7.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically){
+            Column(Modifier.weight(.31f).fillMaxHeight(),verticalArrangement=Arrangement.SpaceAround){
+                DiagramValue(stats[0],TextAlign.Start)
+                DiagramValue(stats[1],TextAlign.Start)
+            }
+            Box(Modifier.weight(.38f).fillMaxHeight(),contentAlignment=Alignment.Center){
+                TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(minOf(150.dp,maxWidth*.38f)),frame)
+            }
+            Column(Modifier.weight(.31f).fillMaxHeight(),verticalArrangement=Arrangement.SpaceAround){
+                DiagramValue(stats[2],TextAlign.End)
+                DiagramValue(stats[3],TextAlign.End)
+            }
         }
     }
 }
 @Composable
+private fun DiagramValue(stat:ArsenalStat,align:TextAlign){
+    val c=Theme.colors
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(1.dp)){
+        Text(stat.label,Type.caption,c.ink2,Modifier.fillMaxWidth(),align=align,maxLines=2)
+        Text(stat.value,Type.headline.merge(Type.numbers),c.ink,Modifier.fillMaxWidth(),align=align,maxLines=2)
+    }
+}
+
+@Composable
 private fun CardDetails(id:Int,ledger:Ledger,modifier:Modifier){
     val c=Theme.colors;val def=Upgrades.of(id);val mission=CardMission.forUpgrade(id)
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical=Space.x2),verticalArrangement=Arrangement.spacedBy(8.dp)){
-        Text(def.blurb,Type.title3,c.ink)
+        Text(def.name,Type.largeTitle,c.ink)
+        Text(def.blurb,Type.body,c.ink2)
         DetailStat("Family",familyName(def.family))
         DetailStat("Run rank limit",Upgrades.runCap(id).toString())
         if(CodexCatalog.legacy(id)){
@@ -222,7 +267,7 @@ private fun CardDetails(id:Int,ledger:Ledger,modifier:Modifier){
 @Composable
 private fun DetailStat(label:String,value:String){
     val c=Theme.colors
-    Row(Modifier.fillMaxWidth().background(c.surface,RoundedCornerShape(8.dp)).padding(horizontal=10.dp,vertical=7.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(Modifier.fillMaxWidth().padding(horizontal=5.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
         Text(label,Type.footnote,c.ink2,Modifier.weight(.85f))
         Text(value,Type.subhead,c.ink,Modifier.weight(1.15f))
     }
