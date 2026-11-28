@@ -70,25 +70,32 @@ abstract class MenuGalleryBase {
         compose.waitForIdle()
     }
     fun tapPerkCombo(index:Int){
-        val (x,y)=UpgradeMap.point(410f,UpgradeMap.angle(index))
+        val (x,y)=PerkTimeline.fusionPoint(index)
         compose.onNodeWithTag("perk-map").performTouchInput{
             val cam=MarketCamera()
             click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))
         }
         compose.waitForIdle()
     }
-    fun sampleShop(stage:Int=17,mask:Long=0L,perks:Int=0,developer:Boolean=false,reward:Int=0):ShopView{
+    fun sampleShop(stage:Int=27,mask:Long=0L,perks:Int=0,developer:Boolean=false,reward:Int=0,wallet:Int=418,repeatMagnet:Boolean=false):ShopView{
         val w=World(seed=721L)
         w.reset(seed=721L,difficulty=Difficulty.NORMAL)
         w.skipTo(stage)
-        w.players.coins[0]=418;w.players.hp[0]=9;w.players.maxHp[0]=12
-        w.devSetFrame(if(stage>=15)TankEvolution.OVERSEER else TankEvolution.BASIC)
+        w.players.coins[0]=wallet;w.players.hp[0]=9;w.players.maxHp[0]=12
+        w.devSetFrame(if(stage>=25)TankEvolution.FOCUS else if(stage>=15)TankEvolution.TRIPLET else TankEvolution.BASIC)
+        if(stage>=15){w.devSetUpgrade(Upgrades.DAMAGE,3);w.devSetUpgrade(Upgrades.MAGNET,2);w.devSetUpgrade(Upgrades.MAX_HEALTH,2)}
         w.devSetSkillMask(mask);w.players.perks[0]=perks
+        val pl=w.players
+        if(stage>5)pl.recordReward(0,5,TankEvolution.REWARD_BASE+TankEvolution.TWIN.ordinal)
+        if(stage>=10&&perks and (1 shl Perks.SECOND_WIND)!=0)pl.recordReward(0,10,Perks.SECOND_WIND)
+        if(stage>15)pl.recordReward(0,15,TankEvolution.REWARD_BASE+TankEvolution.TRIPLET.ordinal)
+        if(stage>=20&&perks and (1 shl Perks.LAST_STAND)!=0)pl.recordReward(0,20,Perks.LAST_STAND)
+        if(stage>25)pl.recordReward(0,25,TankEvolution.REWARD_BASE+TankEvolution.FOCUS.ordinal)
         w.devOpenShop()
         // Choose three valid real offers to make the different rarities visible.
-        w.shop.devStock(w,listOf(CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE),CardCode.pack(Upgrades.MAX_HEALTH,CardRarity.COMMON),CardCode.pack(Upgrades.WEALTH,CardRarity.UNCOMMON)))
+        w.shop.devStock(w,if(repeatMagnet)listOf(CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON),CardCode.pack(Upgrades.MAGNET,CardRarity.RARE),CardCode.pack(Upgrades.DAMAGE,CardRarity.UNCOMMON))else listOf(CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE),CardCode.pack(Upgrades.MAX_HEALTH,CardRarity.COMMON),CardCode.pack(Upgrades.WEALTH,CardRarity.UNCOMMON)))
         w.shop.devReward(w,when(reward){1->dev.david.tessel.core.dev.DevReward.PERKS;2->dev.david.tessel.core.dev.DevReward.EVOLUTION;else->dev.david.tessel.core.dev.DevReward.NONE})
-        val s=w.shop;val pl=w.players
+        val s=w.shop
         val offers=List(SHOP_SLOTS){slot->
             val id=s.item(0,slot)
             if(id<0)ShopOffer(slot,"Empty","",0,0,0,true,false,empty=true)
@@ -100,7 +107,7 @@ abstract class MenuGalleryBase {
         }
         return ShopView(stage,pl.coins[0],pl.hp[0],pl.maxHp[0],offers,s.healPrice(w,0),s.healsLeft(0),s.canHeal(w,0),s.rerollPrice(w,0),s.canReroll(w,0),
             perkOffers=rewards,healAmount=s.healAmount(w,0),perkMask=perks,skillNodes=mask,freeRefreshesLeft=s.freeRefreshesLeft(w,0),
-            devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0])
+            devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
     @Composable fun Market(s:ShopView){
         RunShopScreen(s,false,{}, {}, {}, {}, {}, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
@@ -161,19 +168,42 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         val shop=sampleShop(stage=1)
         show{Market(shop)}
         capture("29-upgrades-early")
-        click("Skills");capture("30-shop-skills-locked")
-        click("Perks");capture("31-perks-stage-five-gate")
+        click("Skills");tapSkill(0);capture("30-shop-skills-locked")
+        click("×");click("Perks");capture("31-perks-stage-five-gate")
     }
     @Test fun marketAdvanced(){
         val shop=sampleShop(mask=SkillGraph.bit(0) or SkillGraph.bit(9),perks=PerkCombo.LAST_LIGHT.mask or (1 shl Perks.OVERCLOCK))
         show{Market(shop)}
         capture("32-upgrades-radial")
         tapUpgrade(Upgrades.DAMAGE);capture("33-upgrade-inspection")
+        scroll("Damage per bullet");capture("59-damage-forecast")
         click("×");click("Skills");capture("34-skills-discovery")
         tapSkill(9);capture("35-skill-inspection")
         click("×");click("Perks");capture("36-perks-radial-sigils")
         tapPerkCombo(0);capture("37-perk-combo-active")
-        click("×");tapPerkCombo(1);capture("38-perk-combo-hint")
+        click("×")
+        val (x,y)=PerkTimeline.roundPoint(1)
+        compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
+        capture("38-perk-combo-hint")
+    }
+    @Test fun repeatOffersAndForecast(){
+        show{Market(sampleShop(stage=17,wallet=420,repeatMagnet=true))}
+        capture("60-repeatable-rank-net")
+        tapUpgrade(Upgrades.MAGNET);capture("61-magnet-first-offer")
+        scroll("Pickup radius");capture("62-magnet-radius-forecast")
+        scroll("#2 · Rare");click("#2 · Rare");capture("63-magnet-rare-offer")
+        scroll("Pickup radius");capture("64-magnet-rare-forecast")
+    }
+    @Test fun skillMoneyCheck(){
+        show{Market(sampleShop(stage=5,wallet=12))}
+        click("Skills");tapSkill(0);capture("65-skill-stage-met-money-missing")
+    }
+    @Test fun perkRoundsBeforeFusion(){
+        show{Market(sampleShop(stage=17,perks=1 shl Perks.SECOND_WIND))}
+        click("Perks");capture("66-perk-rounds-before-fusion")
+        val (x,y)=PerkTimeline.roundPoint(1)
+        compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
+        capture("67-perk-round-inspection")
     }
     @Test fun marketBossRewards(){
         val shop=sampleShop(stage=10,reward=1)

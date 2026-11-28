@@ -13,11 +13,11 @@ class DevShopScenarioTest {
         assertEquals(1234,w.players.coins[0]);assertEquals(0,w.players.earned[0])
         assertEquals(0,w.enemies.count)
     }
-    @Test fun forcedOffersAreUniqueAndStillUseTheActualPurchaseEngine(){
+    @Test fun duplicateOffersRetainTheirOwnSlotsAndRarities(){
         val w=World(seed=42);w.reset(seed=42);w.players.coins[0]=10000;w.devOpenShop()
         val raw=CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE)
         w.shop.devStock(w,listOf(raw,raw,-1))
-        assertEquals(raw,w.shop.raw(0,0));assertEquals(3,(0 until SHOP_SLOTS).map{w.shop.item(0,it)}.toSet().size)
+        assertEquals(raw,w.shop.raw(0,0));assertEquals(raw,w.shop.raw(0,1))
         val price=w.shop.price(w,0,0)
         assertTrue(w.shop.buy(w,0,0));assertEquals(10000-price,w.players.coins[0])
         assertEquals(3,w.players.levels[0][Upgrades.DAMAGE])

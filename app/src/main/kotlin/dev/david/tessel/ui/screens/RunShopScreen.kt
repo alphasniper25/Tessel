@@ -163,7 +163,7 @@ private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->
                         }
                     }
                     Text(offer?.blurb?:def.blurb,Type.footnote,c.ink2)
-                    val rank=rank(id);val cap=Upgrades.runCap(id)
+                    val rank=rank(id);val cap=if(shop.devPreview)maxOf(rank,Upgrades.runCap(id))else Upgrades.runCap(id)
                     Text("Rank $rank → ${(rank+(offer?.levels?:0)).coerceAtMost(cap)} / $cap",Type.subhead,c.ink)
                     RankSockets(cap,rank,offer?.levels?:0,if(offer!=null)rarityColor(offer.rarity,c.dark,c.accent,c.coin)else c.accent)
                     if(offer!=null){

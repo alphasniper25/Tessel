@@ -101,9 +101,9 @@ class SkillTreeAlpha12Test {
         cp.rerolls[0]=3
         // Format 8 appends precisely a long and byte to each seat. One seat here.
         val current=cp.write()
-        val legacy=current.copyOf(current.size-9).also{it[2]=7}
+        val legacy=current.copyOf(current.size-9-RewardRounds.COUNT).also{it[2]=7}
         val read=Checkpoint.read(legacy)!!
-        assertEquals(8,Checkpoint.FORMAT);assertEquals(321,read.coins[0])
+        assertEquals(9,Checkpoint.FORMAT);assertEquals(321,read.coins[0])
         assertEquals(2,read.freeRerollsUsed[0]);assertEquals(1,read.rerolls[0])
         assertEquals(-1,read.perkOffer[0][0])
         val w=World(seed=12L).apply{restore(read,12L){true}}
