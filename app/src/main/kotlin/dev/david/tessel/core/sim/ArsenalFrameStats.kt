@@ -48,7 +48,7 @@ data class ArsenalFrameStats(val primary:List<ArsenalStat>,val secondary:List<Ar
                 }
                 else->{
                     main+=ArsenalStat("Shot damage",f(p.damage(0)))
-                    main+=ArsenalStat("Fire rate","${f(p.fireRate(0))}/s")
+                    main+=ArsenalStat("Volley rate","${f(p.fireRate(0))}/s")
                     extra+=listOf(ArsenalStat("Barrels",p.volley(0).toString()),
                         ArsenalStat("Range","${f(p.range(0))} u"),
                         ArsenalStat("Extra pierce",p.pierce(0).toString()))

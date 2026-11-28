@@ -61,7 +61,7 @@ fun GarageScreen(settings: Settings, ledger: Ledger, onChange: ((Settings) -> Se
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=16.dp)) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
             BackButton("Home", onBack)
-            Spacer(Modifier.weight(1f)); Text("Tank Garage", Type.title2, c.ink); Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             Text("$balance credits", Type.headline, c.coin)
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

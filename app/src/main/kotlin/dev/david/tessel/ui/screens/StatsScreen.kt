@@ -70,7 +70,6 @@ fun StatsScreen(ledger: Ledger, now: Long, onErase: () -> Unit, onBack: () -> Un
     ) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
             BackButton("Home", onBack, Modifier.align(Alignment.CenterStart))
-            Text("Statistics", Type.headline, c.ink, Modifier.align(Alignment.Center))
             if(onCodex!=null) dev.david.tessel.ui.components.SecondaryButton("Arsenal",onCodex,Modifier.align(Alignment.CenterEnd))
         }
         Box(Modifier.fillMaxWidth().padding(horizontal = Space.x6), contentAlignment = Alignment.Center) {

@@ -131,7 +131,6 @@ fun LobbyScreen(
     ) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = Space.x4)) {
             BackButton("Home", onBack, Modifier.align(Alignment.CenterStart))
-            Text("Play Together", Type.headline, c.ink, Modifier.align(Alignment.Center))
         }
         Box(
             Modifier

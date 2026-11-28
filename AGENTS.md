@@ -83,3 +83,9 @@
 - Garage append IDs 15–25 with original 32-bit mask and nibble encoding; cosmetic only. Profile uses existing local multiplayer name; Google sign-in and Google Play listing are placeholders, no cloud or identity credentials. Settings reachable through profile or pause.
 - ScreenFit validates safe bounds, compact HUD and sticks without changing arena physics or personal camera. Validate multiple sizes and font scaling; do not claim perfect rendering on all phones from tests alone.
 - Source only, versionCode 36; never assemble, sign, publish or generate APK without explicit request.
+
+## Alpha.16 — interface-only discovery and portrait Arsenal
+- Keep the alpha.15 gameplay economy, save FORMAT=8, protocol 29, tank stats, mission IDs and 60 skill IDs unchanged. Discovery is a pure view of each seat's skill mask: roots or neighbors of owned nodes are revealed, owned nodes filled, all other nodes anonymous silhouettes with no hit/inspect action. No new saved fields or currency.
+- Skill map fills the screen; no persistent detail panel or duplicate title. Tap a revealed node for its exact current quote and effect; details close independently. Keep zoom, pan, fit, accessible actions and purchase authority.
+- Arsenal alone requests sensor portrait, returns to sensor landscape on exit; existing manifest handles orientation/configuration changes, responsive wide layout fallback when Android ignores orientation. Single-column portrait list, consistent annotated tank diagram from actual base player formulas, no false weapon stats for drones/melee, automatic isolated eight-second previews with lifecycle stop. No real-game progress.
+- Neutral skill-tree menu button and remove redundant center headings in collection/garage/settings/profile/stats/lobby. Keep navigational controls. Source only, versionCode 37, no APK until owner authorizes.

@@ -152,14 +152,14 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                 }
                 // Root sector names remain public, but deeper identities are not disclosed.
                 for(sector in SkillSector.entries){
-                    val root=SkillGraph.nodes[sector.ordinal*9]
-                    val at=point(root.x*1.12f,root.y*1.12f)
+                    val outer=SkillGraph.nodes[sector.ordinal*9+8]
+                    val at=point(outer.x*1.055f,outer.y*1.055f)
                     paint.color=sectorTint(sector,c.dark).copy(alpha=.85f).toArgb()
                     paint.textSize=9.dp.toPx()
                     val label=sector.label.uppercase()
                     val half=paint.measureText(label)*.5f
                     val x=at.x.coerceIn(half+3f,maxOf(half+3f,w-half-3f))
-                    val dy=if(root.y<0)-13.dp.toPx() else 16.dp.toPx()
+                    val dy=if(outer.y<0)-9.dp.toPx() else 12.dp.toPx()
                     val y=(at.y+dy).coerceIn(paint.textSize+2f,maxOf(paint.textSize+2f,h-3f))
                     if(at.x in 0f..w&&at.y in 0f..h)drawContext.canvas.nativeCanvas.drawText(label,x,y,paint)
                 }

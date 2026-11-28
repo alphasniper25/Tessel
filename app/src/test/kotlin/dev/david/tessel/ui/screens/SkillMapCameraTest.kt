@@ -26,4 +26,15 @@ class SkillMapCameraTest{
         assertEquals(1f,c.gesture(900f,380f,450f,190f,0f,0f,.01f).zoom,.001f)
         assertNull(c.hit(900f,380f,0f,0f,15f))
     }
+
+    @Test fun hiddenNodeCentersCannotBeInspectedEvenWithZoom(){
+        val w=1200f;val h=520f
+        val base=SkillMapCamera()
+        val n=SkillGraph.nodes[1]
+        for(cam in listOf(base,base.gesture(w,h,w/2,h/2,15f,-10f,2f))){
+            val x=cam.sx(n.x,w,h);val y=cam.sy(n.y,w,h)
+            assertNull(cam.hitDiscovered(w,h,x,y,15f,0L))
+            assertEquals(1,cam.hitDiscovered(w,h,x,y,15f,SkillGraph.bit(0)))
+        }
+    }
 }

@@ -364,11 +364,11 @@ fun TesselApp(
             )
         }
 
-        AnimatedVisibility(
-            visible = arsenalVisible,
-            enter = slideInHorizontally(Springs.ui()) { it } + fadeIn(Springs.ui()),
-            exit = slideOutHorizontally(Springs.ui()) { it } + fadeOut(Springs.ui()),
-        ) { CardCollectionScreen(ledger, onBack = { cardsOpen = false;game.menuSound() }, onTap=game::menuSound) }
+        // Portrait-only route: dispose the detail preview immediately on exit,
+        // rather than keeping it running through a landscape rotation animation.
+        if(arsenalVisible) {
+            CardCollectionScreen(ledger,onBack={cardsOpen=false;game.menuSound()},onTap=game::menuSound)
+        }
 
         AnimatedVisibility(visible = garageOpen && mode == Mode.HOME, enter = fadeIn(Springs.ui()), exit = fadeOut(Springs.ui())) {
             dev.david.tessel.ui.screens.GarageScreen(settings, ledger, store::update, onBack = { garageOpen = false })

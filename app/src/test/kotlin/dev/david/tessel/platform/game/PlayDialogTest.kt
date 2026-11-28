@@ -11,6 +11,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.geometry.Offset
+import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.ui.screens.SkillMapCamera
 import dev.david.tessel.core.content.Difficulty
 import dev.david.tessel.core.sim.Checkpoint
 import dev.david.tessel.platform.net.CoopLobby
@@ -44,6 +50,15 @@ class PlayDialogTest {
     private lateinit var dir: File
     private lateinit var game: GameSurfaceView
     private lateinit var saves: SoloSaves
+    private val orientationRequests=mutableListOf<Boolean>()
+    private fun tapSkill(id:Int){
+        val n=SkillGraph.nodes[id]
+        compose.onNodeWithTag("skill-map").performTouchInput {
+            val camera=SkillMapCamera()
+            click(Offset(camera.sx(n.x,width.toFloat(),height.toFloat()),camera.sy(n.y,width.toFloat(),height.toFloat())))
+        }
+        compose.waitForIdle()
+    }
 
     @Before
     fun setUp() {
@@ -57,7 +72,7 @@ class PlayDialogTest {
         val store = SettingsStore(compose.activity)
         store.update { it.copy(tutorialSeen = true) }
         val updater = Updater(compose.activity)
-        compose.setContent { TesselTheme { TesselApp(game, lobby, store, ledger, saves, updater, null) } }
+        compose.setContent { TesselTheme { TesselApp(game, lobby, store, ledger, saves, updater, null,onArsenalOrientation={orientationRequests.add(it)}) } }
     }
 
     @After
@@ -137,14 +152,20 @@ class PlayDialogTest {
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Skill Tree").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("Quick Refresh").assertIsDisplayed()
-        compose.onNodeWithText("LOCKED · STAGE 3").assertIsDisplayed()
+        compose.onNodeWithText("0 / 60 unlocked").assertIsDisplayed()
+        compose.onNodeWithText("6 / 60 discovered").assertIsDisplayed()
+        compose.onNodeWithText("Quick Refresh").assertDoesNotExist()
         compose.onNodeWithText("+").performClick()
         compose.onNodeWithText("133%").assertIsDisplayed()
         compose.onNodeWithText("Fit").performClick()
         compose.onNodeWithText("100%").assertIsDisplayed()
-        compose.onNodeWithText("›").performClick()
-        compose.onNodeWithText("Double Refresh").assertIsDisplayed()
+        tapSkill(1)
+        compose.onNodeWithText("Double Refresh").assertDoesNotExist()
+        tapSkill(0)
+        compose.onNodeWithText("Quick Refresh").assertIsDisplayed()
+        compose.onNodeWithText("LOCKED · STAGE 3").assertIsDisplayed()
+        compose.onNodeWithText("×").performClick()
+        compose.onNodeWithText("Quick Refresh").assertDoesNotExist()
         compose.onNodeWithText("Home").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Play").assertIsDisplayed()
@@ -153,8 +174,9 @@ class PlayDialogTest {
     @Test
     fun codexCardCanOpenDetailsAndReturnToList() {
         compose.mainClock.advanceTimeBy(1000)
-        compose.onNodeWithText("Arsenal").performClick()
+        compose.onNodeWithText("Arsenal").performScrollTo().performClick()
         compose.mainClock.advanceTimeBy(1000)
+        compose.runOnIdle{assertEquals(true,orientationRequests.last())}
         compose.onNodeWithText("Cards").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Damage").performClick()
@@ -163,6 +185,10 @@ class PlayDialogTest {
         compose.onNodeWithText("Arsenal").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Cards").assertIsDisplayed()
+        compose.runOnIdle{assertEquals(true,orientationRequests.last())}
+        compose.onNodeWithText("Home").performClick()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.runOnIdle{assertEquals(false,orientationRequests.last())}
     }
 
     @Test
@@ -178,13 +204,22 @@ class PlayDialogTest {
         compose.onNodeWithText("Next Stage").assertIsDisplayed()
         compose.onNodeWithText("Skill Tree").performClick()
         compose.mainClock.advanceTimeBy(1000)
-        val cost=dev.david.tessel.core.content.SkillGraph.nodes[0].price
+        tapSkill(0)
+        val cost=SkillGraph.nodes[0].price
         compose.onNodeWithText("Unlock · $cost").performClick()
         val until=System.currentTimeMillis()+5000
         while(game.shop.value?.skillNodes!=1L&&System.currentTimeMillis()<until){compose.waitForIdle();Thread.sleep(10)}
         assertEquals(1L,game.shop.value?.skillNodes)
         assertEquals(200-cost,game.shop.value?.coins)
         compose.onNodeWithText("Unlocked").assertIsDisplayed()
+        compose.onNodeWithText("8 / 60 discovered").assertIsDisplayed()
+        compose.onNodeWithText("×").performClick()
+        tapSkill(1)
+        compose.onNodeWithText("Double Refresh").assertIsDisplayed()
+        compose.onNodeWithText("LOCKED · STAGE 7").assertIsDisplayed()
+        compose.onNodeWithText("×").performClick()
+        tapSkill(3)
+        compose.onNodeWithText("Triple Refresh").assertDoesNotExist()
         compose.onNodeWithText("Shop").performClick()
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithText("Next Stage").assertIsDisplayed()

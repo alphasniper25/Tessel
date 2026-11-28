@@ -19,8 +19,8 @@ android {
         applicationId = "com.kreatonik.tessel"
         minSdk = 26
         targetSdk = 37
-        versionCode = 36
-        versionName = "1.1.0-alpha.15"
+        versionCode = 37
+        versionName = "1.1.0-alpha.16"
         resValue("string", "app_name", "Tessel")
     }
 

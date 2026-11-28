@@ -62,7 +62,7 @@ fun PlayerProfileScreen(initialName:String,ledger:Ledger,onName:(String)->Unit,o
     Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout).padding(horizontal=Space.x4)){
         Row(Modifier.fillMaxWidth().height(52.dp),verticalAlignment=Alignment.CenterVertically){
             BackButton("Home",onBack)
-            Spacer(Modifier.weight(1f));Text("Player profile",Type.title2,c.ink);Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             Text("LOCAL",Type.caption,c.accent)
         }
         Divider()

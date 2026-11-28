@@ -191,6 +191,7 @@ private fun TankDetails(frame:TankEvolution,modifier:Modifier) {
 private fun TankDiagram(frame:TankEvolution,stats:List<ArsenalStat>){
     val c=Theme.colors
     BoxWithConstraints(Modifier.fillMaxWidth().height(176.dp).background(c.surface,RoundedCornerShape(10.dp)).testTag("tank-diagram")){
+        val spriteSize=minOf(150.dp,maxWidth*.38f)
         Canvas(Modifier.fillMaxSize()){
             val w=size.width;val h=size.height
             val grid=22.dp.toPx()
@@ -217,7 +218,7 @@ private fun TankDiagram(frame:TankEvolution,stats:List<ArsenalStat>){
                 DiagramValue(stats[1],TextAlign.Start)
             }
             Box(Modifier.weight(.38f).fillMaxHeight(),contentAlignment=Alignment.Center){
-                TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(minOf(150.dp,maxWidth*.38f)),frame)
+                TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(spriteSize),frame)
             }
             Column(Modifier.weight(.31f).fillMaxHeight(),verticalArrangement=Arrangement.SpaceAround){
                 DiagramValue(stats[2],TextAlign.End)

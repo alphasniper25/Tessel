@@ -1,9 +1,9 @@
-name: TESSEL alpha.15 source checks
+name: TESSEL alpha.16 source checks
 on:
   push:
-    branches: [test/alpha15]
+    branches: [test/alpha16]
 concurrency:
-  group: alpha15-${{ github.ref }}
+  group: alpha16-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -33,54 +33,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TESSEL-alpha15-unit-tests
+          name: TESSEL-alpha16-unit-tests
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 7
       # Source-only candidate: no APK assembly, signing or publication.
 
-  balance-audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - variant: baseline
-            ref: 5818be50af9bd2fcce8cdd7a9de98c2c1591f291
-          - variant: candidate
-            ref: ${{ github.sha }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: harness
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.ref }}
-          path: game
-      - run: cp harness/app/src/test/kotlin/dev/david/tessel/core/sim/BalanceAuditTest.kt game/app/src/test/kotlin/dev/david/tessel/core/sim/BalanceAuditTest.kt
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
-      - run: sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0"
-      - name: Run matched frame and campaign audit (no APK)
-        working-directory: game
-        env:
-          TESSEL_BALANCE_AUDIT: '1'
-          TESSEL_BALANCE_OUT: ${{ github.workspace }}/balance-results
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon testDebugUnitTest --tests '*BalanceAuditTest'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: TESSEL-alpha15-balance-${{ matrix.variant }}
-          path: |
-            balance-results/
-            game/app/build/test-results/testDebugUnitTest/
-          if-no-files-found: warn
-          retention-days: 30
