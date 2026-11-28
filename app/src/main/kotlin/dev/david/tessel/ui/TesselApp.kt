@@ -494,7 +494,9 @@ fun TesselApp(
                 canSpend=currentShop!=null && !currentShop.selfReady && currentShop.perkOffers.isEmpty(),
                 onSpend=game::buySkill,
                 onBack={treeOpen=false;game.menuSound()},
-                backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home"
+                backLabel=if(mode==Mode.SHOP)"Shop" else if(mode==Mode.PAUSED)"Pause" else "Home",
+                frame=currentShop?.frame?:dev.david.tessel.core.content.TankEvolution.BASIC,
+                character=currentShop?.character?:settings.tankClass,look=currentShop?.look?:settings.tankLook
             )
         }
         // The partner left, or the link never came back, while the lobby screen was closed.

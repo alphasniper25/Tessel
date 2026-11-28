@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.*
 import dev.david.tessel.platform.game.ShopOffer
 import dev.david.tessel.platform.game.ShopView
+import dev.david.tessel.platform.game.TankArt
 import dev.david.tessel.ui.components.*
 import dev.david.tessel.ui.theme.*
 import kotlin.math.*
@@ -88,7 +89,7 @@ fun RunShopScreen(shop:ShopView,vibrate:Boolean,
                 0->UpgradeMarket(shop,{feedback();onBuy(it)},{i,v->feedback();onLock(i,v)},onDevRank)
                 1->SkillTreeScreen(shop.stage,shop.skillNodes,shop.coins,!pending&&!shop.selfReady,
                     {feedback();onSkill(it)},{tab=0},"Shop",embedded=true,
-                    onDevSkill=if(shop.devPreview)onDevSkill else null)
+                    onDevSkill=if(shop.devPreview)onDevSkill else null,frame=shop.frame,character=shop.character,look=shop.look)
                 else->PerkMarket(shop,{feedback();onPerk(it)},onDevPerk)
             }
         }
@@ -107,7 +108,7 @@ fun RunShopScreen(shop:ShopView,vibrate:Boolean,
 }
 
 private data class MarketItem(val id:Int,val x:Float,val y:Float,val icon:MarketIcon,val tint:Color,
-    val visibleLabel:String?=null,val caption:String?=null,val selectable:Boolean=false,val owned:Boolean=false,val lit:Boolean=false,val locked:Boolean=false)
+    val visibleLabel:String?=null,val caption:String?=null,val selectable:Boolean=false,val owned:Boolean=false,val lit:Boolean=false,val locked:Boolean=false,val sigil:Int=-1)
 
 private fun rarityColor(tier:CardRarity,dark:Boolean,normal:Color,coin:Color):Color=when(tier){
     CardRarity.COMMON->normal
@@ -137,8 +138,8 @@ private fun UpgradeMarket(shop:ShopView,onBuy:(Int)->Unit,onLock:(Int,Boolean)->
     }
     BoxWithConstraints(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(c.surface)){
         MarketCanvas(items,links,selected,{id->selected=id},tag="upgrade-map",
-            labels=listOf(Triple("FIREPOWER",-320f,-255f),Triple("HULL",320f,-255f),Triple("IMPACT",-430f,100f),Triple("MOBILITY",0f,100f),Triple("ECONOMY",430f,100f)),
-            footer="${offers.size} / 3 offers  ·  Dim nodes are not on sale")
+            labels=UpgradeMap.groups.map{g->val (x,y)=UpgradeMap.point(487f,UpgradeMap.angle(g.ordinal));Triple(UpgradeMap.label(g).uppercase(),x,y)},
+            footer="${offers.size} / 3 offers  ·  Dim nodes are not on sale",frame=shop.frame,character=shop.character,look=shop.look)
         val id=selected.takeIf{it in 0 until Upgrades.count}
         if(id!=null&&(selectedOffer!=null||shop.devPreview)){
             val wide=maxWidth>=580.dp
@@ -189,6 +190,8 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
             if(pending)MarketButton(if(rewards)"Perk map" else "Choose reward",{rewards=!rewards;selected=-1})
             Text("${PerkCombo.entries.count{it.active(shop.perkMask)}} / ${PerkCombo.entries.size} combos",Type.footnote,c.ink2)
         }
+        if(!pending&&shop.stage<Bestiary.BOSS_EVERY&&!shop.devPreview)
+            StageGateNotice("PERKS & EVOLUTION · STAGE ${Bestiary.BOSS_EVERY}","Clear stage ${Bestiary.BOSS_EVERY} to choose your first boss reward. ${shop.stage}/${Bestiary.BOSS_EVERY} stages cleared.",Modifier.fillMaxWidth().padding(bottom=4.dp))
         if(pending&&rewards){
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
                 Text(if(shop.perkOffers.any{it.evolution!=null})"Choose a tank evolution" else "Choose one boss perk",Type.headline,c.ink)
@@ -196,7 +199,14 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
                     for(offer in shop.perkOffers){
                         Column(Modifier.width(182.dp).heightIn(min=142.dp).background(c.surface,RoundedCornerShape(10.dp)).border(1.dp,c.line,RoundedCornerShape(10.dp)).padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                             if(offer.evolution!=null)TankPreview(CharacterDef.BALANCED,TankLook(),Modifier.size(46.dp),offer.evolution)
-                            else if(offer.id in 0 until SkillTree.ORIGINAL_PERKS)Canvas(Modifier.size(32.dp)){marketGlyph(MarketIcon.perk(offer.id),center,size.minDimension*.38f,c.perk)}
+                            else if(offer.id in 0 until SkillTree.ORIGINAL_PERKS)Canvas(Modifier.fillMaxWidth().height(38.dp)){
+                                val combo=PerkCombo.entries.firstOrNull{offer.id==it.first||offer.id==it.second}
+                                if(combo!=null){
+                                    perkSigil(combo.ordinal,center+Offset(size.width*.23f,0f),size.minDimension*.17f,c.perk.copy(alpha=.14f))
+                                    perkSigil(combo.ordinal,center-Offset(size.width*.23f,0f),size.minDimension*.17f,c.perk.copy(alpha=.14f))
+                                }
+                                marketGlyph(MarketIcon.perk(offer.id),center,size.minDimension*.38f,c.perk)
+                            }
                             Text(offer.name,Type.headline,c.ink,maxLines=2)
                             Text(offer.blurb,Type.footnote,c.ink2)
                             PrimaryButton(if(offer.evolution!=null)"Evolve" else if(offer.id==TankEvolution.STAY_BASIC)"Stay Basic" else "Take",{onPerk(offer.slot)},Modifier.fillMaxWidth(),enabled=!shop.selfReady)
@@ -207,19 +217,21 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
         }else BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.surface)){
             val items=buildList{
                 for((i,combo) in PerkCombo.entries.withIndex()){
-                    val x=-500f+i*250f
+                    val angle=UpgradeMap.angle(i)
                     for((j,perk) in listOf(combo.first,combo.second).withIndex()){
+                        val (x,y)=UpgradeMap.point(220f,angle+if(j==0)-17f else 17f)
                         val own=shop.perkMask and (1 shl perk)!=0
                         val offered=shop.perkOffers.any{it.id==perk}
-                        add(MarketItem(perk,x,if(j==0)-170f else 170f,MarketIcon.perk(perk),c.perk,Perks.of(perk).name,
-                            if(own)"OWNED" else if(offered)"REWARD" else null,true,own,offered))
+                        add(MarketItem(perk,x,y,MarketIcon.perk(perk),c.perk,if(own||offered||shop.devPreview)Perks.of(perk).name else null,
+                            if(own)"OWNED" else if(offered)"REWARD" else null,true,own,offered,sigil=i))
                     }
                     val progress=combo.progress(shop.perkMask)
-                    add(MarketItem(comboBase+i,x,0f,MarketIcon.LINK,c.coin,if(progress>0||shop.devPreview)combo.title else "Synergy","$progress/2",true,progress==2,progress==2))
+                    val (x,y)=UpgradeMap.point(410f,angle)
+                    add(MarketItem(comboBase+i,x,y,MarketIcon.LINK,c.coin,if(progress>0||shop.devPreview)combo.title else null,"$progress/2",true,progress==2,progress==2,sigil=i))
                 }
             }
-            val edges=PerkCombo.entries.flatMapIndexed{i,combo->listOf(MapLink(combo.first,comboBase+i),MapLink(combo.second,comboBase+i))}
-            MarketCanvas(items,edges,selected,{selected=it},tag="perk-map",labels=emptyList(),footer="Own both connected perks to activate the combo")
+            val edges=PerkCombo.entries.flatMapIndexed{i,combo->listOf(MapLink(UpgradeMap.HUB_ID,combo.first),MapLink(UpgradeMap.HUB_ID,combo.second),MapLink(combo.first,comboBase+i),MapLink(combo.second,comboBase+i))}
+            MarketCanvas(items,edges,selected,{selected=it},tag="perk-map",labels=emptyList(),footer="Matching faint sigils hint at perk combinations",frame=shop.frame,character=shop.character,look=shop.look)
             if(selected>=0){
                 val combo=PerkCombo.entries.getOrNull(selected-comboBase)
                 val perk=selected.takeIf{it in 0 until SkillTree.ORIGINAL_PERKS}
@@ -249,13 +261,14 @@ private fun PerkMarket(shop:ShopView,onPerk:(Int)->Unit,onDevPerk:(Int,Boolean)-
 }
 
 @Composable
-private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int,inspect:(Int)->Unit,tag:String,labels:List<Triple<String,Float,Float>>,footer:String){
+private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int,inspect:(Int)->Unit,tag:String,labels:List<Triple<String,Float,Float>>,footer:String,frame:TankEvolution,character:CharacterDef,look:TankLook){
     val c=Theme.colors;var zoom by rememberSaveable(tag){mutableFloatStateOf(1f)}
     var px by rememberSaveable(tag){mutableFloatStateOf(0f)};var py by rememberSaveable(tag){mutableFloatStateOf(0f)}
     var viewport by remember{mutableStateOf(IntSize.Zero)}
     val liveItems by rememberUpdatedState(items);val callback by rememberUpdatedState(inspect)
     val camera=MarketCamera(zoom,px,py)
     val paint=remember{Paint(Paint.ANTI_ALIAS_FLAG).apply{textAlign=Paint.Align.CENTER;typeface=Typeface.DEFAULT_BOLD}}
+    val art=remember{TankArt()}
     fun update(next:MarketCamera){zoom=next.zoom;px=next.x;py=next.y}
     fun resize(factor:Float){
         val w=viewport.width.toFloat();val h=viewport.height.toFloat()
@@ -285,18 +298,31 @@ private fun MarketCanvas(items:List<MarketItem>,links:List<MapLink>,selected:Int
             while(gx<w){drawLine(c.ink.copy(alpha=.035f),Offset(gx,0f),Offset(gx,h));gx+=step}
             var gy=((center.y%step)+step)%step
             while(gy<h){drawLine(c.ink.copy(alpha=.035f),Offset(0f,gy),Offset(w,gy));gy+=step}
+            val rings=if(tag=="perk-map")listOf(220f,410f)else listOf(125f,225f,325f,425f)
+            for(r in rings)drawCircle(c.ink.copy(alpha=.065f),r*scale,center,style=Stroke(1.dp.toPx()))
             val byId=items.associateBy{it.id}
             for(edge in links){
-                val a=byId[edge.a]?:continue;val b=byId[edge.b]?:continue
-                val active=a.owned&&b.owned
-                drawLine(if(active)c.coin.copy(alpha=.8f) else c.ink.copy(alpha=if(a.owned||b.owned).25f else .10f),pos(a),pos(b),strokeWidth=if(active)2.dp.toPx() else 1.dp.toPx())
+                val a=byId[edge.a];val b=byId[edge.b]?:continue
+                if(a==null&&edge.a!=UpgradeMap.HUB_ID)continue
+                val active=(a?.owned?:true)&&b.owned
+                val lit=(a?.lit==true)||b.lit
+                drawLine(if(active)c.coin.copy(alpha=.8f) else if(lit)b.tint.copy(alpha=.48f) else c.ink.copy(alpha=if(a?.owned==true||b.owned).25f else .12f),
+                    a?.let{pos(it)}?:center,pos(b),strokeWidth=if(active||lit)1.8.dp.toPx() else 1.dp.toPx())
             }
+            // Repeated low-contrast three-glyph sequences are a visual clue, not labels.
+            if(tag=="perk-map")for(n in items.filter{it.sigil>=0}){
+                val at=pos(n);val delta=at-center;val len=delta.getDistance().coerceAtLeast(1f)
+                val dir=delta/len
+                val mark=at+dir*(47f*scale).coerceAtLeast(16.dp.toPx())
+                perkSigil(n.sigil,mark,(12f*scale).coerceIn(3.dp.toPx(),11.dp.toPx()),c.perk.copy(alpha=if(n.owned).28f else .13f))
+            }
+            treeTank(art,center,(78f*scale).coerceIn(13.dp.toPx(),48.dp.toPx()),character,look,frame,c.ink,c.ground,c.accent)
             for((label,x,y) in labels){
                 val at=Offset(camera.sx(x,w,h),camera.sy(y,w,h));paint.color=c.ink2.toArgb();paint.textSize=10.dp.toPx()
                 if(at.x in 0f..w&&at.y in 0f..h)drawContext.canvas.nativeCanvas.drawText(label,at.x,at.y,paint)
             }
             for(n in items){
-                val at=pos(n);val radius=(32f*scale).coerceIn(8.dp.toPx(),31.dp.toPx())
+                val at=pos(n);val radius=(32f*scale).coerceIn(7.dp.toPx(),31.dp.toPx())
                 if(at.x+radius<0||at.x-radius>w||at.y+radius<0||at.y-radius>h)continue
                 val strong=n.lit||n.owned||n.id==selected
                 if(strong)drawCircle(n.tint.copy(alpha=.12f),radius+4.dp.toPx(),at)

@@ -1408,7 +1408,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
-            devPreview=canEditDev(),debugLevels=if(canEditDev())pl.levels[me].toList() else emptyList(),frame=pl.evolution[me],
+            devPreview=canEditDev(),debugLevels=if(canEditDev())pl.levels[me].toList() else emptyList(),frame=pl.evolution[me],character=pl.character[me],look=pl.appearance[me],
         )
     }
 
@@ -1493,7 +1493,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
-            frame=s.evolution[me],
+            frame=s.evolution[me],character=s.character[me],look=s.appearance[me],
         )
     }
 

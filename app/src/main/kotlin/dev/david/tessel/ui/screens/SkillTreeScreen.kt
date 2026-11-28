@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.david.tessel.core.content.*
+import dev.david.tessel.platform.game.TankArt
 import dev.david.tessel.ui.components.*
 import dev.david.tessel.ui.theme.*
 import kotlinx.coroutines.delay
@@ -50,7 +51,8 @@ private fun sectorTint(sector:SkillSector,dark:Boolean):Color {
 @Composable
 fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
     onSpend:(Int)->Unit,onBack:()->Unit,backLabel:String="Home",
-    embedded:Boolean=false,onDevSkill:((Int,Boolean)->Unit)?=null) {
+    embedded:Boolean=false,onDevSkill:((Int,Boolean)->Unit)?=null,
+    frame:TankEvolution=TankEvolution.BASIC,character:CharacterDef=CharacterDef.BALANCED,look:TankLook=TankLook()) {
     val c=Theme.colors
     var selected by rememberSaveable { mutableIntStateOf(-1) }
     var zoom by rememberSaveable { mutableFloatStateOf(1f) }
@@ -68,6 +70,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
     val count=SkillGraph.count(mask)
     val discovered=states.count{it!=SkillVisibility.HIDDEN}
     val paint=remember{Paint(Paint.ANTI_ALIAS_FLAG).apply{textAlign=Paint.Align.CENTER;typeface=Typeface.DEFAULT_BOLD}}
+    val art=remember{TankArt()}
     fun update(next:SkillMapCamera){zoom=next.zoom;px=next.x;py=next.y}
     fun resize(factor:Float){
         val w=viewport.width.toFloat();val h=viewport.height.toFloat()
@@ -87,6 +90,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
             Spacer(Modifier.width(10.dp))
             if(backLabel=="Home")Text("Preview",Type.footnote,c.ink2) else CoinAmount(coins,style=Type.headline)
         }
+        if(clearedStage<SkillGraph.FIRST_STAGE&&!revealAll)StageGateNotice("SKILLS LOCKED · STAGE ${SkillGraph.FIRST_STAGE}","Clear stage ${SkillGraph.FIRST_STAGE} to unlock purchases. $clearedStage/${SkillGraph.FIRST_STAGE} stages cleared.",Modifier.fillMaxWidth().padding(bottom=5.dp))
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(bottom=4.dp).clip(RoundedCornerShape(10.dp)).background(c.surface)) {
             val wide=maxWidth>=580.dp
             Canvas(Modifier.fillMaxSize().onSizeChanged{viewport=it}.testTag("skill-map")
@@ -134,10 +138,8 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                     val tint=if(both||frontier)if(n.bridge||SkillGraph.nodes[edge.b].bridge)c.coin else sectorTint(n.sector,c.dark) else c.ink
                     drawLine(tint.copy(alpha=if(both).9f else if(frontier).58f else .085f),point(edge.a),point(edge.b),strokeWidth=if(both)2.2.dp.toPx() else 1.dp.toPx())
                 }
-                val hr=(29f*scale).coerceAtLeast(6.dp.toPx())
-                drawCircle(c.ground,hr+2.dp.toPx(),hub)
-                drawCircle(c.accent,hr,hub,style=Stroke(1.5.dp.toPx()))
-                drawCircle(c.accent,hr*.25f,hub)
+                val hr=(85f*scale).coerceIn(13.dp.toPx(),48.dp.toPx())
+                treeTank(art,hub,hr,character,look,frame,c.ink,c.ground,c.accent)
                 for(n in SkillGraph.nodes){
                     val at=point(n.id)
                     val radius=((if(n.root||n.id%9==8)29f else 24f)*scale).coerceIn(5.dp.toPx(),35.dp.toPx())
@@ -179,7 +181,7 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
             }
             Column(Modifier.align(Alignment.BottomStart).padding(7.dp)){
                 Text("$discovered / ${SkillGraph.COUNT} discovered",Type.footnote,c.ink2)
-                Text(if(clearedStage<SkillGraph.FIRST_STAGE)"Purchases start after stage 3" else "Drag · Pinch · Tap a revealed node",Type.caption,c.ink3)
+                Text("Drag · Pinch · Tap a revealed node",Type.caption,c.ink3)
             }
             val n=SkillGraph.nodes.getOrNull(selected)?.takeIf{states[it.id]!=SkillVisibility.HIDDEN}
             if(n!=null){
@@ -206,7 +208,8 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                     }
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical=6.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                         Text(n.description,Type.subhead,c.ink)
-                        Text(when{own->"UNLOCKED";clearedStage<n.minStage->"LOCKED · STAGE ${n.minStage}";!canSpend->"PURCHASE IN SHOP";coins<price->"NOT ENOUGH COINS";else->"AVAILABLE"},Type.caption,if(own||ready)c.accent else c.ink2)
+                        Text(when{own->"UNLOCKED";clearedStage<n.minStage->"LOCKED · STAGE ${n.minStage}";!canSpend->"PURCHASE IN SHOP";coins<price->"NOT ENOUGH COINS";else->"AVAILABLE"},if(!own&&clearedStage<n.minStage)Type.headline else Type.caption,if(own||ready)c.accent else if(clearedStage<n.minStage)c.coin else c.ink2)
+                        if(!own&&clearedStage<n.minStage)Text("Clear stage ${n.minStage} to unlock this skill. $clearedStage/${n.minStage} cleared.",Type.subhead,c.ink)
                         if(!own){
                             Row(verticalAlignment=Alignment.CenterVertically){Text("Cost",Type.footnote,c.ink2,Modifier.weight(1f));CoinAmount(price,style=Type.headline)}
                             Text("Unlocking reveals connected nodes.",Type.footnote,c.ink2)

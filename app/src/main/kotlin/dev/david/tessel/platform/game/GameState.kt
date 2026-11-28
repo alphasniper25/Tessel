@@ -67,6 +67,8 @@ class ShopView(
     val devPreview:Boolean=false,
     val debugLevels:List<Int> = emptyList(),
     val frame:dev.david.tessel.core.content.TankEvolution=dev.david.tessel.core.content.TankEvolution.BASIC,
+    val character:dev.david.tessel.core.content.CharacterDef=dev.david.tessel.core.content.CharacterDef.BALANCED,
+    val look:dev.david.tessel.core.content.TankLook=dev.david.tessel.core.content.TankLook(),
 )
 
 /** One player's column in the run's statistics. */

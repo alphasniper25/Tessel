@@ -7,8 +7,10 @@ import kotlin.math.*
 data class UpgradePosition(val id:Int,val x:Float,val y:Float,val family:CardFamily)
 data class MapLink(val a:Int,val b:Int)
 object UpgradeMap {
-    const val WIDTH=1320f
-    const val HEIGHT=590f
+    // Equal axes deliberately keep the map circular, not stretched to the display.
+    const val WIDTH=1080f
+    const val HEIGHT=1080f
+    const val HUB_ID=-2
     val groups=CardFamily.entries
     fun label(family:CardFamily)=when(family){
         CardFamily.GUN->"Firepower"
@@ -18,38 +20,42 @@ object UpgradeMap {
         CardFamily.ECONOMY->"Economy"
     }
     fun legacy(id:Int)=id==Upgrades.MULTISHOT||id==Upgrades.VELOCITY
+    fun angle(index:Int)=-90f+index*72f
+    fun point(radius:Float,degrees:Float):Pair<Float,Float>{
+        val a=degrees*PI.toFloat()/180f
+        return radius*cos(a) to radius*sin(a)
+    }
     fun positions(includeLegacy:Boolean=false):List<UpgradePosition> = buildList{
         for(group in groups){
             val ids=(0 until Upgrades.count).filter{(includeLegacy||!legacy(it))&&Upgrades.of(it).family==group}
-            val (lo,hi,top,bottom)=when(group){
-                CardFamily.GUN->listOf(-560f,-70f,-190f,-63f)
-                CardFamily.HEALTH->listOf(110f,530f,-190f,-63f)
-                CardFamily.RAM->listOf(-540f,-325f,164f,164f)
-                CardFamily.MOBILITY->listOf(-110f,105f,164f,164f)
-                CardFamily.ECONOMY->listOf(320f,535f,164f,164f)
+            val a=angle(group.ordinal)
+            var cursor=0
+            // Each discipline has a central root and fans into successive rings.
+            for((ring,capacity) in listOf(1,2,3,6).withIndex()){
+                val count=min(capacity,ids.size-cursor)
+                if(count<=0)break
+                val radius=listOf(125f,225f,325f,425f)[ring]
+                for(i in 0 until count){
+                    val offset=if(count==1)0f else -29f+58f*i/(count-1)
+                    val (x,y)=point(radius,a+offset)
+                    add(UpgradePosition(ids[cursor++],x,y,group))
+                }
             }
-            val two=group==CardFamily.GUN||group==CardFamily.HEALTH
-            val cols=if(two)(ids.size+1)/2 else ids.size
-            for((i,id) in ids.withIndex()){
-                val row=i/cols;val col=i%cols
-                val x=if(cols<=1)(lo+hi)*.5f else lo+(hi-lo)*col/(cols-1)
-                add(UpgradePosition(id,x,if(row==0)top else bottom,group))
-            }
+            check(cursor==ids.size)
         }
     }
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
-        val reps=mutableListOf<UpgradePosition>()
         for(group in groups){
-            val rows=positions.filter{it.family==group}.groupBy{it.y}.values.map{it.sortedBy{n->n.x}}
-            for(row in rows)row.zipWithNext().forEach{(a,b)->add(MapLink(a.id,b.id))}
-            if(rows.size>1)for(a in rows[0]){
-                val b=rows[1].minByOrNull{abs(it.x-a.x)}!!
-                add(MapLink(a.id,b.id))
+            val ring=positions.filter{it.family==group}.groupBy{hypot(it.x,it.y).roundToInt()}.toSortedMap().values.toList()
+            if(ring.isEmpty())continue
+            add(MapLink(HUB_ID,ring.first().first().id))
+            for(i in 1 until ring.size){
+                for(n in ring[i]){
+                    val parent=ring[i-1].minByOrNull{(it.x-n.x).pow(2)+(it.y-n.y).pow(2)}!!
+                    add(MapLink(parent.id,n.id))
+                }
             }
-            rows.lastOrNull()?.let{row->reps.add(row[row.size/2])}
         }
-        // Connect each category through the central trunk. No additional gating.
-        reps.zipWithNext().forEach{(a,b)->add(MapLink(a.id,b.id))}
     }
 }
 
