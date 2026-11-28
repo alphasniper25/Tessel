@@ -100,3 +100,7 @@
 - Source-only until owner approves native screenshots. No APK. Skills inspect independent stage / coins / adjacency checks, no blanket lock banner. Existing stage gates and prices unchanged.
 - Independent three shop offers may duplicate type with distinct rarity/slot; cap-safe ranks, locked partial bundle prorated only if another purchase reduces remaining capacity. Rank net has each attainable rank socket. Forecast from actual PlayerState equations, immutable full levels and modifier state transferred only during shop; wire 35.
 - Boss choices recorded by round 5–45 in FORMAT 9 checkpoints; migrate old saves with unknown dates, preserve ownership. Nine circles, no edges unless two recorded active perks fuse. New fusion powers Phoenix Pulse, Kinetic Capacitor, Purge Protocol, Living Armor, Salvage Cache; originals retained, fused powers deactivate when either input lost. No duplicate grant of progress.
+
+## Alpha.16.1 three-round refinement
+- No generated UI images. Render actual production Compose via existing screenshots job. Three exclusive six-perk pools, stages 10/20/30; one choice per round. Evolution schedule unchanged. Save FORMAT 9 with legacy history, wire 36. New IDs 19–26 (legacy skill IDs 10–18 preserved). Six pair and six triple synergies; keep original perks, core theft disables derived effects. No APK without approval.
+- Full-size rank nodes, same radius on all tracks, expand as rank is purchased/rolled; no miniature rank socket rendering. UI only; existing transaction validation retained. Skill tree untouched.

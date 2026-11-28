@@ -53,10 +53,11 @@ abstract class MenuGalleryBase {
     }
     fun click(label:String){compose.onNodeWithText(label).performClick();compose.waitForIdle()}
     fun scroll(label:String){compose.onNodeWithText(label).performScrollTo();compose.waitForIdle()}
+    private lateinit var currentShop:ShopView
     fun tapUpgrade(id:Int,developer:Boolean=false){
         val n=UpgradeMap.positions(developer).first{it.id==id}
         compose.onNodeWithTag("upgrade-map").performTouchInput{
-            val cam=MarketCamera()
+            val cam=MarketCamera(extent=upgradeExtent(currentShop))
             click(Offset(cam.sx(n.x,width.toFloat(),height.toFloat()),cam.sy(n.y,width.toFloat(),height.toFloat())))
         }
         compose.waitForIdle()
@@ -91,6 +92,7 @@ abstract class MenuGalleryBase {
         if(stage>15)pl.recordReward(0,15,TankEvolution.REWARD_BASE+TankEvolution.TRIPLET.ordinal)
         if(stage>=20&&perks and (1 shl Perks.LAST_STAND)!=0)pl.recordReward(0,20,Perks.LAST_STAND)
         if(stage>25)pl.recordReward(0,25,TankEvolution.REWARD_BASE+TankEvolution.FOCUS.ordinal)
+        if(stage>=30&&perks and (1 shl Perks.VITAL_CORE)!=0)pl.recordReward(0,30,Perks.VITAL_CORE)
         w.devOpenShop()
         // Choose three valid real offers to make the different rarities visible.
         w.shop.devStock(w,if(repeatMagnet)listOf(CardCode.pack(Upgrades.MAGNET,CardRarity.COMMON),CardCode.pack(Upgrades.MAGNET,CardRarity.RARE),CardCode.pack(Upgrades.DAMAGE,CardRarity.UNCOMMON))else listOf(CardCode.pack(Upgrades.DAMAGE,CardRarity.RARE),CardCode.pack(Upgrades.MAX_HEALTH,CardRarity.COMMON),CardCode.pack(Upgrades.WEALTH,CardRarity.UNCOMMON)))
@@ -110,6 +112,7 @@ abstract class MenuGalleryBase {
             devPreview=developer,debugLevels=if(developer)pl.levels[0].toList() else emptyList(),frame=pl.evolution[0],stats=ShopStatState.from(pl,0,w.difficulty,w.stage),rewardRounds=pl.rewardRounds[0].toList())
     }
     @Composable fun Market(s:ShopView){
+        currentShop=s
         RunShopScreen(s,false,{}, {}, {}, {}, {}, {_,_->}, {}, {}, {}, {_,_->}, {_,_->}, {_,_->})
     }
 }
@@ -182,7 +185,7 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
         click("×");click("Perks");capture("36-perks-radial-sigils")
         tapPerkCombo(0);capture("37-perk-combo-active")
         click("×")
-        val (x,y)=PerkTimeline.roundPoint(1)
+        val (x,y)=PerkTimeline.roundPoint(0)
         compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
         capture("38-perk-combo-hint")
     }
@@ -201,9 +204,19 @@ class ScreenshotsMenuGallery:MenuGalleryBase(){
     @Test fun perkRoundsBeforeFusion(){
         show{Market(sampleShop(stage=17,perks=1 shl Perks.SECOND_WIND))}
         click("Perks");capture("66-perk-rounds-before-fusion")
-        val (x,y)=PerkTimeline.roundPoint(1)
+        val (x,y)=PerkTimeline.roundPoint(0)
         compose.onNodeWithTag("perk-map").performTouchInput{val cam=MarketCamera();click(Offset(cam.sx(x,width.toFloat(),height.toFloat()),cam.sy(y,width.toFloat(),height.toFloat())))}
         capture("67-perk-round-inspection")
+    }
+    @Test fun threeRoundFusionAndRoundChoice(){
+        show{Market(sampleShop(stage=32,perks=PerkCombo.SOLAR_REBIRTH.mask))}
+        click("Perks");capture("68-three-round-fusion-map")
+        tapPerkCombo(PerkCombo.SOLAR_REBIRTH.ordinal);capture("69-three-round-fusion-detail")
+    }
+    @Test fun roundThreeChoices(){
+        show{Market(sampleShop(stage=30,perks=PerkCombo.LAST_LIGHT.mask,reward=1))}
+        capture("70-third-round-choice")
+        click("Perk map");capture("71-third-round-available")
     }
     @Test fun marketBossRewards(){
         val shop=sampleShop(stage=10,reward=1)

@@ -27,4 +27,24 @@ class RadialUpgradeMapTest {
             }
         }
     }
+
+    @Test fun allRankNodesUseSameRadiusAndExpandOutwardsWithoutOverlap(){
+        for(dev in listOf(false,true)){
+            val roots=UpgradeMap.positions(dev)
+            val all=roots.flatMap{UpgradeMap.ranks(it,roots)}
+            for(root in roots){
+                val ranks=UpgradeMap.ranks(root,roots)
+                assertEquals(Upgrades.runCap(root.id),ranks.size)
+                for((i,n) in ranks.withIndex())assertEquals(UpgradeMap.FIRST_RADIUS+i*UpgradeMap.RANK_STEP,hypot(n.x,n.y),.002f)
+            }
+            for(i in all.indices)for(j in i+1 until all.size){
+                val a=all[i];val b=all[j]
+                assertTrue(hypot(a.x-b.x,a.y-b.y)>2*UpgradeMap.NODE_RADIUS)
+            }
+            assertTrue(UpgradeMap.extent(List(Upgrades.count){0},emptyMap(),dev)<=1080f)
+            val expanded=UpgradeMap.extent(List(Upgrades.count){if(it==Upgrades.MAGNET)5 else 0},mapOf(Upgrades.MAGNET to 3),dev)
+            assertTrue(expanded>1080f)
+            assertEquals(8,UpgradeMap.visibleCount(8,5,3))
+        }
+    }
 }

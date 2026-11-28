@@ -25,18 +25,20 @@ class RunShopMapTest{
         listOf(offer(Upgrades.DAMAGE,0),offer(Upgrades.MAX_HEALTH,1),offer(Upgrades.WEALTH,2)),25,2,true,9,true,
         perkOffers=if(reward)listOf(PerkOffer(0,Perks.of(Perks.SECOND_WIND).name,Perks.of(Perks.SECOND_WIND).blurb,id=Perks.SECOND_WIND))else emptyList(),
         devPreview=dev,debugLevels=if(dev)List(Upgrades.count){0}else emptyList())
+    private lateinit var currentShop:ShopView
     private var bought=-1
     private var chosen=-1
     private var granted=-1
     private var rank=-1
     private fun show(dev:Boolean=false,reward:Boolean=false){
-        compose.setContent{TesselTheme{RunShopScreen(view(dev,reward),false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{id,_->rank=id},{id,_->granted=id},{_,_->})}}
+        currentShop=view(dev,reward)
+        compose.setContent{TesselTheme{RunShopScreen(currentShop,false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{id,_->rank=id},{id,_->granted=id},{_,_->})}}
         compose.waitForIdle()
     }
     private fun tap(id:Int,dev:Boolean=false){
         val n=UpgradeMap.positions(dev).first{it.id==id}
         compose.onNodeWithTag("upgrade-map").performTouchInput{
-            val cam=MarketCamera()
+            val cam=MarketCamera(extent=upgradeExtent(currentShop))
             click(Offset(cam.sx(n.x,width.toFloat(),height.toFloat()),cam.sy(n.y,width.toFloat(),height.toFloat())))
         }
         compose.waitForIdle()
@@ -83,7 +85,8 @@ class RunShopMapTest{
             CharacterDef.BALANCED,TankEvolution.BASIC,0,0L,0,false,Difficulty.NORMAL,17,0)
         val a=ShopOffer(0,"Magnet","+25% pickup radius",2,8,26,false,true,levels=1,rarity=CardRarity.COMMON,upgradeId=Upgrades.MAGNET)
         val b=ShopOffer(1,"Magnet","+75% pickup radius",2,8,90,false,true,levels=3,rarity=CardRarity.RARE,upgradeId=Upgrades.MAGNET)
-        compose.setContent{TesselTheme{RunShopScreen(ShopView(17,420,9,12,listOf(a,b,offer(Upgrades.DAMAGE,2)),25,2,true,9,true,stats=stat),false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{_,_->},{_,_->},{_,_->})}}
+        currentShop=ShopView(17,420,9,12,listOf(a,b,offer(Upgrades.DAMAGE,2)),25,2,true,9,true,stats=stat)
+        compose.setContent{TesselTheme{RunShopScreen(currentShop,false,{bought=it},{},{},{},{chosen=it},{_,_->},{},{},{},{_,_->},{_,_->},{_,_->})}}
         compose.waitForIdle()
         tap(Upgrades.MAGNET)
         compose.onNodeWithText("Pickup radius").assertExists()
