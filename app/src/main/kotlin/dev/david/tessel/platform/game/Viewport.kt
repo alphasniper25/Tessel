@@ -21,7 +21,7 @@ class Viewport {
     val bottom get() = top + ARENA_H * scale
 
     fun fit(width: Int, height: Int) {
-        scale = min(width / ARENA_W, height / ARENA_H)
+        scale = min(width.coerceAtLeast(1) / ARENA_W, height.coerceAtLeast(1) / ARENA_H)
         left = (width - ARENA_W * scale) / 2f
         top = (height - ARENA_H * scale) / 2f
     }

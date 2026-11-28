@@ -106,6 +106,7 @@ fun TesselApp(
     val rematch by game.rematch.collectAsState()
 
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
     var lobbyOpen by rememberSaveable { mutableStateOf(false) }
     var statsOpen by rememberSaveable { mutableStateOf(false) }
     var cardsOpen by rememberSaveable { mutableStateOf(false) }
@@ -126,6 +127,7 @@ fun TesselApp(
     }
     val startTutorial = {
         settingsOpen = false
+        profileOpen = false
         devOpen = false
         store.update { it.copy(tutorialSeen = true) }
         game.startTutorial()
@@ -137,7 +139,7 @@ fun TesselApp(
     LaunchedEffect(settings) { game.applySettings(settings) }
     LaunchedEffect(shop) { shop?.let { lastShop = it } }
     // Opening the tree is always a deliberate player action.
-    LaunchedEffect(mode) { treeOpen=false }
+    LaunchedEffect(mode) { treeOpen=false;if(mode!=Mode.HOME)profileOpen=false }
     LaunchedEffect(summary) { summary?.let { lastSummary = it } }
     LaunchedEffect(Unit) { onStart?.invoke() }
     // Once the host presses Start, every phone leaves the lobby for the arena.
@@ -147,6 +149,7 @@ fun TesselApp(
         if (s is LobbyState.Playing) lobbyOpen = false
         if (s is LobbyState.Searching && s.invite != null && mode == Mode.HOME) {
             settingsOpen = false
+            profileOpen = false
             cardsOpen = false
             garageOpen = false
             treeOpen = false
@@ -259,7 +262,7 @@ fun TesselApp(
         }
 
         AnimatedVisibility(
-            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !treeOpen && !playOpen,
+            visible = mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !treeOpen && !playOpen && !profileOpen,
             enter = fadeIn(Springs.ui()),
             exit = fadeOut(Springs.ui()),
         ) {
@@ -273,6 +276,8 @@ fun TesselApp(
                 onGarage = { game.menuSound();garageOpen = true },
                 onTree = { game.menuSound();treeOpen=true },
                 onSettings = { game.menuSound();settingsOpen = true },
+                onProfile = { game.menuSound();profileOpen=true },
+                playerName=lobby.myName,
                 onLogo = if (settings.devUnlocked) {
                     {
                         settingsOpen = true
@@ -312,6 +317,10 @@ fun TesselApp(
                     game.startRun(settings.difficulty, character)
                 },
             )
+        }
+
+        AnimatedVisibility(visible=profileOpen && mode==Mode.HOME && !settingsOpen && !statsOpen,enter=fadeIn(Springs.ui()),exit=fadeOut(Springs.ui())) {
+            dev.david.tessel.ui.screens.PlayerProfileScreen(lobby.myName,ledger, onName={lobby.setUsername(it)},onSettings={settingsOpen=true;game.menuSound()},onStats={statsOpen=true;game.menuSound()},onBack={profileOpen=false;game.menuSound()})
         }
 
         // The lobby and settings slide in from the trailing edge and leave the same way.
@@ -358,7 +367,7 @@ fun TesselApp(
 
         // A new install offers the tutorial once. Drawn after the home screen, or that would cover it.
         Sheet(
-            visible = onStart == null && !settings.tutorialSeen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !playOpen,
+            visible = onStart == null && !settings.tutorialSeen && mode == Mode.HOME && !settingsOpen && !lobbyOpen && !statsOpen && !cardsOpen && !garageOpen && !playOpen && !profileOpen && !treeOpen,
             onDismiss = { store.update { it.copy(tutorialSeen = true) } },
         ) {
             Column(
@@ -394,6 +403,7 @@ fun TesselApp(
                 inRun = mode != Mode.HOME,
                 onChange = store::update,
                 onBack = { settingsOpen = false },
+                fromProfile=profileOpen,
                 onTutorial = startTutorial,
                 onDev = { devOpen = true },
                 onEditBreak = { minutesOpen = true },
@@ -481,7 +491,7 @@ fun TesselApp(
         }
     }
 
-    BackHandler(enabled = treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME) {
+    BackHandler(enabled = profileOpen || treeOpen || settingsOpen || lobbyOpen || statsOpen || garageOpen || playOpen || mode != Mode.HOME) {
         when {
             treeOpen -> treeOpen=false
             codeOpen -> codeOpen = false
@@ -490,6 +500,7 @@ fun TesselApp(
             devOpen && settingsOpen -> devOpen = false
             settingsOpen -> settingsOpen = false
             statsOpen -> statsOpen = false
+            profileOpen -> profileOpen=false
             cardsOpen -> cardsOpen = false
             garageOpen -> garageOpen = false
             playOpen -> playOpen = false

@@ -8,6 +8,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -46,17 +49,19 @@ fun HomeScreen(
     onCards: () -> Unit = {},
     onGarage: () -> Unit = {},
     onTree: () -> Unit = {},
+    onProfile: () -> Unit = onSettings,
+    playerName: String = "Player",
 ) {
     val c = Theme.colors
-    Row(
-        Modifier
-            .fillMaxSize()
-            .background(c.ground)
-            .windowInsetsPadding(WindowInsets.displayCutout)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Space.x4),
-    ) {
+    Column(Modifier.fillMaxSize().background(c.ground).windowInsetsPadding(WindowInsets.displayCutout)
+        .padding(horizontal=Space.x4,vertical=Space.x2)){
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+            Text("TESSEL",Type.caption,c.ink2)
+            Spacer(Modifier.weight(1f))
+            ProfileButton(playerName,onProfile)
+        }
+        Row(Modifier.weight(1f).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(Space.x4)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             // With developer options on, the logo is a shortcut to them.
             ShardMark(
@@ -67,7 +72,7 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(Space.x2))
             Text("TESSEL", Type.largeTitle, c.ink)
-            Text("ARENA SURVIVAL  /  ALPHA 14",Type.caption,c.accent)
+            Text("ARENA SURVIVAL  /  ALPHA 15",Type.caption,c.accent)
             Spacer(Modifier.height(Space.x2))
             val best = ledger.bestOverall()
             val line = if (best == null) {
@@ -92,11 +97,9 @@ fun HomeScreen(
                     SecondaryButton("Skill Tree",onTree,Modifier.weight(1f),tint=c.accent)
                 }
                 SecondaryButton("Arsenal", onCards, Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(Space.x2)) {
-                    SecondaryButton("Statistics", onStats, Modifier.weight(1f))
-                    SecondaryButton("Settings",onSettings,Modifier.weight(1f))
-                }
+                SecondaryButton("Statistics",onStats,Modifier.fillMaxWidth())
             }
+        }
         }
     }
 }

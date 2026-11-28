@@ -1509,6 +1509,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
         synchronized(surfaceLock) { viewport.fit(width, height) }
         val c = cutout
         controller.layout(width, height, c.left, c.top, c.right, c.bottom)
+        handler.post { renderer.stickRadius=controller.stickRadius }
     }
 
     private fun paletteFor(config: Configuration): Palette {

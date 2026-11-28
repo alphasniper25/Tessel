@@ -3,6 +3,7 @@ package dev.david.tessel.platform.input
 import android.view.MotionEvent
 import dev.david.tessel.core.input.Stick
 import dev.david.tessel.core.sim.PlayerInput
+import dev.david.tessel.platform.game.ScreenFit
 
 /** What the renderer needs to draw one stick, copied out under the lock. */
 class StickView {
@@ -53,7 +54,9 @@ class TwinStickController(private val density: Float) {
             synchronized(lock) { applyRadius() }
         }
 
-    val stickRadius get() = stickRadiusDp * density
+    private var safe=ScreenFit.safe(1,1)
+    @Volatile private var actualRadius=stickRadiusDp*density
+    val stickRadius get() = actualRadius
 
     init {
         applyRadius()
@@ -63,11 +66,13 @@ class TwinStickController(private val density: Float) {
         synchronized(lock) {
             width = w.toFloat()
             height = h.toFloat()
-            val pad = EDGE_PAD_DP * density
-            minX = insetLeft + pad
-            minY = insetTop + pad
-            maxX = w - insetRight - pad
-            maxY = h - insetBottom - pad
+            safe=ScreenFit.safe(w,h,insetLeft,insetTop,insetRight,insetBottom)
+            applyRadius()
+            val pad=EDGE_PAD_DP*density
+            minX=ScreenFit.centered(safe.left,pad,safe.left,safe.right)
+            minY=ScreenFit.centered(safe.top,pad,safe.top,safe.bottom)
+            maxX=ScreenFit.centered(safe.right,pad,safe.left,safe.right)
+            maxY=ScreenFit.centered(safe.bottom,pad,safe.top,safe.bottom)
         }
     }
 
@@ -122,15 +127,16 @@ class TwinStickController(private val density: Float) {
             out.aimX = if (firing) aim.dirX else 0f
             out.aimY = if (firing) aim.dirY else 0f
 
-            val restY = height - stickRadius - REST_LIFT_DP * density
-            val leftRest = width * 0.15f
-            val rightRest = width * 0.85f
+            val restY=ScreenFit.centered(safe.bottom-stickRadius-REST_LIFT_DP*density,stickRadius,safe.top,safe.bottom)
+            val leftRest=ScreenFit.centered(safe.left+safe.width*.15f,stickRadius,safe.left,safe.right)
+            val rightRest=ScreenFit.centered(safe.left+safe.width*.85f,stickRadius,safe.left,safe.right)
             moveView.copy(move, if (leftHanded) rightRest else leftRest, restY)
             aimView.copy(aim, if (leftHanded) leftRest else rightRest, restY)
         }
     }
 
     private fun applyRadius() {
+        actualRadius=if(width>0f&&height>0f)ScreenFit.stickRadius(stickRadiusDp*density,safe) else stickRadiusDp*density
         move.radius = stickRadius
         aim.radius = stickRadius
     }

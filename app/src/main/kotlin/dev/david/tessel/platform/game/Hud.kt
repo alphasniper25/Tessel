@@ -115,8 +115,26 @@ class Hud(private val density: Float, fontScale: Float) {
     }
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val buf = TextBuf()
+    private var safe=ScreenFit.safe(1,1)
+    private var centerWidth=1f
+    private var centerX=0f
+    private var compact=false
+    private fun fitted(canvas:Canvas,text:String,x:Float,y:Float,paint:Paint,width:Float){
+        val old=paint.textScaleX;paint.textScaleX=1f
+        paint.textScaleX=ScreenFit.textScale(paint.measureText(text),width)
+        canvas.drawText(text,x,y,paint);paint.textScaleX=old
+    }
+    private fun fittedBuffer(canvas:Canvas,x:Float,y:Float,paint:Paint,width:Float){
+        val old=paint.textScaleX;paint.textScaleX=1f
+        paint.textScaleX=ScreenFit.textScale(paint.measureText(buf.chars,0,buf.length),width)
+        canvas.drawText(buf.chars,0,buf.length,x,y,paint);paint.textScaleX=old
+    }
 
     fun draw(canvas: Canvas, w: World, palette: Palette, insetLeft: Int, insetTop: Int, insetRight: Int, me: Int, now: Long) {
+        safe=ScreenFit.safe(canvas.width,canvas.height,insetLeft,insetTop,insetRight)
+        centerWidth=ScreenFit.hudCenterWidth(safe,density)
+        centerX=(safe.left+safe.right)*.5f
+        compact=safe.width/density<700f
         val pl = w.players
         val left = insetLeft + 20f * density
         val top = insetTop + 18f * density
@@ -126,7 +144,7 @@ class Hud(private val density: Float, fontScale: Float) {
         canvas.drawCircle(left + 6f * density, coinRow, 6f * density, fill)
         number.color = palette.ink
         buf.clear().putGrouped(pl.coins[me])
-        canvas.drawText(buf.chars, 0, buf.length, left + 18f * density, coinRow + number.textSize * 0.35f, number)
+        fittedBuffer(canvas,left+18f*density,coinRow+number.textSize*.35f,number,safe.width*.25f)
 
         if (practice) return
         if (surgeSeconds > 0 && !w.duel.on) {
@@ -188,7 +206,7 @@ class Hud(private val density: Float, fontScale: Float) {
         }
         stageLabel.color = palette.danger
         stageLabel.alpha = (255 * ((NOTICE_MS - age) / 500f).coerceIn(0f, 1f)).toInt()
-        canvas.drawText(text, canvas.width / 2f, canvas.height * 0.62f, stageLabel)
+        fitted(canvas,text,centerX,canvas.height*.62f,stageLabel,safe.width*.9f)
         stageLabel.alpha = 255
     }
 
@@ -202,14 +220,14 @@ class Hud(private val density: Float, fontScale: Float) {
         // Holds, then fades over the last half second.
         val alpha = (255 * ((ANNOUNCE_MS - age) / 500f).coerceIn(0f, 1f)).toInt()
         val def = Bestiary.of(announced)
-        val cx = canvas.width / 2f
+        val cx = centerX
         val cy = canvas.height * 0.36f
         title.color = palette.ink
         title.alpha = alpha
-        canvas.drawText(def.name, cx, cy, title)
+        fitted(canvas,def.name,cx,cy,title,safe.width*.88f)
         note.color = palette.ink2
         note.alpha = alpha
-        canvas.drawText(def.blurb, cx, cy + 26f * sp, note)
+        fitted(canvas,def.blurb,cx,cy+26f*sp,note,safe.width*.88f)
         note.alpha = 255
     }
 
@@ -260,7 +278,7 @@ class Hud(private val density: Float, fontScale: Float) {
         buf.clear().putGrouped(score)
         val scoreWidth = scoreText.measureText(buf.chars, 0, buf.length)
         canvas.drawText(buf.chars, 0, buf.length, right - scoreWidth, baseline, scoreText)
-        val label = "Score"
+        val label = if(compact)"" else "Score"
         val labelWidth = scoreText.measureText(label)
         scoreText.color = palette.ink3
         val labelLeft = right - scoreWidth - 5f * density - labelWidth
@@ -277,20 +295,20 @@ class Hud(private val density: Float, fontScale: Float) {
      * is how hard things are; the bar is how long until the shop.
      */
     private fun drawStageBar(canvas: Canvas, w: World, palette: Palette, insetTop: Int, me: Int) {
-        val cx = canvas.width / 2f
+        val cx = centerX
         val baseline = insetTop + 26f * density
         stageLabel.color = palette.ink
         val boss = if (w.phase == Phase.FIGHT) w.bossType() else -1
         when {
-            boss >= 0 -> { buf.clear().put("Stage ").put(w.stage).put(" · ").put(Bestiary.of(boss).name);canvas.drawText(buf.chars,0,buf.length,cx,baseline,stageLabel) }
-            w.phase == Phase.CLEAR -> canvas.drawText("Clear the arena", cx, baseline, stageLabel)
+            boss >= 0 -> { buf.clear().put("Stage ").put(w.stage).put(" · ").put(Bestiary.of(boss).name);fittedBuffer(canvas,cx,baseline,stageLabel,centerWidth) }
+            w.phase == Phase.CLEAR -> fitted(canvas,"Clear the arena",cx,baseline,stageLabel,centerWidth)
             else -> {
                 buf.clear().put("Stage ").put(w.stage)
-                canvas.drawText(buf.chars, 0, buf.length, cx, baseline, stageLabel)
+                fittedBuffer(canvas,cx,baseline,stageLabel,centerWidth)
             }
         }
 
-        val width = BAR_WIDTH_DP * density
+        val width = centerWidth.coerceAtMost(BAR_WIDTH_DP*density)
         val height = 4f * density
         val top = baseline + 9f * density
         val round = height / 2f
@@ -326,7 +344,7 @@ class Hud(private val density: Float, fontScale: Float) {
                 else -> "Prepare for the Core"
             }
             note.color = palette.ink2
-            canvas.drawText(objective, cx, insetTop + 51f * density, note)
+            fitted(canvas,objective,cx,insetTop+51f*density,note,safe.width*.58f)
             if (escorts > 0) {
                 buf.clear().put("Summoned bosses left: ").put(escorts)
                 canvas.drawText(buf.chars,0,buf.length,cx,insetTop+76f*density,note)
@@ -344,7 +362,7 @@ class Hud(private val density: Float, fontScale: Float) {
             }
             if (message != null) {
                 note.color = palette.danger
-                canvas.drawText(message, cx, insetTop + (if(w.stage==50) 98f else 62f) * density, note)
+                fitted(canvas,message,cx,insetTop+(if(w.stage==50)98f else 62f)*density,note,safe.width*.86f)
             }
         }
         tag?.let {
@@ -366,7 +384,7 @@ class Hud(private val density: Float, fontScale: Float) {
     /** The round and who has won how many, and between rounds who took the last one. */
     private fun drawDuel(canvas: Canvas, w: World, palette: Palette, insetTop: Int, me: Int) {
         val d = w.duel
-        val cx = canvas.width / 2f
+        val cx = centerX
         val baseline = insetTop + 26f * density
         stageLabel.color = palette.ink
         buf.clear().put("Round ").put(d.round).put("  ·  First to ").put(d.target)
@@ -382,7 +400,7 @@ class Hud(private val density: Float, fontScale: Float) {
             buf.put(" ").put(d.wins[p])
         }
         note.color = palette.ink2
-        canvas.drawText(buf.chars, 0, buf.length, cx, baseline + 20f * density, note)
+        fittedBuffer(canvas,cx,baseline+20f*density,note,safe.width*.72f)
         if (d.pause > 0) {
             buf.clear()
             val who = if (d.champion >= 0) d.champion else d.roundWinner
@@ -396,7 +414,7 @@ class Hud(private val density: Float, fontScale: Float) {
             }
             title.color = palette.ink
             title.alpha = 255
-            canvas.drawText(buf.chars, 0, buf.length, cx, canvas.height * 0.36f, title)
+            fittedBuffer(canvas,cx,canvas.height*.36f,title,safe.width*.88f)
         }
     }
 

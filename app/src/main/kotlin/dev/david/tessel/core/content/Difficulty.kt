@@ -41,6 +41,6 @@ enum class Difficulty(
     IMPOSSIBLE(
         "Impossible", "Everything at once. Eight health. Good luck.",
         spawn = 1.6f, speed = 1.2f, toughness = 1.5f, bossToughness = 1.6f,
-        shotSpeed = 1.2f, attackRate = 1.35f, bonusHp = -2, coinValue = 1.0f, score = 2.2f,
+        shotSpeed = 1.2f, attackRate = 1.35f, bonusHp = -2, coinValue = 0.97f, score = 2.2f,
     ),
 }

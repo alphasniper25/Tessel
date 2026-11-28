@@ -60,6 +60,7 @@ fun SettingsScreen(
     onDev: () -> Unit = {},
     onUnlockDev: () -> Unit = {},
     onEditBreak: () -> Unit = {},
+    fromProfile:Boolean=false,
 ) {
     val c = Theme.colors
     Column(
@@ -74,7 +75,7 @@ fun SettingsScreen(
                 .height(56.dp)
                 .padding(horizontal = Space.x4),
         ) {
-            BackButton(if (inRun) "Paused" else "Home", onBack, Modifier.align(Alignment.CenterStart))
+            BackButton(if (inRun) "Paused" else if(fromProfile)"Profile" else "Home", onBack, Modifier.align(Alignment.CenterStart))
             Text("Settings", Type.headline, c.ink, Modifier.align(Alignment.Center))
         }
         Column(

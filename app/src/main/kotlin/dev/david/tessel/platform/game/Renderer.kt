@@ -447,21 +447,21 @@ class Renderer(private val density: Float, palette: Palette) {
         val rawX = view.screenX(lerp(pl.prevX[p], pl.x[p], blend))
         val centerY = view.screenY(lerp(pl.prevY[p], pl.y[p], blend))
         if (rawX !in 0f..canvas.width.toFloat() || centerY !in 0f..canvas.height.toFloat()) return
-        val x = rawX.coerceIn(25f*density, max(25f*density,canvas.width-25f*density))
+        val x = ScreenFit.centered(rawX,60f*density,0f,canvas.width.toFloat())
         val r = Balance.PLAYER_RADIUS * view.scale
         if (w.playerCount > 1) {
             line.color = teamColors[p % teamColors.size]; line.strokeWidth = 2f*density; line.alpha = 255
             canvas.drawCircle(rawX, centerY, r + 3f*density, line)
         }
         if(pl.poisonTicks[p]>0 || pl.stun[p]>0){line.color=if(pl.stun[p]>0) 0xFF8EB5FF.toInt() else 0xFF76CF8A.toInt();line.strokeWidth=2f*density;canvas.drawCircle(rawX,centerY,r+7f*density,line)}
-        val y = (if (centerY-r-22*density < 44*density) centerY+r+14*density else centerY-r-10*density).coerceIn(14f*density, max(14f*density, canvas.height-6f*density))
-        val half = max(r*1.25f, 19f*density)
+        val y = (if (centerY-r-22*density < 44*density) centerY+r+14*density else centerY-r-10*density).coerceIn(14f*density, max(14f*density, canvas.height-22f*density))
+        val half = max(r*1.25f,19f*density).coerceAtMost(minOf(58f*density,canvas.width*.45f))
         val h = if(self) 4f*density else 3f*density
         val fraction = (pl.hp[p].toFloat()/pl.maxHp[p].coerceAtLeast(1)).coerceIn(0f,1f)
         fill.color=palette.raised; canvas.drawRoundRect(x-half,y,x+half,y+h,h/2,h/2,fill)
         fill.color=if(fraction <= .25f) palette.danger else if(w.playerCount > 1) teamColors[p % teamColors.size] else palette.ink
         if(fraction>0f) canvas.drawRoundRect(x-half,y,x-half+2*half*fraction,y+h,h/2,h/2,fill)
-        hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(w.playerCount > 1) (names.getOrNull(p) ?: "P${p+1}") else "").put(if(w.playerCount > 1) "  " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
+        hpText.color=if(self) palette.ink else palette.ink2; hpBuf.clear().put(if(w.playerCount > 1) (names.getOrNull(p)?.take(12) ?: "P${p+1}") else "").put(if(w.playerCount > 1) "  " else "").put(pl.hp[p].coerceAtLeast(0)).put("/").put(pl.maxHp[p]); canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y-2*density,hpText)
         pl.evolution[p].droneSpec?.let { spec -> hpBuf.clear().put("Drones ").put(w.droneWing.count(p)).put("/").put(spec.cap);canvas.drawText(hpBuf.chars,0,hpBuf.length,x,y+h+11*density,hpText) }
     }
 
