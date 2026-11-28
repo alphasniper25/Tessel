@@ -63,6 +63,7 @@ import dev.david.tessel.platform.net.Link
 import dev.david.tessel.platform.store.Dev
 import dev.david.tessel.core.dev.DevScenario
 import dev.david.tessel.core.content.SkillGraph
+import dev.david.tessel.core.sim.ShopStatState
 import dev.david.tessel.platform.store.LedgerStore
 import dev.david.tessel.platform.store.Settings
 import dev.david.tessel.platform.store.SoloSaves
@@ -1408,7 +1409,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = pl.perks[me],
             skillNodes = pl.skillMask(me),
             freeRefreshesLeft = s.freeRefreshesLeft(world,me),
-            stats=dev.david.tessel.core.sim.ShopStatState.from(pl,me,world.difficulty,world.stage),rewardRounds=pl.rewardRounds[me].toList(),
+            stats=ShopStatState.from(pl,me,world.difficulty,world.stage),rewardRounds=pl.rewardRounds[me].toList(),
             devPreview=canEditDev(),debugLevels=if(canEditDev())pl.levels[me].toList() else emptyList(),frame=pl.evolution[me],character=pl.character[me],look=pl.appearance[me],
         )
     }
@@ -1499,7 +1500,7 @@ class GameSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Ca
             perkMask = s.perks[me],
             skillNodes = s.skillNodes[me],
             freeRefreshesLeft = s.freeRefreshesLeft,
-            stats=dev.david.tessel.core.sim.ShopStatState(s.shopAllLevels.toList(),s.hp[me],s.maxHp[me],s.character[me],s.evolution[me],s.perks[me],s.skillNodes[me],s.shopSinceHit,s.surge[me]>0,s.difficulty,s.stage,s.shopMissionMask),rewardRounds=s.shopRewardRounds.toList(),
+            stats=ShopStatState(s.shopAllLevels.toList(),s.hp[me],s.maxHp[me],s.character[me],s.evolution[me],s.perks[me],s.skillNodes[me],s.shopSinceHit,s.surge[me]>0,s.difficulty,s.stage,s.shopMissionMask),rewardRounds=s.shopRewardRounds.toList(),
             frame=s.evolution[me],character=s.character[me],look=s.appearance[me],
         )
     }

@@ -68,3 +68,26 @@ internal fun StageGateNotice(title:String,detail:String,modifier:Modifier=Modifi
         }
     }
 }
+
+/** Status uses both shape and color; never rely on red/green alone. */
+@Composable
+internal fun PurchaseRequirement(label:String,detail:String,met:Boolean){
+    val c=Theme.colors
+    val tint=if(met)c.accent else c.danger
+    Row(Modifier.fillMaxWidth().padding(vertical=2.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        Canvas(Modifier.size(21.dp)){
+            val d=size.minDimension
+            drawCircle(tint.copy(alpha=.12f),d*.48f)
+            drawCircle(tint,d*.43f,style=Stroke(1.3.dp.toPx()))
+            if(met){
+                drawLine(tint,Offset(d*.27f,d*.51f),Offset(d*.43f,d*.67f),2.dp.toPx(),StrokeCap.Round)
+                drawLine(tint,Offset(d*.43f,d*.67f),Offset(d*.75f,d*.32f),2.dp.toPx(),StrokeCap.Round)
+            }else{
+                drawLine(tint,Offset(d*.32f,d*.32f),Offset(d*.68f,d*.68f),1.8.dp.toPx(),StrokeCap.Round)
+                drawLine(tint,Offset(d*.68f,d*.32f),Offset(d*.32f,d*.68f),1.8.dp.toPx(),StrokeCap.Round)
+            }
+        }
+        Text(label,Type.subhead,c.ink,Modifier.weight(1f))
+        Text(detail,Type.footnote,tint)
+    }
+}

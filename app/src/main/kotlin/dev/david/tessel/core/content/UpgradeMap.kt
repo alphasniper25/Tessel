@@ -6,6 +6,7 @@ import kotlin.math.*
  * Stable upgrade IDs are independent of offers, rarity or purchase history. */
 data class UpgradePosition(val id:Int,val x:Float,val y:Float,val family:CardFamily)
 data class MapLink(val a:Int,val b:Int)
+data class RankPosition(val rank:Int,val x:Float,val y:Float)
 object UpgradeMap {
     // Equal axes deliberately keep the map circular, not stretched to the display.
     const val WIDTH=1080f
@@ -44,6 +45,27 @@ object UpgradeMap {
             check(cursor==ids.size)
         }
     }
+    /** Every attainable rank gets its own socket around its type icon. The local
+     * orbit shrinks to the nearest neighboring track's space, preventing overlap.
+     * Dense tracks fan into two or three nested circles; zoom to inspect them. */
+    fun ranks(anchor:UpgradePosition,positions:List<UpgradePosition>,cap:Int=Upgrades.runCap(anchor.id)):List<RankPosition> {
+        val gap=positions.filter{it.id!=anchor.id}.minOfOrNull{hypot(it.x-anchor.x,it.y-anchor.y)}?:110f
+        val reach=(gap*.43f).coerceIn(23f,55f)
+        if(cap<=0)return emptyList()
+        return buildList{
+            val rings=if(cap<=12)1 else if(cap<=28)2 else 3
+            val counts=when(rings){1->listOf(cap);2->listOf(min(10,cap),cap-min(10,cap));else->listOf(8,12,cap-20)}
+            var rank=1
+            for((ring,count) in counts.withIndex()){
+                val radius=if(rings==1)reach else reach*(.58f+.42f*ring/(rings-1))
+                for(i in 0 until count){
+                    val a=-90f+360f*i/count+if(ring%2==1)180f/count else 0f
+                    val (x,y)=point(radius,a)
+                    add(RankPosition(rank++,anchor.x+x,anchor.y+y))
+                }
+            }
+        }
+    }
     fun links(positions:List<UpgradePosition>):List<MapLink> = buildList{
         for(group in groups){
             val ring=positions.filter{it.family==group}.groupBy{hypot(it.x,it.y).roundToInt()}.toSortedMap().values.toList()
@@ -51,9 +73,11 @@ object UpgradeMap {
             add(MapLink(HUB_ID,ring.first().first().id))
             for(i in 1 until ring.size){
                 for(n in ring[i]){
-                    val parent=ring[i-1].minByOrNull{(it.x-n.x).pow(2)+(it.y-n.y).pow(2)}!!
-                    add(MapLink(parent.id,n.id))
+                    val parents=ring[i-1].sortedBy{(it.x-n.x).pow(2)+(it.y-n.y).pow(2)}
+                    add(MapLink(parents.first().id,n.id))
+                    if(parents.size>1&&i>1)add(MapLink(parents[1].id,n.id))
                 }
+                ring[i].sortedBy{atan2(it.y,it.x)}.zipWithNext().forEach{(a,b)->add(MapLink(a.id,b.id))}
             }
         }
     }

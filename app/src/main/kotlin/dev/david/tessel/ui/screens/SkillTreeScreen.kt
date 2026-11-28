@@ -90,7 +90,6 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
             Spacer(Modifier.width(10.dp))
             if(backLabel=="Home")Text("Preview",Type.footnote,c.ink2) else CoinAmount(coins,style=Type.headline)
         }
-        if(clearedStage<SkillGraph.FIRST_STAGE&&!revealAll)StageGateNotice("SKILLS LOCKED · STAGE ${SkillGraph.FIRST_STAGE}","Clear stage ${SkillGraph.FIRST_STAGE} to unlock purchases. $clearedStage/${SkillGraph.FIRST_STAGE} stages cleared.",Modifier.fillMaxWidth().padding(bottom=5.dp))
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(bottom=4.dp).clip(RoundedCornerShape(10.dp)).background(c.surface)) {
             val wide=maxWidth>=580.dp
             Canvas(Modifier.fillMaxSize().onSizeChanged{viewport=it}.testTag("skill-map")
@@ -208,10 +207,13 @@ fun SkillTreeScreen(clearedStage:Int,mask:Long,coins:Int,canSpend:Boolean,
                     }
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical=6.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                         Text(n.description,Type.subhead,c.ink)
-                        Text(when{own->"UNLOCKED";clearedStage<n.minStage->"LOCKED · STAGE ${n.minStage}";!canSpend->"PURCHASE IN SHOP";coins<price->"NOT ENOUGH COINS";else->"AVAILABLE"},if(!own&&clearedStage<n.minStage)Type.headline else Type.caption,if(own||ready)c.accent else if(clearedStage<n.minStage)c.coin else c.ink2)
-                        if(!own&&clearedStage<n.minStage)Text("Clear stage ${n.minStage} to unlock this skill. $clearedStage/${n.minStage} cleared.",Type.subhead,c.ink)
-                        if(!own){
-                            Row(verticalAlignment=Alignment.CenterVertically){Text("Cost",Type.footnote,c.ink2,Modifier.weight(1f));CoinAmount(price,style=Type.headline)}
+                        if(own)Text("UNLOCKED",Type.caption,c.accent)
+                        else{
+                            Text(if(clearedStage<n.minStage)"LOCKED · STAGE ${n.minStage}" else "Requirements",Type.subhead,if(clearedStage<n.minStage)c.coin else c.ink)
+                            PurchaseRequirement("Stage","$clearedStage / ${n.minStage}",clearedStage>=n.minStage)
+                            PurchaseRequirement("Coins","$coins / $price",coins>=price)
+                            PurchaseRequirement("Connected route",if(SkillGraph.connected(mask,n.id))"Reached" else "Unlock neighbor",SkillGraph.connected(mask,n.id))
+                            if(!canSpend)PurchaseRequirement("Shop access",if(backLabel=="Home")"In-run shop only" else "Finish reward / ready",false)
                             Text("Unlocking reveals connected nodes.",Type.footnote,c.ink2)
                         }
                         if(backLabel=="Home")Text("Preview only. Earn run coins to purchase skills.",Type.footnote,c.ink2)
